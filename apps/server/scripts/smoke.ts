@@ -34,7 +34,10 @@ for (let i = 0; i < SHIPS; i++) {
     tier: 1,
     upgrade: 0,
   });
-  mems.set(id, createBotMemory(hf, i + 1, map.launchDecks[i % 2 ? 'vex' : 'concord']));
+  mems.set(
+    id,
+    createBotMemory(hf, i + 1, map.launchDecks[i % 2 ? 'vex' : 'concord'], map.env.stallSpeed),
+  );
 }
 
 let total = 0,
