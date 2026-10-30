@@ -71,24 +71,6 @@ function Controls() {
         saveInputSettings();
       },
     },
-    deadzone: {
-      value: inputSettings.deadzone,
-      min: 0,
-      max: 0.3,
-      step: 0.01,
-      onChange: (v: number) => {
-        inputSettings.deadzone = v;
-        saveInputSettings();
-      },
-    },
-    recenter: {
-      value: inputSettings.recenter,
-      label: 'soft recentre',
-      onChange: (v: boolean) => {
-        inputSettings.recenter = v;
-        saveInputSettings();
-      },
-    },
   });
   const a = useSettings();
   useControls('Audio', {

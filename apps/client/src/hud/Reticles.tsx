@@ -11,7 +11,7 @@ import {
   type WeaponDef,
 } from '@skyriot/shared';
 import { world } from '../state/world';
-import { inputSettings, inputState } from '../input/input';
+import { inputState } from '../input/input';
 import { isGrounded } from './hudStore';
 import { project } from './view';
 import { Ammo } from './Ammo';
@@ -78,7 +78,7 @@ export function Reticles() {
   const crTag = useRef<HTMLSpanElement>(null);
   const crMax = useRef<HTMLSpanElement>(null);
   const noseEl = useRef<HTMLDivElement>(null);
-  const arrowEl = useRef<HTMLDivElement>(null);
+  const aimEl = useRef<HTMLDivElement>(null);
   const leadEl = useRef<HTMLDivElement>(null);
   const targetEl = useRef<HTMLDivElement>(null);
   const targetLabel = useRef<HTMLSpanElement>(null);
@@ -103,23 +103,13 @@ export function Reticles() {
       const W = window.innerWidth;
       const H = window.innerHeight;
       const own = world.ownId ? world.ships.get(world.ownId) : undefined;
-      // The crosshair is fixed at screen centre (the Ship's nose); the cursor only steers.
+      // The crosshair is fixed at screen centre (the Ship's nose); the aim point moves freely and the Ship follows.
       const cx = W / 2;
       const cy = H / 2;
-      const off = Math.hypot(world.cursor.x, world.cursor.y);
-      const dz = inputSettings.deadzone;
-      const arrow = arrowEl.current;
-      if (arrow) {
-        if (off <= dz) arrow.style.display = 'none';
-        else {
-          const mag = Math.min(1, (off - dz) / (1 - dz));
-          const dx = world.cursor.x / off;
-          const dy = -world.cursor.y / off;
-          const dist = 34 + mag * 46;
-          arrow.style.display = 'block';
-          arrow.style.opacity = String(0.25 + 0.75 * mag);
-          arrow.style.transform = `translate(${cx + dx * dist}px,${cy + dy * dist}px) rotate(${(Math.atan2(dy, dx) * 180) / Math.PI + 90}deg) scale(${0.7 + mag * 0.9})`;
-        }
+      const aimPt = aimEl.current;
+      if (aimPt) {
+        aimPt.style.display = own?.alive && !world.freeLook ? 'block' : 'none';
+        aimPt.style.transform = `translate(${cx + (world.cursor.x * W) / 2}px,${cy - (world.cursor.y * H) / 2}px)`;
       }
       if (!own || !own.alive) {
         place(cursorEl.current, cx, cy, true);
@@ -317,7 +307,7 @@ export function Reticles() {
       </div>
       <div className="lead" ref={leadEl} style={{ display: 'none' }} />
       <div className="nose" ref={noseEl} style={{ display: 'none' }} />
-      <div className="curs-arrow" ref={arrowEl} style={{ display: 'none' }} />
+      <div className="aim-pt" ref={aimEl} style={{ display: 'none' }} />
       <div className="cursor" ref={cursorEl}>
         <span className="cr-dist" ref={crDist} />
         <span className="cr-tag" ref={crTag} />

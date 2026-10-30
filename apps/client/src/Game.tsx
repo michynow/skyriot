@@ -19,7 +19,7 @@ import { PostFx } from './scene/PostFx';
 import { Hud } from './hud/Hud';
 import { addChatLine, addConsoleLine, handleHudEvent, useHud } from './hud/hudStore';
 import { view } from './hud/view';
-import { attachInput, inputState, sampleInput } from './input/input';
+import { attachInput, inputState, sampleInput, trackAim } from './input/input';
 import { connect, type Connection } from './net/connection';
 import { createInterpolator } from './net/interpolator';
 import { createPredictor } from './net/predictor';
@@ -70,11 +70,12 @@ function GameLoop() {
     setListener(camera.position, camera.quaternion);
     updateAudio();
 
+    trackAim(camera, world.ships.get(ownId));
     world.shake *= Math.exp(-delta / 0.15);
     state.acc = Math.min(state.acc + delta, 0.25);
     while (state.acc >= TICK_DT) {
       state.acc -= TICK_DT;
-      const input = sampleInput(++state.seq, interp.renderTick(), camera, world.ships.get(ownId));
+      const input = sampleInput(++state.seq, interp.renderTick(), world.ships.get(ownId));
       if (session.predictor) {
         try {
           session.predictor.applyLocal(input);
