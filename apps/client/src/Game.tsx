@@ -177,7 +177,7 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
     <>
       {status === 'playing' && map && (
         <>
-          <Canvas shadows dpr={QUALITY_DPR[quality]} camera={{ fov: 70, near: 0.5, far: 8000 }}>
+          <Canvas shadows="percentage" dpr={QUALITY_DPR[quality]} camera={{ fov: 70, near: 0.5, far: 8000 }}>
             <MapScene map={map} />
             <Ships />
             <ProjectilesFx />

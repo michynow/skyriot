@@ -105,7 +105,6 @@
 .fl { position: absolute; left: 0; top: 0; font: 800 24px 'Orbitron', sans-serif; margin: -12px 0 0 -10px; text-shadow: 0 0 5px #000, 0 0 2px #000; }
 .fl.shield { color: #6fd6ff; } .fl.hp { color: #ff9a4a; } .fl.defl { color: #aab; font-size: 13px; letter-spacing: .1em; }
 @keyframes rise { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-50px); opacity: 0; } }
-@media (max-width: 1300px) { .slot { width: 44px; height: 44px; } .skill-icon { width: 28px; height: 28px; } .status { width: 220px; } .radar { transform: scale(.7); transform-origin: bottom right; } }
 .gauge { position: absolute; left: 28px; top: 24px; width: 168px; height: 168px; background: radial-gradient(#06121fcc 55%, transparent 70%); }
 .gauge .g-num b { font-size: 26px; } .gauge .g-num span { font-size: 15px; }
 .gauge .taken { top: 100%; }
@@ -133,3 +132,7 @@
 .inc-arrow { position: absolute; left: 0; top: 0; width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 34px solid #ff3b3b; margin: -17px 0 0 -16px; filter: drop-shadow(0 0 8px #f00); animation: blink .25s infinite alternate; }
 .evaded { position: absolute; left: 50%; top: 30%; transform: translateX(-50%); font: 800 34px 'Orbitron', sans-serif; letter-spacing: .25em; color: #6fffa0; animation: dmgfade 1.4s forwards; }
 .status { bottom: 28px; }
+
+/* graceful scale-down: --hud-scale is set from the viewport size in Hud.tsx */
+.status, .gauge, .hotbar, .radar, .killfeed, .chat, .siege, .dock, .warn-lock, .incoming, .evaded, .oob { zoom: var(--hud-scale, 1); }
+.oob { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); white-space: nowrap; font: 800 30px 'Orbitron', sans-serif; letter-spacing: .15em; color: #ff3b3b; animation: blink .3s infinite alternate; text-shadow: 0 0 10px #f00; }

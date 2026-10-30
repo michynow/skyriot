@@ -57,6 +57,27 @@ export function Radar() {
         y: -(dx * fx + dz * fz) / range,
       });
 
+      // Map boundary as a dashed edge, clipped to the radar disc.
+      const half = (world.map?.size ?? 0) / 2;
+      if (half > 0) {
+        g.save();
+        g.beginPath();
+        g.arc(c, c, R, 0, Math.PI * 2);
+        g.clip();
+        g.strokeStyle = '#ff4d4d';
+        g.lineWidth = 3;
+        g.setLineDash([8, 6]);
+        g.beginPath();
+        [[-half, -half], [half, -half], [half, half], [-half, half]].forEach(([wx, wz], i) => {
+          const s = toScreen(wx! - own.pos[0], wz! - own.pos[2]);
+          if (i === 0) g.moveTo(c + s.x * R, c + s.y * R);
+          else g.lineTo(c + s.x * R, c + s.y * R);
+        });
+        g.closePath();
+        g.stroke();
+        g.restore();
+      }
+
       // Launch Deck icons for the own nation; bearing arrow at the edge when out of range.
       for (const deck of world.map?.launchDecks?.[own.nation] ?? []) {
         const s = toScreen(deck.pos[0] - own.pos[0], deck.pos[2] - own.pos[2]);

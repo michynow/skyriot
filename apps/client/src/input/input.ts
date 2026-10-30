@@ -142,7 +142,7 @@ export function attachInput(canvas: HTMLElement): () => void {
     if (isUi(e.target) || inputState.typing) return;
     if (!isLocked() && !lockFailed) {
       void Promise.resolve(canvas.requestPointerLock()).catch(() => (lockFailed = true));
-      return;
+      // the first click also fires
     }
     if (e.button === 0) fire1 = true;
     if (e.button === 2) fire2 = true;

@@ -20,6 +20,8 @@ export interface FrameModelProps {
 }
 
 // Shared flame geometry: base at origin, tip along +Z (behind the ship).
+const diamondGeo = new THREE.OctahedronGeometry(1, 0);
+const diamondMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.4, 2.0), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false });
 const flameGeo = new THREE.ConeGeometry(1, 1, 10, 1, true).translate(0, 0.5, 0).rotateX(Math.PI / 2);
 
 export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shipId }: FrameModelProps) {
@@ -31,10 +33,11 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
   const spinner = useRef<THREE.Group>(null);
   const legs = useRef<(THREE.Group | null)[]>([]);
   const fins = useRef<(THREE.Group | null)[]>([]);
+  const diamonds = useRef<(THREE.Mesh | null)[]>([]);
   const padFlames = useRef<(THREE.Group | null)[]>([]);
   const hull = useRef<THREE.Group>(null);
   const hover = useRef<THREE.Group>(null);
-  const st = useRef({ boost: 0, siege: sieged ? 1 : 0, ground: 0, leg: 0, fin: 0, t: Math.random() * 100 });
+  const st = useRef({ boost: 0, siege: sieged ? 1 : 0, ground: 0, leg: 0, fin: 0, kick: 0, was: false, t: Math.random() * 100 });
 
   useFrame((_, dt) => {
     const s = st.current;
@@ -63,12 +66,21 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
         g.scale.set(0.6 + s.fin * 0.3, 0.6 + s.fin * 0.3, len);
       }
     }
+    if (b && !s.was) s.kick = 1;
+    s.was = b;
+    s.kick = Math.max(0, s.kick - dt / 0.45);
     for (let i = 0; i < data.engines.length; i++) {
       const g = flames.current[i];
       if (!g) continue;
       const e = data.engines[i]!;
       const flick = 1 + 0.14 * Math.sin(s.t * 47 + i * 2.1) + 0.08 * Math.sin(s.t * 91 + i);
-      const len = (0.55 + s.boost * 2.6) * e.r * 4 * flick * (sg ? 0.35 : 1);
+      const len = (0.55 + s.boost * 3.4) * e.r * 4 * flick * (sg ? 0.35 : 1) * (1 + s.kick * 0.7);
+      const dm = diamonds.current[i];
+      if (dm) {
+        dm.visible = s.boost > 0.35;
+        dm.position.z = len * (0.38 + 0.04 * Math.sin(s.t * 60 + i));
+        dm.scale.set(e.r * 0.55, e.r * 0.55, e.r * (0.9 + 0.3 * Math.sin(s.t * 80 + i * 3)));
+      }
       g.scale.set(e.r * (1 + s.boost * 0.3), e.r * (1 + s.boost * 0.3), len);
     }
     const gr = !!(shipId && (world.ships.get(shipId) as { grounded?: boolean } | undefined)?.grounded);
@@ -151,6 +163,7 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
         <group key={i} position={e.pos} ref={(el) => void (flames.current[i] = el)}>
           <mesh geometry={flameGeo} material={flame.outer} renderOrder={5} />
           <mesh geometry={flameGeo} material={flame.inner} scale={[0.55, 0.55, 0.6]} renderOrder={6} />
+          <mesh ref={(el) => void (diamonds.current[i] = el)} geometry={diamondGeo} material={diamondMat} renderOrder={7} visible={false} />
         </group>
       ))}
     </group>

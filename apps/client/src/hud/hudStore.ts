@@ -57,6 +57,7 @@ export interface HudState {
   altitude: number;
   sieged: boolean;
   grounded: boolean;
+  outOfBounds: boolean;
   locked: boolean;
   respawnIn: number;
   rollCd: number;
@@ -107,6 +108,7 @@ export const useHud = create<HudState>(() => ({
   altitude: 0,
   sieged: false,
   grounded: false,
+  outOfBounds: false,
   locked: false,
   respawnIn: 0,
   rollCd: 0,
@@ -270,6 +272,7 @@ export function startHudFeed(): () => void {
         altitude: hf ? own.pos[1] - sampleHeight(hf, own.pos[0], own.pos[2]) : own.pos[1],
         sieged: own.sieged,
         grounded,
+        outOfBounds: (own as { outOfBounds?: boolean }).outOfBounds === true,
         locked,
         respawnIn: own.alive ? 0 : Math.min(RESPAWN_SEC, Math.max(0, (own.respawnAtTick - tick) / TICK_HZ)),
         rollCd: Math.min(1, own.rollCooldownTicks / Math.max(1, def.rollCooldownSec * TICK_HZ)),

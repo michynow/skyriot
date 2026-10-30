@@ -52,10 +52,10 @@ Skill kits are our own designs covering these roles (no 1:1 renames of any exist
 
 | Input | Action |
 |---|---|
-| Mouse | Aim cursor; ship steers toward it at Frame turn rate |
+| Mouse | Steers: ship turns toward the cursor at Frame turn rate. The **crosshair is fixed at screen centre (= Ship nose, where guns fire and missiles lock)**; a small arrow from centre shows the cursor direction |
 | W / S | Throttle up / down (stall floor on atmospheric maps) |
 | A / D | Strafe (visual bank) |
-| **Double-tap A / D** | **Barrel roll** — lateral burst, 0.25 s invulnerability, costs fuel, 3 s cooldown |
+| **Double-tap A / D** | **Barrel roll** — full 360° spin with a 25–35 m lateral displacement, 0.25 s invulnerability, costs fuel, 3 s cooldown. Not available while Grounded/Docked |
 | Q / E | Vertical strafe down / up |
 | Space | Booster (fuel, regenerates) |
 | Shift | Hover/brake (Bulwark: land when near ground) |
@@ -70,7 +70,7 @@ Close third-person chase camera with slight lag. Mouse steering is deliberately 
 
 ## 5. Combat
 
-- **Easy to hit, hard to master.** Ships are large relative to the map. Primary has **aim assist**: with a Target inside a small cone around the crosshair, rounds lead onto it. The crosshair advises when the Secondary is in range/lockable.
+- **Easy to hit, hard to master.** Ships are large relative to the map. Primary has **aim assist**: with a Target inside a small cone around the centre crosshair, rounds lead onto it. The crosshair advises when the Secondary is in range/lockable.
 - **Missile lock is relative to the Ship's nose**, not the cursor. Evading missiles is a skill: a well-timed Barrel Roll makes a close missile overshoot, terrain breaks line of sight and eats missiles, flares break locks.
 - Siege Mode is a hotbar Skill (`Siege Anchor`), not a dedicated key.
 - **All projectiles are real.** Primaries: fast tracer rounds (dodgeable at range by strafing). Secondaries: missiles, rockets, bombs — slower; homing missiles have a turn-rate limit and can be outflown.

@@ -159,14 +159,15 @@ export function Reticles() {
         const t = rx * aim[0] + ry * aim[1] + rz * aim[2];
         if (t <= 0) continue;
         const perp = Math.sqrt(Math.max(0, o.d * o.d - t * t));
-        if (perp < Math.max(FRAMES[o.s.frame].radius * 2.5, t * 0.03) && (underD === null || t < underD)) {
+        if (perp < Math.max(FRAMES[o.s.frame].radius * 2.5, t * Math.tan(AIM_ASSIST.coneRad)) && (underD === null || t < underD)) {
           underD = t;
           underEnemy = true;
         }
       }
       if (underD === null && world.heightfield) underD = terrainHit(world.heightfield, own.pos, aim, 3500);
 
-      const inRange = (underEnemy && underD! <= primRange) || targetD <= primRange;
+      // Only when the aim actually covers something in range: an enemy inside the aim-assist cone, or terrain.
+      const inRange = underD !== null && underD <= primRange;
       // Lock advice. The cone is measured from the Ship's nose, not the cursor.
       let secInRange = false;
       let lockRange = false;

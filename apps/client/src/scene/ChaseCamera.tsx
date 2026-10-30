@@ -10,7 +10,7 @@ import { MODEL_SCALE } from '../frames/models';
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 
 const BASE_FOV = 60;
-const BOOST_FOV = 16;
+const BOOST_FOV = -1.5; // boost narrows the view very slightly; never widens
 const POS_OMEGA = 9; // critically-damped spring angular frequency (1/s): higher = stiffer
 const ROT_RATE = 7;
 
@@ -38,6 +38,10 @@ export function ChaseCamera() {
       zoom: 1,
       shake: 0,
       fp: 0,
+      anc: new THREE.Vector3(),
+      sp: new THREE.Vector3(),
+      fwd: new THREE.Vector3(),
+      ancInit: false,
       fpPos: new THREE.Vector3(),
       qf: new THREE.Quaternion(),
       qsh: new THREE.Quaternion(),
@@ -88,12 +92,20 @@ export function ChaseCamera() {
     st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(height, dist + AIM_DISTANCE));
     st.tmp.set(ship.pos[0], ship.pos[1], ship.pos[2]).add(st.off);
 
+    // Anchor springs toward the ship (soft lateral/vertical sway), but its error ALONG the ship's forward
+    // axis is removed every frame, so acceleration/boost never stretches the camera distance.
+    st.sp.set(ship.pos[0], ship.pos[1], ship.pos[2]);
+    if (!st.ancInit) { st.anc.copy(st.sp); st.ancInit = true; }
     for (let i = 0; i < 3; i++) {
       const key = (['x', 'y', 'z'] as const)[i]!;
-      spring(st.pos[key], st.vel[key], st.tmp[key], POS_OMEGA, dt, st.out);
-      st.pos[key] = st.out[0];
+      spring(st.anc[key], st.vel[key], st.sp[key], POS_OMEGA, dt, st.out);
+      st.anc[key] = st.out[0];
       st.vel[key] = st.out[1];
     }
+    st.fwd.set(0, 0, -1).applyQuaternion(st.qsh.set(ship.rot[0], ship.rot[1], ship.rot[2], ship.rot[3]));
+    st.anc.addScaledVector(st.fwd, st.sp.sub(st.anc).dot(st.fwd));
+    st.vel.addScaledVector(st.fwd, -st.vel.dot(st.fwd));
+    st.pos.copy(st.anc).add(st.off);
 
     // never clip into terrain
     const hf = world.heightfield;

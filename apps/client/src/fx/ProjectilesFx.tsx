@@ -9,6 +9,7 @@ import { ParticlePool, SpriteBatch } from './sprites';
 
 // ---- tuning -------------------------------------------------------------------------------
 const MAX_PROJ = 512;
+const PS = 16; // projectile float stride
 const MAX_DEBRIS = 320;
 const MAX_BUBBLES = 24;
 const MAX_ROLLS = 16;
@@ -31,14 +32,16 @@ class Projectiles {
   n = 0;
   id = new Int32Array(MAX_PROJ);
   kind = new Uint8Array(MAX_PROJ);
-  /** pos(3) vel(3) col(3) misc: range-left / lifetime, emitAcc, splash, turnRate */
-  f = new Float32Array(MAX_PROJ * 13);
+  /** pos(3) vel(3) col(3) | range-left or lifetime, emitAcc, splash, turnRate, age, wobble seed, ember acc */
+  f = new Float32Array(MAX_PROJ * PS);
+  /** 0 sting missile, 1 seeker pod (plasma orb), 2 heavy (bomb / mortar) */
+  style = new Uint8Array(MAX_PROJ);
   target: (ShipId | null)[] = new Array(MAX_PROJ).fill(null);
   evaded = new Uint8Array(MAX_PROJ);
 
   add(e: Extract<SimEvent, { type: 'projectileSpawned' }>, col: RGB) {
     if (this.n >= MAX_PROJ) return;
-    const i = this.n++, o = i * 13, f = this.f;
+    const i = this.n++, o = i * PS, f = this.f;
     const w = WEAPONS[e.weapon];
     this.id[i] = e.id;
     this.kind[i] = KIND_ID[e.kind];
@@ -51,6 +54,8 @@ class Projectiles {
     f[o + 12] = w?.homingTurnRate ?? 0;
     this.target[i] = e.target;
     this.evaded[i] = 0;
+    f[o + 13] = 0; f[o + 14] = rnd() * 6.28; f[o + 15] = 0;
+    this.style[i] = e.weapon === 'seeker-pod' ? 1 : e.kind === 'rocket' || e.kind === 'shell' ? 2 : 0;
   }
   find(id: number) {
     for (let i = 0; i < this.n; i++) if (this.id[i] === id) return i;
@@ -59,8 +64,8 @@ class Projectiles {
   remove(i: number) {
     const l = --this.n;
     if (i !== l) {
-      this.id[i] = this.id[l]!; this.kind[i] = this.kind[l]!; this.evaded[i] = this.evaded[l]!; this.target[i] = this.target[l]!;
-      for (let k = 0; k < 13; k++) this.f[i * 13 + k] = this.f[l * 13 + k]!;
+      this.id[i] = this.id[l]!; this.kind[i] = this.kind[l]!; this.evaded[i] = this.evaded[l]!; this.style[i] = this.style[l]!; this.target[i] = this.target[l]!;
+      for (let k = 0; k < PS; k++) this.f[i * PS + k] = this.f[l * PS + k]!;
     }
     this.target[l] = null;
   }
@@ -75,7 +80,7 @@ export function ProjectilesFx() {
   (window as unknown as { __fx: unknown }).__fx = fx;
 
   useEffect(() => {
-    const objs = [fx.additive.mesh, fx.smoke.mesh, fx.streaks.mesh, fx.bodies, fx.debris, fx.bubbles];
+    const objs = [fx.additive.mesh, fx.smoke.mesh, fx.streaks.mesh, fx.rings.mesh, fx.ringsFlat.mesh, fx.boomLight, fx.bodies, fx.debris, fx.bubbles];
     objs.forEach((o) => scene.add(o));
     return () => objs.forEach((o) => scene.remove(o));
   }, [scene, fx]);
@@ -83,6 +88,7 @@ export function ProjectilesFx() {
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
     fx.time += dt;
+    fx.camPos.copy(camera.position);
     handleEvents(fx, dt);
     updateProjectiles(fx, dt);
     updateDebris(fx, dt);
@@ -90,9 +96,15 @@ export function ProjectilesFx() {
     updateShipFx(fx, dt, camera.position);
     fx.glow.update(dt, fx.additive);
     fx.puffs.update(dt, fx.smoke);
+    fx.ringP.update(dt, fx.rings);
+    fx.ringFlatP.update(dt, fx.ringsFlat);
+    fx.boomLight.intensity *= Math.exp(-9 * dt);
+    if (fx.boomLight.intensity < 0.05) fx.boomLight.intensity = 0;
     fx.additive.flush();
     fx.smoke.flush();
     fx.streaks.flush();
+    fx.rings.flush();
+    fx.ringsFlat.flush();
   });
   return null;
 }
@@ -101,10 +113,15 @@ type Fx = ReturnType<typeof makeFx>;
 
 function makeFx() {
     const additive = new SpriteBatch(26000, true); // glow, sparks, fire, trails
-    const smoke = new SpriteBatch(3500, false);
+    const smoke = new SpriteBatch(9000, false);
+    const rings = new SpriteBatch(400, true, 'ring');
+    const ringsFlat = new SpriteBatch(200, true, 'ringFlat');
+    const ringP = new ParticlePool(400);
+    const ringFlatP = new ParticlePool(200);
+    const boomLight = new THREE.PointLight('#ffa050', 0, 160, 2);
     const streaks = new SpriteBatch(1100, true); // tracer streaks
     const glow = new ParticlePool(24000);
-    const puffs = new ParticlePool(3000);
+    const puffs = new ParticlePool(9000);
 
     // missile / rocket / shell bodies
     const body = new THREE.CylinderGeometry(0.1, 0.12, 1.1, 8).rotateX(Math.PI / 2);
@@ -150,7 +167,7 @@ function makeFx() {
     bubbles.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_BUBBLES * 3), 3);
 
     return {
-      additive, smoke, streaks, glow, puffs, bodies, debris, bubbles,
+      additive, smoke, streaks, glow, puffs, rings, ringsFlat, ringP, ringFlatP, boomLight, bodies, debris, bubbles,
       proj: new Projectiles(),
       // debris state
       dN: 0,
@@ -172,6 +189,9 @@ function makeFx() {
       fwd: new THREE.Vector3(0, 0, -1),
       c: new THREE.Color(),
       time: 0,
+      camPos: new THREE.Vector3(),
+      cu: new THREE.Vector3(),
+      cw: new THREE.Vector3(),
       boomT: new Map<ShipId, number>(),
     };
 }
@@ -201,9 +221,10 @@ function handleEvents(fx: Fx, _dt: number) {
       if (i >= 0) {
         fx.proj.evaded[i] = 1;
         fx.proj.target[i] = null; // stops homing: it overshoots
-        const p: [number, number, number] = loose.pos ?? [fx.proj.f[i * 13]!, fx.proj.f[i * 13 + 1]!, fx.proj.f[i * 13 + 2]!];
-        sparks(fx, p, 18, false);
-        fx.glow.emit(p[0], p[1], p[2], 0, 0, 0, 0.25, 6, 1, 1.4, 2.2, 3, 0.9);
+        const p: [number, number, number] = loose.pos ?? [fx.proj.f[i * PS]!, fx.proj.f[i * PS + 1]!, fx.proj.f[i * PS + 2]!];
+        sparks(fx, p, 40, false);
+        fx.glow.emit(p[0], p[1], p[2], 0, 0, 0, 0.3, 8, 1, 1.4, 2.2, 3, 0.9);
+        fx.ringP.emit(p[0], p[1], p[2], 0, 0, 0, 0.5, 2, 18, 1.2, 2.0, 3.0, 0.9);
       }
       continue;
     }
@@ -220,19 +241,19 @@ function handleEvents(fx: Fx, _dt: number) {
         const i = fx.proj.find(e.id);
         if (i >= 0) {
           const k = fx.proj.kind[i]!;
-          const splash = fx.proj.f[i * 13 + 11]!;
+          const splash = fx.proj.f[i * PS + 11]!;
           fx.proj.remove(i);
-          if (k === 1 || k === 2 || k === 3) explosion(fx, e.pos, Math.max(0.5, splash / 8), false);
+          if (k === 1 || k === 2 || k === 3) explosion(fx, e.pos, Math.max(0.5, splash / 8) * (k > 1 ? 1.7 : 1), false, undefined, k > 1);
         }
         break;
       }
       case 'hit': {
         const i = fx.proj.find(e.projectile);
         let splash = 0, k = 0;
-        if (i >= 0) { splash = fx.proj.f[i * 13 + 11]!; k = fx.proj.kind[i]!; fx.proj.remove(i); }
+        if (i >= 0) { splash = fx.proj.f[i * PS + 11]!; k = fx.proj.kind[i]!; fx.proj.remove(i); }
         const victim = world.ships.get(e.victim);
         sparks(fx, e.pos, e.deflected ? 12 : 8, e.deflected);
-        if (k === 1 || k === 2 || k === 3) explosion(fx, e.pos, Math.max(0.5, splash / 8), false);
+        if (k === 1 || k === 2 || k === 3) explosion(fx, e.pos, Math.max(0.5, splash / 8) * (k > 1 ? 1.7 : 1), false, undefined, k > 1);
         if (victim && (e.deflected || victim.shield > 0)) {
           const col = e.deflected ? ([1.6, 1.8, 2.4] as RGB) : ACCENT[victim.nation];
           bubble(fx, e.victim, col, e.deflected ? 0.6 : 1);
@@ -328,8 +349,9 @@ function dust(fx: Fx, p: [number, number, number], k: number) {
   for (let i = 0; i < 6; i++) spawnDebris(fx, p, [0.4, 0.26, 0.16], rr(8, 30), 0.5 + rnd() * 0.7);
 }
 
-function explosion(fx: Fx, p: [number, number, number], k: number, big: boolean, nation?: NationId) {
+function explosion(fx: Fx, p: [number, number, number], k: number, big: boolean, nation?: NationId, heavy = false) {
   const [x, y, z] = p;
+  shockwave(fx, p, k, heavy);
   fx.glow.emit(x, y, z, 0, 0, 0, 0.14, 10 * k, 22 * k, 3, 2.3, 1.4, 1);
   const n = big ? 26 : 12;
   for (let i = 0; i < n; i++) {
@@ -355,6 +377,35 @@ function explosion(fx: Fx, p: [number, number, number], k: number, big: boolean,
       fx.c.set(cols[i % cols.length]!);
       spawnDebris(fx, p, [fx.c.r, fx.c.g, fx.c.b], rr(10, 55) * Math.min(1.5, k), rr(0.5, 1.6) * Math.min(1.8, k));
     }
+  }
+}
+
+/** Billboard shock ring, flat ground ring near terrain, point-light flash, lingering smoke, and shake for heavy booms. */
+function shockwave(fx: Fx, p: [number, number, number], k: number, heavy: boolean) {
+  const [x, y, z] = p;
+  fx.ringP.emit(x, y, z, 0, 0, 0, heavy ? 0.7 : 0.45, 2 * k, (heavy ? 44 : 28) * k, 2.4, 1.7, 1.0, 0.9, 0, 0, 0.5, 0.25, 0.12);
+  const hf = world.heightfield;
+  if (hf) {
+    const gy = sampleHeight(hf, x, z);
+    if (y - gy < 45 * k) {
+      fx.ringFlatP.emit(x, gy + 0.8, z, 0, 0, 0, heavy ? 0.9 : 0.6, 3 * k, (heavy ? 60 : 36) * k, 2.0, 1.5, 1.0, 0.8, 0, 0, 0.4, 0.22, 0.12);
+      for (let i = 0; i < (heavy ? 14 : 8); i++) {
+        const a = rnd() * 6.28, sp = rr(8, 26) * k;
+        fx.puffs.emit(x, gy + 1, z, Math.cos(a) * sp, rr(1, 4), Math.sin(a) * sp, rr(1.6, 2.8), 3 * k, 12 * k, 0.6, 0.45, 0.32, 0.45, 1.2, -0.3);
+      }
+    }
+  }
+  for (let i = 0; i < (heavy ? 14 : 6); i++) {
+    const dx = rnd() - 0.5, dy = rnd() - 0.2, dz = rnd() - 0.5;
+    const l = (1 / Math.hypot(dx, dy, dz)) * rr(1, 5) * k;
+    fx.puffs.emit(x, y, z, dx * l, dy * l, dz * l, rr(2.5, heavy ? 5 : 4), 5 * k, 20 * k, 0.5, 0.45, 0.42, 0.55, 0.9, -0.5, 0.26, 0.25, 0.25);
+  }
+  fx.boomLight.position.set(x, y, z);
+  fx.boomLight.intensity = Math.max(fx.boomLight.intensity, 1400 * Math.min(k, 3));
+  if (heavy) {
+    const d = Math.hypot(x - fx.camPos.x, y - fx.camPos.y, z - fx.camPos.z);
+    const w = world as unknown as { shake?: number };
+    if (d < 400) w.shake = Math.max(w.shake ?? 0, 0.6 * (1 - d / 400));
   }
 }
 
@@ -387,9 +438,11 @@ function updateProjectiles(fx: Fx, dt: number) {
   const P = fx.proj, f = P.f, hf = world.heightfield;
   let bodyN = 0;
   for (let i = 0; i < P.n; ) {
-    const o = i * 13, k = P.kind[i]!;
+    const o = i * PS, k = P.kind[i]!, style = P.style[i]!;
+    f[o + 13]! += dt;
+    const age = f[o + 13]!;
     let dead = false;
-    if (k === 1) {
+    if (k === 1 && age > 0.15) {
       // missile homing: steer velocity direction toward the target, capped turn rate
       const tgt = P.target[i] ? world.ships.get(P.target[i]!) : undefined;
       if (tgt && tgt.alive) {
@@ -406,7 +459,6 @@ function updateProjectiles(fx: Fx, dt: number) {
       }
     }
     if (k === 4) {
-      // flare: decelerate, fall
       const d = Math.max(0, 1 - 1.6 * dt);
       f[o + 3]! *= d; f[o + 5]! *= d; f[o + 4] = f[o + 4]! * d - 16 * dt;
       f[o + 9]! -= dt;
@@ -422,58 +474,131 @@ function updateProjectiles(fx: Fx, dt: number) {
       dead = true;
       const pos: [number, number, number] = [f[o]!, f[o + 1]!, f[o + 2]!];
       if (k === 0) sparks(fx, pos, 4, false);
-      else if (k !== 4) { explosion(fx, pos, Math.max(0.6, f[o + 11]! / 8), false); dust(fx, pos, 0.8); }
+      else if (k !== 4) { explosion(fx, pos, Math.max(0.6, f[o + 11]! / 8) * (style === 2 ? 1.7 : 1), false, undefined, style === 2); dust(fx, pos, 0.8); }
     }
     if (dead) { P.remove(i); continue; }
 
-    const x = f[o]!, y = f[o + 1]!, z = f[o + 2]!;
+    let x = f[o]!, y = f[o + 1]!, z = f[o + 2]!;
     const vx = f[o + 3]!, vy = f[o + 4]!, vz = f[o + 5]!;
     const sp = Math.hypot(vx, vy, vz) || 1;
+    const dx = vx / sp, dy = vy / sp, dz = vz / sp;
     const r = f[o + 6]!, g = f[o + 7]!, b = f[o + 8]!;
     if (k === 0) {
       const len = Math.min(26, Math.max(7, sp * 0.03));
       const s = len / sp;
       fx.streaks.push(x, y, z, 0.5, r * 0.8, g * 0.8, b * 0.8, 0.75, vx * s, vy * s, vz * s);
       fx.streaks.push(x, y, z, 0.14, 1.8, 1.8, 1.8, 0.9, vx * s * 0.7, vy * s * 0.7, vz * s * 0.7);
-    } else if (k === 4) {
+      i++;
+      continue;
+    }
+    if (k === 4) {
+      // flare: blazing core and an arcing hot trail
       const fl = 0.8 + 0.4 * Math.sin(f[o + 9]! * 40 + i);
-      fx.additive.push(x, y, z, 2.2 * fl, 3, 2.2, 1.2, 1);
-      fx.additive.push(x, y, z, 6 * fl, 1.4, 0.9, 0.4, 0.5);
+      fx.additive.push(x, y, z, 2.8 * fl, 3.5, 2.6, 1.4, 1);
+      fx.additive.push(x, y, z, 9 * fl, 1.6, 1.0, 0.45, 0.55);
       f[o + 10]! += dt;
-      while (f[o + 10]! > 0.04) {
-        f[o + 10]! -= 0.04;
-        fx.puffs.emit(x, y, z, rr(-1, 1), rr(-1, 1), rr(-1, 1), 1.6, 0.8, 3.5, 0.9, 0.85, 0.8, 0.35, 0.8, -0.5);
+      while (f[o + 10]! > 0.012) {
+        f[o + 10]! -= 0.012;
+        fx.glow.emit(x, y, z, rr(-1, 1), rr(0, 2), rr(-1, 1), 0.55, 1.5, 0.2, 3, 2.4, 1.4, 0.9, 1, 4, 1.3, 0.3, 0.05);
       }
-    } else {
-      // missile / rocket / shell: body + hot tail + smoke
-      const big = k === 2 ? 1.7 : k === 3 ? 1.35 : 1;
-      const s = (big * 6) / sp;
-      fx.streaks.push(x, y, z, 0.5 * big, 2.4, 1.3, 0.4, 0.9, vx * s, vy * s, vz * s);
-      fx.additive.push(x - (vx / sp) * 0.8, y - (vy / sp) * 0.8, z - (vz / sp) * 0.8, 1.6 * big, 3, 1.8, 0.7, 1);
-      // blinking beacon so a target can spot incoming missiles; brighter and bigger when it is chasing the own ship
-      const mine = k === 1 && !!P.target[i] && P.target[i] === world.ownId;
-      if (k === 1) {
-        const blink = Math.sin(fx.time * (mine ? 16 : 9) + i) > 0.2 ? 1 : 0.15;
-        fx.additive.push(x, y + 0.4, z, (mine ? 7 : 3.5) * blink, 3.5, 0.25, 0.2, 0.9 * blink);
-        if (P.evaded[i]) fx.glow.emit(x, y, z, rr(-8, 8), rr(-8, 8), rr(-8, 8), 0.4, 0.5, 0.1, 3, 1.8, 0.5, 1, 1, 12);
+      f[o + 15]! += dt;
+      while (f[o + 15]! > 0.05) {
+        f[o + 15]! -= 0.05;
+        fx.puffs.emit(x, y, z, rr(-1, 1), rr(-1, 1), rr(-1, 1), 2.2, 1, 4, 0.95, 0.9, 0.85, 0.4, 0.8, -0.4, 0.4, 0.38, 0.37);
       }
-      f[o + 10]! += dt;
-      const step = mine ? 0.008 : 0.012;
-      while (f[o + 10]! > step) {
-        f[o + 10]! -= step;
-        const back = f[o + 10]! * sp;
-        fx.puffs.emit(x - (vx / sp) * (0.9 + back), y - (vy / sp) * (0.9 + back), z - (vz / sp) * (0.9 + back),
-          rr(-1.5, 1.5), rr(-1.5, 1.5), rr(-1.5, 1.5), rr(1.6, 2.8), 1.1 * big, 5.4 * big * (mine ? 1.4 : 1), 0.95, 0.92, 0.88, mine ? 0.7 : 0.55, 0.4, -0.3);
+      i++;
+      continue;
+    }
+
+    // missile / rocket / shell: perpendicular basis for spiral + wobble
+    let ux = dz, uy = 0, uz = -dx;
+    let ul = Math.hypot(ux, uz);
+    if (ul < 0.05) { ux = 0; uy = dz; uz = -dy; ul = Math.hypot(uy, uz) || 1; }
+    ux /= ul; uy /= ul; uz /= ul;
+    const wx = dy * uz - dz * uy, wy = dz * ux - dx * uz, wz = dx * uy - dy * ux;
+    // visual-only snake that decays to zero at impact
+    let wob = 0;
+    if (k === 1) {
+      const tgt = P.target[i] ? world.ships.get(P.target[i]!) : undefined;
+      const dist = tgt ? Math.hypot(tgt.pos[0] - x, tgt.pos[1] - y, tgt.pos[2] - z) : 250;
+      wob = 2.4 * Math.min(1, dist / 220) * Math.min(1, age / 0.6);
+    }
+    const sa = Math.sin(age * 6.3 + f[o + 14]!) * wob, ca = Math.cos(age * 5.1 + f[o + 14]! * 1.7) * wob;
+    x += ux * sa + wx * ca; y += uy * sa + wy * ca; z += uz * sa + wz * ca;
+    const dropping = (k === 1 || k === 2) && age < 0.15;
+    if (dropping) y -= age * 14;
+    const big = k === 2 ? 1.7 : k === 3 ? 1.35 : 1;
+    const mine = k === 1 && !!P.target[i] && P.target[i] === world.ownId;
+
+    if (!dropping) {
+      if (age - dt < 0.15 && (k === 1 || k === 2)) {
+        // ignition: flash + smoke puff
+        fx.glow.emit(x, y, z, 0, 0, 0, 0.18, 7 * big, 1, 3, 2.2, 1.2, 1);
+        for (let n = 0; n < 8; n++) fx.puffs.emit(x, y, z, rr(-4, 4), rr(-3, 3), rr(-4, 4), rr(1.4, 2.2), 1.5, 6, 0.95, 0.9, 0.85, 0.6, 1, -0.2, 0.4, 0.38, 0.37);
       }
-      if (bodyN < 160) {
-        const O = fx.o;
-        O.position.set(x, y, z);
-        fx.v.set(vx / sp, vy / sp, vz / sp);
-        O.quaternion.setFromUnitVectors(fx.fwd, fx.v);
-        O.scale.set(big, big, big * (k === 3 ? 0.8 : 1));
-        O.updateMatrix();
-        fx.bodies.setMatrixAt(bodyN++, O.matrix);
+      if (style === 1) {
+        // seeker pod: cyan plasma orb with a double-helix ribbon trail
+        const fl = 0.85 + 0.3 * rnd();
+        fx.additive.push(x, y, z, 1.5 * fl, 2.6, 3.2, 3.6, 1);
+        fx.additive.push(x, y, z, 5 * fl, 0.25, 1.3, 2.2, 0.75);
+        f[o + 10]! += dt;
+        let n = 0;
+        while (f[o + 10]! > 0.006) {
+          f[o + 10]! -= 0.006;
+          const back = f[o + 10]! * sp, ph = age * 26 - n++ * 0.4;
+          const c1 = Math.cos(ph) * 0.55, s1 = Math.sin(ph) * 0.55;
+          for (const sgn of [1, -1]) {
+            fx.glow.emit(x - dx * back + (ux * c1 + wx * s1) * sgn, y - dy * back + (uy * c1 + wy * s1) * sgn, z - dz * back + (uz * c1 + wz * s1) * sgn,
+              0, 0, 0, 0.55, 1.0, 0.1, 0.7, 2.2, 3.2, 0.7, 0, 0, 0.1, 0.4, 1.4);
+          }
+        }
+      } else {
+        // exhaust core: flickering white-hot centre inside an orange sheath
+        const t = (mine ? 1.3 : 1) * big;
+        fx.additive.push(x - dx * 0.8, y - dy * 0.8, z - dz * 0.8, 1.3 * t * (0.7 + 0.6 * rnd()), 3.5, 3, 1.8, 1);
+        fx.additive.push(x - dx * 1.2, y - dy * 1.2, z - dz * 1.2, 3.4 * t * (0.8 + 0.4 * rnd()), 2.4, 0.9, 0.2, 0.55);
+        const sc = (big * 6) / sp;
+        fx.streaks.push(x, y, z, 0.5 * big, 2.4, 1.3, 0.4, 0.9, vx * sc, vy * sc, vz * sc);
+        f[o + 10]! += dt;
+        const step = mine ? 0.007 : 0.011;
+        let n = 0;
+        while (f[o + 10]! > step) {
+          f[o + 10]! -= step;
+          const back = 0.9 + f[o + 10]! * sp;
+          const ph = age * 22 - n++ * 0.55, rad = (style === 2 ? 0.35 : 0.65) * big;
+          const c1 = Math.cos(ph) * rad, s1 = Math.sin(ph) * rad;
+          const px = x - dx * back + ux * c1 + wx * s1, py = y - dy * back + uy * c1 + wy * s1, pz = z - dz * back + uz * c1 + wz * s1;
+          // lingering smoke: pale -> grey, curls via the spiral spawn offset
+          fx.puffs.emit(px, py, pz, rr(-1.2, 1.2), rr(-1.2, 1.2), rr(-1.2, 1.2), rr(2.0, 3.6), 1.1 * big, 5.6 * big * (mine ? 1.4 : 1),
+            0.97, 0.92, 0.86, mine ? 0.72 : 0.55, 0.4, -0.3, 0.38, 0.36, 0.35);
+          // hot flame core: white -> orange
+          fx.glow.emit(px, py, pz, 0, 0, 0, 0.32, 1.3 * big, 0.3, 3, 2.3, 1.3, 0.75, 0, 0, 1.3, 0.35, 0.05);
+        }
+        // bright sparkle embers shed from the trail
+        f[o + 15]! += dt;
+        while (f[o + 15]! > 0.03) {
+          f[o + 15]! -= 0.03;
+          fx.glow.emit(x - dx * 1.5, y - dy * 1.5, z - dz * 1.5, rr(-5, 5), rr(-3, 6), rr(-5, 5), rr(0.6, 1.3), 0.4, 0.1, 3, 2.2, 0.8, 1, 0.6, 9);
+        }
       }
+    }
+    if (k === 1) {
+      // blinking beacon so a target can spot incoming missiles
+      const blink = Math.sin(fx.time * (mine ? 16 : 9) + i) > 0.2 ? 1 : 0.15;
+      if (!dropping) fx.additive.push(x, y + 0.4, z, (mine ? 7 : 3.5) * blink, 3.5, 0.25, 0.2, 0.9 * blink);
+      if (P.evaded[i]) {
+        for (let n = 0; n < 3; n++) fx.glow.emit(x, y, z, rr(-10, 10), rr(-10, 10), rr(-10, 10), rr(0.5, 1.1), 0.7, 0.1, 3, 1.6, 0.4, 1, 1, 12);
+        fx.additive.push(x, y, z, 6, 3, 1.2, 0.3, 0.8);
+      }
+    }
+    if (style !== 1 && bodyN < 160) {
+      const O = fx.o;
+      O.position.set(x, y, z);
+      fx.v.set(dx, dy, dz);
+      O.quaternion.setFromUnitVectors(fx.fwd, fx.v);
+      O.scale.set(big, big, big * (k === 3 ? 0.8 : 1));
+      O.updateMatrix();
+      fx.bodies.setMatrixAt(bodyN++, O.matrix);
     }
     i++;
   }
@@ -589,6 +714,7 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
             const u = k / (n + 1);
             const life = boost ? 0.65 : 0.4;
             const sz = e.r * MODEL_SCALE * (boost ? 3.4 : 2.4);
+            if (boost && k % 3 === 0) fx.puffs.emit(t.x + mx * u, t.y + my * u, t.z + mz * u, rr(-1, 1), rr(0.5, 2), rr(-1, 1), 0.7, sz * 1.5, sz * 5, 1.0, 0.85, 0.65, 0.05, 0.6);
             if (boost) fx.glow.emit(t.x + mx * u, t.y + my * u, t.z + mz * u, 0, 0, 0, life, sz, sz * 0.25, 2.6, 1.7, 0.8, 0.14);
             else fx.glow.emit(t.x + mx * u, t.y + my * u, t.z + mz * u, 0, 0, 0, life, sz, sz * 0.3, ar * 1.3, ag * 1.3, ab * 1.3, 0.16);
           }

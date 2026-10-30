@@ -20,7 +20,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     verticalSpeed: 40,
     fuelBurnPerSec: 0.22,
     fuelRegenPerSec: 0.12,
-    rollImpulse: 70,
+    rollImpulse: 120,
     rollInvulnSec: 0.25,
     rollCooldownSec: 3,
     rollFuelCost: 0.12,
@@ -64,7 +64,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     verticalSpeed: 22,
     fuelBurnPerSec: 0.18,
     fuelRegenPerSec: 0.1,
-    rollImpulse: 40,
+    rollImpulse: 75,
     rollInvulnSec: 0.25,
     rollCooldownSec: 4,
     rollFuelCost: 0.18,
@@ -108,7 +108,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     verticalSpeed: 34,
     fuelBurnPerSec: 0.2,
     fuelRegenPerSec: 0.12,
-    rollImpulse: 55,
+    rollImpulse: 100,
     rollInvulnSec: 0.25,
     rollCooldownSec: 3,
     rollFuelCost: 0.14,
@@ -152,7 +152,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     verticalSpeed: 18,
     fuelBurnPerSec: 0.2,
     fuelRegenPerSec: 0.1,
-    rollImpulse: 35,
+    rollImpulse: 65,
     rollInvulnSec: 0.25,
     rollCooldownSec: 4,
     rollFuelCost: 0.2,
@@ -198,10 +198,10 @@ export const DECK = { dockMaxSpeed: 30, resupplySec: 2, launchSpeed: 60 };
 export const RESPAWN_SEC = 5;
 
 /**
- * Primary aim assist: if the selected Target is within `coneRad` of the aim direction and in range,
+ * Primary aim assist: if the selected Target is within `coneRad` of the Ship nose (centre crosshair) and in range,
  * Primary rounds are fired at the Target's lead point instead of straight down the aim line.
  */
-export const AIM_ASSIST = { coneRad: 0.12, spreadMul: 0.5 };
+export const AIM_ASSIST = { coneRad: 0.2, spreadMul: 0.5 };
 
 /**
  * Missile evasion (the skill curve):

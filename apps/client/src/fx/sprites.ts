@@ -9,6 +9,10 @@ void main(){
   vec4 mv0 = modelViewMatrix * vec4(iA.xyz, 1.0);
   vUv = position.xy; vC = iC;
   vec4 mv;
+#ifdef RING_FLAT
+  vStreak = 0.0;
+  mv = modelViewMatrix * vec4(iA.xyz + vec3(position.x, 0.0, position.y) * iA.w, 1.0);
+#else
   if (dot(iB.xyz, iB.xyz) > 1e-6) {
     vec4 mv1 = modelViewMatrix * vec4(iA.xyz - iB.xyz, 1.0);
     vec2 d = mv1.xy - mv0.xy; float dl = length(d);
@@ -19,6 +23,7 @@ void main(){
   } else {
     mv = mv0; mv.xy += position.xy * iA.w; vStreak = 0.0;
   }
+#endif
   gl_Position = projectionMatrix * mv;
 }`;
 
@@ -31,7 +36,12 @@ void main(){
     float t = vUv.x * 0.5 + 0.5;               // 0 head -> 1 tail
     a = pow(1.0 - abs(vUv.y), 2.0) * pow(1.0 - t, 1.4) * smoothstep(0.0, 0.06, t);
   } else {
+#if defined(RING) || defined(RING_FLAT)
+    float l = length(vUv);
+    a = smoothstep(0.62, 0.86, l) * smoothstep(1.0, 0.9, l);
+#else
     a = pow(smoothstep(1.0, 0.0, length(vUv)), uPow);
+#endif
   }
   a *= vC.a;
   if (a < 0.003) discard;
@@ -67,7 +77,7 @@ export class SpriteBatch {
   private C: Float32Array;
   private geo: THREE.InstancedBufferGeometry;
 
-  constructor(readonly cap: number, additive: boolean) {
+  constructor(readonly cap: number, additive: boolean, mode: 'glow' | 'ring' | 'ringFlat' = 'glow') {
     this.geo = quadGeo(cap);
     this.A = (this.geo.getAttribute('iA') as THREE.BufferAttribute).array as Float32Array;
     this.B = (this.geo.getAttribute('iB') as THREE.BufferAttribute).array as Float32Array;
@@ -76,6 +86,7 @@ export class SpriteBatch {
       vertexShader: vert,
       fragmentShader: frag,
       uniforms: { uPow: { value: additive ? 2 : 1 } },
+      defines: mode === 'ring' ? { RING: '' } : mode === 'ringFlat' ? { RING_FLAT: '' } : {},
       transparent: true,
       depthWrite: false,
       blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
@@ -101,7 +112,7 @@ export class SpriteBatch {
   }
 }
 
-const S = 16;
+const S = 19;
 /** Fixed-capacity particle pool (swap-remove, struct-of-arrays), drawn into a SpriteBatch. No per-frame allocation. */
 export class ParticlePool {
   private d: Float32Array;
@@ -112,12 +123,14 @@ export class ParticlePool {
 
   /** Emit one particle. `grav` > 0 pulls down, < 0 rises. Alpha fades out over life; size lerps s0 -> s1. */
   emit(x: number, y: number, z: number, vx: number, vy: number, vz: number, life: number,
-    s0: number, s1: number, r: number, g: number, b: number, a: number, drag = 0, grav = 0) {
+    s0: number, s1: number, r: number, g: number, b: number, a: number, drag = 0, grav = 0,
+    er = r, eg = g, eb = b) {
     if (this.n >= this.cap) return;
     const o = this.n++ * S, d = this.d;
     d[o] = x; d[o + 1] = y; d[o + 2] = z; d[o + 3] = vx; d[o + 4] = vy; d[o + 5] = vz;
     d[o + 6] = life; d[o + 7] = life; d[o + 8] = s0; d[o + 9] = s1;
     d[o + 10] = r; d[o + 11] = g; d[o + 12] = b; d[o + 13] = a; d[o + 14] = drag; d[o + 15] = grav;
+    d[o + 16] = er; d[o + 17] = eg; d[o + 18] = eb;
   }
 
   update(dt: number, batch: SpriteBatch) {
@@ -136,7 +149,8 @@ export class ParticlePool {
       const t = 1 - d[o + 6]! / d[o + 7]!;
       const f = 1 - t;
       const alpha = d[o + 13]! * f * f * Math.min(1, t * 12);
-      batch.push(d[o]!, d[o + 1]!, d[o + 2]!, d[o + 8]! + (d[o + 9]! - d[o + 8]!) * t, d[o + 10]!, d[o + 11]!, d[o + 12]!, alpha);
+      batch.push(d[o]!, d[o + 1]!, d[o + 2]!, d[o + 8]! + (d[o + 9]! - d[o + 8]!) * t,
+        d[o + 10]! + (d[o + 16]! - d[o + 10]!) * t, d[o + 11]! + (d[o + 17]! - d[o + 11]!) * t, d[o + 12]! + (d[o + 18]! - d[o + 12]!) * t, alpha);
       i++;
     }
   }

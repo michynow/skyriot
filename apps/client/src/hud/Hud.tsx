@@ -175,7 +175,7 @@ function Chat() {
 function Warnings() {
   const h = useHud(
     useShallow((x) => ({
-      locked: x.locked, alive: x.alive, respawnIn: x.respawnIn, sieged: x.sieged, grounded: x.grounded, evadedNonce: x.evadedNonce,
+      locked: x.locked, alive: x.alive, respawnIn: x.respawnIn, sieged: x.sieged, grounded: x.grounded, evadedNonce: x.evadedNonce, outOfBounds: x.outOfBounds,
       flashes: x.damageFlashes, hitNonce: x.hitNonce, hitDeflected: x.hitDeflected, ping: x.pingMs, frame: x.frame,
       docked: x.docked, resupply: x.resupply, resupplied: x.resupplied, crashed: x.crashed,
     })),
@@ -184,6 +184,7 @@ function Warnings() {
   return (
     <>
       {h.locked && h.alive && <div className="warn-lock">MISSILE LOCK</div>}
+      {h.outOfBounds && h.alive && <div className="oob">RETURN TO COMBAT AREA</div>}
       {h.evadedNonce > 0 && <div key={h.evadedNonce} className="evaded">EVADED</div>}
       {h.sieged && (
         <div className="siege">
@@ -223,7 +224,19 @@ function Warnings() {
 }
 
 export function Hud() {
-  useEffect(() => startHudFeed(), []);
+  useEffect(() => {
+    const fit = () => {
+      const scale = Math.max(0.55, Math.min(1, window.innerHeight / 1000, window.innerWidth / 1700));
+      document.documentElement.style.setProperty('--hud-scale', String(scale));
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    const stop = startHudFeed();
+    return () => {
+      window.removeEventListener('resize', fit);
+      stop();
+    };
+  }, []);
   return (
     <div className="hud">
       <Reticles />

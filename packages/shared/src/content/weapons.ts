@@ -9,14 +9,14 @@ export const WEAPONS: Record<string, WeaponDef> = {
   'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 48, 0.12, 750, 1000, 0.02),
   'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 260, 2.2, 190, 1400, 0, {
     homingTurnRate: 2.2,
-    lockConeRad: 0.26,
-    lockTimeSec: 1.2,
+    lockConeRad: 0.45,
+    lockTimeSec: 0.8,
     splashRadius: 5,
   }),
   'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 180, 1.6, 175, 1200, 0, {
     homingTurnRate: 2.0,
-    lockConeRad: 0.3,
-    lockTimeSec: 1.0,
+    lockConeRad: 0.5,
+    lockTimeSec: 0.7,
     splashRadius: 5,
   }),
   'brick-bomb': w('brick-bomb', 'Brick Bomb', 'rocket', 520, 3.0, 140, 900, 0.01, {
