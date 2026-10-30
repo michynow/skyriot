@@ -151,6 +151,11 @@ All award Glory; defenders get a bonus.
 - Space: starfield, nebula, planet backdrops.
 - Perf target: **60 fps at 1080p on M1 integrated / GTX 1060**. Low/Med/High presets.
 
+## 9b. Audio
+
+- Procedural Web Audio (no third-party samples in v1): positional SFX for weapons, missiles, hits, boost, rolls, locks/warnings, Skill activations, docking, impacts; generative futuristic war music with intensity layers (idle → radar contact → combat) and per-nation motif variants; separate hangar theme.
+- Master/SFX/music volume + mute (M). Sample-file adapter can replace synth recipes later without caller changes.
+
 ## 10. Tech (summary — see ARCHITECTURE.md)
 
 pnpm monorepo · Vite + React + react-three-fiber + drei + postprocessing · zustand · Rapier (WASM, shared client/server) · Node + Colyseus (Fly.io) · Postgres (Neon) + Drizzle · Discord OAuth + email magic link · client on Vercel.
