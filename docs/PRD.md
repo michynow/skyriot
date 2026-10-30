@@ -58,7 +58,7 @@ Skill kits are our own designs covering these roles (no 1:1 renames of any exist
 | **Double-tap A / D** | **Barrel roll** — lateral burst, 0.25 s invulnerability, costs fuel, 3 s cooldown |
 | Q / E | Vertical strafe down / up |
 | Space | Booster (fuel, regenerates) |
-| Shift | Hover/brake; Bulwark: toggle Siege mode |
+| Shift | Hover/brake (Bulwark: land when near ground) |
 | R | Launch from a Launch Deck |
 | LMB / RMB | Primary / secondary weapon |
 | 1–0 | 10-slot hotbar: skills, Flares (a skill), consumables (shield kit, repair kit, fuel cell) |
@@ -70,6 +70,9 @@ Close third-person chase camera with slight lag. Mouse steering is deliberately 
 
 ## 5. Combat
 
+- **Easy to hit, hard to master.** Ships are large relative to the map. Primary has **aim assist**: with a Target inside a small cone around the crosshair, rounds lead onto it. The crosshair advises when the Secondary is in range/lockable.
+- **Missile lock is relative to the Ship's nose**, not the cursor. Evading missiles is a skill: a well-timed Barrel Roll makes a close missile overshoot, terrain breaks line of sight and eats missiles, flares break locks.
+- Siege Mode is a hotbar Skill (`Siege Anchor`), not a dedicated key.
 - **All projectiles are real.** Primaries: fast tracer rounds (dodgeable at range by strafing). Secondaries: missiles, rockets, bombs — slower; homing missiles have a turn-rate limit and can be outflown.
 - **Flares** skill breaks missile locks.
 - **Deflect** stat: chance (hard cap 15%) for a hit to glance for 30% damage. Wasp stacks highest.
@@ -81,7 +84,7 @@ Close third-person chase camera with slight lag. Mouse steering is deliberately 
 - **Damage feedback**: floating damage numbers on hits dealt (deflected hits marked), hit markers.
 
 ### HUD
-- Circular HP/shield gauge around the reticle area, fuel arc, ammo counters for Primary/Secondary.
+- HP/shield/fuel panel top-left. Near the crosshair only Primary/Secondary rounds (icon + small weapon name). Incoming-missile warning with time-to-impact.
 - **Radar**: circular, heading-up, range per Frame (`radarRangeM`); blips above/below marked. Enemies beyond radar range are neither shown nor sent by the server.
 - **Crosshair range**: shows distance to what's under the aim; changes state when inside Primary range / missile lock range.
 - Hotbar slots show icons (original art), cooldown sweep, key number.

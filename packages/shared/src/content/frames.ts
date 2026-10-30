@@ -28,8 +28,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     ammo1Max: 1200,
     ammo2Max: 8,
     radarRangeM: 1600,
-    radius: 2.2,
-    halfLength: 3,
+    radius: 4.4,
+    halfLength: 6.0,
     canHover: false,
     primary: 'needle-cannon',
     secondary: 'sting-missile',
@@ -61,8 +61,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     ammo1Max: 500,
     ammo2Max: 12,
     radarRangeM: 1300,
-    radius: 3.6,
-    halfLength: 5,
+    radius: 7.2,
+    halfLength: 10.0,
     canHover: false,
     primary: 'flak-repeater',
     secondary: 'brick-bomb',
@@ -94,8 +94,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     ammo1Max: 800,
     ammo2Max: 10,
     radarRangeM: 1800,
-    radius: 2.8,
-    halfLength: 3.5,
+    radius: 5.6,
+    halfLength: 7.0,
     canHover: false,
     primary: 'pulse-blaster',
     secondary: 'seeker-pod',
@@ -127,8 +127,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     ammo1Max: 600,
     ammo2Max: 16,
     radarRangeM: 1400,
-    radius: 3.4,
-    halfLength: 4,
+    radius: 6.8,
+    halfLength: 8.0,
     canHover: true,
     primary: 'twin-autocannon',
     secondary: 'mortar-battery',
@@ -152,3 +152,18 @@ export const TERRAIN_IMPACT = { minSpeed: 25, bounceHpFrac: 0.15, restitution: 0
 export const DECK = { dockMaxSpeed: 30, resupplySec: 2, launchSpeed: 60 };
 
 export const RESPAWN_SEC = 5;
+
+/**
+ * Primary aim assist: if the selected Target is within `coneRad` of the aim direction and in range,
+ * Primary rounds are fired at the Target's lead point instead of straight down the aim line.
+ */
+export const AIM_ASSIST = { coneRad: 0.12, spreadMul: 0.5 };
+
+/**
+ * Missile evasion (the skill curve):
+ * - lock cone is measured from the Ship's nose, not the cursor;
+ * - a Barrel Roll started while a missile is within `rollBreakDistM` breaks its guidance (it overshoots);
+ * - terrain between missile and target for `losBreakSec` breaks guidance; missiles hitting terrain explode;
+ * - homing missiles get `endgameTurnMul` turn rate inside `endgameDistM` so straight flight is not enough.
+ */
+export const MISSILE_EVADE = { rollBreakDistM: 90, losBreakSec: 0.4, endgameDistM: 150, endgameTurnMul: 1.6 };

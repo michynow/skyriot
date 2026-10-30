@@ -29,7 +29,7 @@ export const SKILLS: Record<string, SkillDef> = {
   'iron-hide': s('iron-hide', 'Iron Hide', 'Take 40% less damage.', ['anvil'], 35, 6),
   'mend-beam': s('mend-beam', 'Mend Beam', 'Heal the nearest ally in front of you over time.', ['halo'], 12, 4),
   'aegis-bubble': s('aegis-bubble', 'Aegis Bubble', 'Shield all allies within 60 m.', ['halo'], 40, 6),
-  'siege-anchor': s('siege-anchor', 'Siege Anchor', 'Toggle Siege Mode (same as Space).', ['bulwark'], 1, 0),
+  'siege-anchor': s('siege-anchor', 'Siege Anchor', 'Toggle Siege Mode: root in place, first-person gunner view, Target lock. Stronger when grounded.', ['bulwark'], 1, 0),
   'scrap-wall': s('scrap-wall', 'Scrap Wall', 'Deploy a barrier that eats Projectiles.', ['bulwark'], 30, 8),
   'repair-kit': c('repair-kit', 'Repair Kit', 'Restore 35% HP.', 20),
   'shield-kit': c('shield-kit', 'Shield Kit', 'Restore full shield.', 20),
