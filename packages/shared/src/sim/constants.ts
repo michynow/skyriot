@@ -83,9 +83,9 @@ export const WALL_MAX = 16;
 
 // Steering smoothing
 /** Desired turn rate = angle-to-aim * gain (capped at turnRate): eases out of turns. */
-export const TURN_GAIN = 9;
+export const TURN_GAIN = 5;
 /** Angular velocity blend time constant (s): eases into turns. */
-export const TURN_TAU_SEC = 0.05;
+export const TURN_TAU_SEC = 0.1;
 
 // Launch Decks
 export const DECK_HALF_THICKNESS = 1;

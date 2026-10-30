@@ -12,7 +12,7 @@ const X_AXIS = new THREE.Vector3(1, 0, 0);
 const BASE_FOV = 60;
 const BOOST_FOV = -1.5; // boost narrows the view very slightly; never widens
 const POS_OMEGA = 9; // critically-damped spring angular frequency (1/s): higher = stiffer
-const ROT_RATE = 11;
+const ROT_RATE = 8;
 /** Share of the Ship's bank the camera follows: the rest shows as the Ship banking on screen. */
 const CAM_BANK = 0.3;
 /** Screen drift on hard turns: camera shifts against the turn by dist * this per rad/s, capped. */
