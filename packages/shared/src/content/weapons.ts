@@ -25,6 +25,10 @@ export const WEAPONS: Record<string, WeaponDef> = {
   'mortar-battery': w('mortar-battery', 'Mortar Battery', 'shell', 380, 2.6, 220, 1600, 0.02, {
     splashRadius: 10,
   }),
+  // Base Turret gun (not a Frame weapon).
+  'turret-flak': w('turret-flak', 'Turret Flak', 'tracer', 24, 0.2, 700, 950, 0.02, {
+    splashRadius: 5,
+  }),
 };
 
 export const SKILLS: Record<string, SkillDef> = {

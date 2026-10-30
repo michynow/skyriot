@@ -200,7 +200,12 @@ export class MapRoom extends Room {
         });
         this.bots.set(
           id,
-          createBotMemory(this.hf, this.botCounter * 7919, this.map.launchDecks[nation]),
+          createBotMemory(
+            this.hf,
+            this.botCounter * 7919,
+            this.map.launchDecks[nation],
+            this.map.env.stallSpeed,
+          ),
         );
         total++;
       }
@@ -262,6 +267,13 @@ export class MapRoom extends Room {
           console.log(`[MapRoom] ${e.victim} destroyed by ${e.killer ?? 'terrain'}`);
         else if (e.type === 'shipRespawned' && this.humans.has(e.id))
           console.log(`[MapRoom] ${e.id} respawned`);
+        else if (e.type === 'catapult' && this.humans.has(e.id))
+          console.log(`[MapRoom] ${e.id} catapulted from tunnel ${e.tunnel}`);
+        else if (e.type === 'structureDestroyed')
+          console.log(`[MapRoom] ${e.structure} destroyed by ${e.killer ?? 'dev'}`);
+        else if (e.type === 'shieldDown') console.log(`[MapRoom] ${e.nation} shield down`);
+        else if (e.type === 'matchEnded') console.log(`[MapRoom] battle won by ${e.winner}`);
+        else if (e.type === 'matchStarted') console.log('[MapRoom] battle started');
       }
     }
     const ms = performance.now() - t0;
@@ -277,20 +289,24 @@ export class MapRoom extends Room {
     const all = [...this.sim.ships()];
     const missiles = this.sim.missiles();
     const base = { tick: this.sim.tick, serverTimeMs: Date.now() };
+    const structures = this.sim.structures();
+    const match = this.sim.match();
     for (const [id, client] of this.byId) {
       const me = this.sim.getShip(id);
       let ships = all;
       if (me) {
         // Radar: allies always, enemies only within this Frame's radar range.
         const range2 = FRAMES[me.frame].radarRangeM ** 2;
+        // Ships in the enemy hangar are hidden.
         ships = all.filter(
           (o) =>
             o.id === id ||
             o.nation === me.nation ||
-            (o.pos[0] - me.pos[0]) ** 2 +
-              (o.pos[1] - me.pos[1]) ** 2 +
-              (o.pos[2] - me.pos[2]) ** 2 <=
-              range2,
+            (o.launchPhase !== 'hangar' &&
+              (o.pos[0] - me.pos[0]) ** 2 +
+                (o.pos[1] - me.pos[1]) ** 2 +
+                (o.pos[2] - me.pos[2]) ** 2 <=
+                range2),
         );
       }
       const range2 = me ? FRAMES[me.frame].radarRangeM ** 2 : Infinity;
@@ -310,14 +326,8 @@ export class MapRoom extends Room {
         ack: this.humans.get(id)?.ack ?? 0,
         ships,
         missiles: visible,
-        structures: [],
-        match: {
-          phase: 'battle',
-          winner: null,
-          restartAtTick: 0,
-          shielded: { concord: true, vex: true },
-          queues: { concord: [], vex: [] },
-        },
+        structures,
+        match,
       };
       client.send(MSG.snapshot, snapshot);
     }
