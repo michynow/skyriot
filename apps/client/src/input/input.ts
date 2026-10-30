@@ -1,6 +1,7 @@
 import { Vector3, type Camera } from 'three';
 import { EMPTY_INPUT, FRAMES, TICK_DT, type PilotInput, type ShipId, type ShipState } from '@skyriot/shared';
 import { world } from '../state/world';
+import { useSettings } from '../ui/settings';
 
 /** Mutable input-side state shared with the HUD (read per frame, never React state). */
 export const inputState = {
@@ -101,6 +102,10 @@ export function attachInput(canvas: HTMLElement): () => void {
       return;
     }
     if (inputState.typing) return;
+    if (e.code === 'KeyM' && !e.repeat) {
+      useSettings.getState().toggleMute();
+      return;
+    }
     if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Alt')) e.preventDefault();
     if (e.repeat) return;
     keys.add(e.code);

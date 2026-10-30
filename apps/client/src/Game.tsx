@@ -25,6 +25,8 @@ import { createInterpolator } from './net/interpolator';
 import { createPredictor } from './net/predictor';
 import { session } from './net/session';
 import { QUALITY_DPR, useSettings } from './ui/settings';
+import { music, setListener } from './audio/engine';
+import { handleAudioEvent, resetAudioSession, updateAudio } from './audio/sfxDriver';
 import './ui/lobby.css';
 
 const DevPanel = import.meta.env.DEV ? lazy(() => import('./dev/DevPanel')) : null;
@@ -65,6 +67,8 @@ function GameLoop() {
     const ownId = world.ownId;
     if (!interp || !ownId) return;
     view.camera = camera;
+    setListener(camera.position, camera.quaternion);
+    updateAudio();
 
     world.shake *= Math.exp(-delta / 0.15);
     state.acc = Math.min(state.acc + delta, 0.25);
@@ -110,6 +114,8 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
   useEffect(() => {
     let current = true;
     let conn: Connection | null = null;
+    music.setMode('game');
+    music.setNation(options.nation);
     useHud.setState({ status: 'connecting', error: '', chat: [], killfeed: [], consoleLines: [] });
     const interp = createInterpolator();
     session.interp = interp;
@@ -147,6 +153,7 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
         for (const ev of events) {
           world.fxQueue.push(ev);
           handleHudEvent(ev);
+          handleAudioEvent(ev);
           if (ev.type === 'teleport' && ev.id === world.ownId) session.predictor?.teleport();
         }
         if (world.fxQueue.length > FX_QUEUE_MAX) world.fxQueue.splice(0, world.fxQueue.length - FX_QUEUE_MAX);
@@ -163,6 +170,8 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
 
     return () => {
       current = false;
+      resetAudioSession();
+      music.setMode('lobby');
       conn?.close();
       session.sim?.dispose();
       Object.assign(session, { conn: null, interp: null, predictor: null, sim: null });

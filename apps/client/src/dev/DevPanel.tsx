@@ -4,6 +4,7 @@ import { FRAMES, type FrameId } from '@skyriot/shared';
 import { inputSettings, saveInputSettings } from '../input/input';
 import { lag } from '../net/lagSim';
 import { session } from '../net/session';
+import { audioStats } from '../audio/engine';
 import { useSettings, type Quality } from '../ui/settings';
 import { addConsoleLine, useHud } from '../hud/hudStore';
 
@@ -89,6 +90,13 @@ function Controls() {
       },
     },
   });
+  const a = useSettings();
+  useControls('Audio', {
+    master: { value: a.master, min: 0, max: 1, step: 0.05, onChange: (v: number) => useSettings.getState().setAudio({ master: v }) },
+    sfx: { value: a.sfx, min: 0, max: 1, step: 0.05, onChange: (v: number) => useSettings.getState().setAudio({ sfx: v }) },
+    music: { value: a.music, min: 0, max: 1, step: 0.05, onChange: (v: number) => useSettings.getState().setAudio({ music: v }) },
+    muted: { value: a.muted, onChange: (v: boolean) => useSettings.getState().setAudio({ muted: v }) },
+  });
   useControls('Graphics & debug', {
     quality: { value: useSettings.getState().quality, options: ['low', 'med', 'high'], onChange: (q: Quality) => setQuality(q) },
     physicsDebug: { value: false, onChange: (on: boolean) => setPhysicsDebug(on) },
@@ -113,7 +121,8 @@ function Console() {
       const st = session.predictor?.stats();
       if (!st) return setRec('prediction off');
       const line = `reconcile err avg ${st.avg.toFixed(2)} m  max ${st.max.toFixed(2)} m  (${st.count} snaps / 10 s)`;
-      setRec(line);
+      const au = audioStats();
+      setRec(`${line}\naudio ${au.state} voices ${au.voices} (peak ${au.peak}, stolen ${au.dropped}) loops ${au.loops} music I=${au.music?.intensity.toFixed(2) ?? '-'}`);
       if (++n % 20 === 0) console.log('[reconcile]', line);
     }, 500);
     return () => clearInterval(t);
@@ -123,7 +132,7 @@ function Console() {
       data-ui
       style={{ position: 'fixed', left: 28, top: 330, width: 380, font: '13px ui-monospace, monospace', color: '#cfe', pointerEvents: 'auto' }}
     >
-      <div style={{ background: '#000c', padding: '2px 6px', color: '#ffd24a' }}>{rec}</div>
+      <div style={{ background: '#000c', padding: '2px 6px', color: '#ffd24a' }}><span style={{ whiteSpace: 'pre-line' }}>{rec}</span></div>
       <div style={{ background: '#000a', padding: 6, maxHeight: 140, overflow: 'auto' }}>
         {lines.slice(-8).map((l, i) => (
           <div key={i}>{l}</div>
@@ -150,7 +159,7 @@ export default function DevPanel() {
   return (
     <>
       <div data-ui>
-        <Leva collapsed titleBar={{ title: 'SKYRIOT DEV' }} />
+        <Leva collapsed titleBar={{ title: 'SKYRIOT DEV', position: { x: -50, y: 0 } }} />
       </div>
       <Controls />
       <Console />

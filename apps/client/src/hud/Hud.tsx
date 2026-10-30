@@ -5,6 +5,7 @@ import { session } from '../net/session';
 import { inputState, setTyping } from '../input/input';
 import { addChatLine, startHudFeed, useHud } from './hudStore';
 import { Floaters } from './Floaters';
+import { useSettings } from '../ui/settings';
 import { IconDefs, SkillIcon } from './icons';
 import { Incoming } from './Incoming';
 import { Radar } from './Radar';
@@ -296,6 +297,43 @@ function Warnings() {
   );
 }
 
+function SettingsGear() {
+  const [open, setOpen] = useState(false);
+  const st = useSettings();
+  const row = (label: string, key: 'master' | 'sfx' | 'music') => (
+    <label>
+      {label}
+      <input type="range" min={0} max={1} step={0.05} value={st[key]} onChange={(e) => st.setAudio({ [key]: Number(e.target.value) })} />
+    </label>
+  );
+  return (
+    <div className="gear" data-ui>
+      <button onClick={() => setOpen(!open)} title="Settings (M = mute)">
+        {st.muted ? '🔇' : '⚙'}
+      </button>
+      {open && (
+        <div className="gear-panel">
+          {row('MASTER', 'master')}
+          {row('EFFECTS', 'sfx')}
+          {row('MUSIC', 'music')}
+          <label>
+            MUTE (M)
+            <input type="checkbox" checked={st.muted} onChange={(e) => st.setAudio({ muted: e.target.checked })} />
+          </label>
+          <label>
+            QUALITY
+            <select value={st.quality} onChange={(e) => st.setQuality(e.target.value as 'low' | 'med' | 'high')}>
+              <option value="low">low</option>
+              <option value="med">med</option>
+              <option value="high">high</option>
+            </select>
+          </label>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Hud() {
   useEffect(() => {
     const fit = () => {
@@ -313,6 +351,7 @@ export function Hud() {
   return (
     <div className="hud">
       <IconDefs />
+      <SettingsGear />
       <Reticles />
       <Warnings />
       <Floaters />

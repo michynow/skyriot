@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { FRAMES, RUSTWATER_CANYONS, WEAPONS, type FrameId, type JoinOptions, type NationId } from '@skyriot/shared';
+import { initAudio, music, playSfx } from '../audio/engine';
 import './lobby.css';
 
 const KEY = 'skyriot.lobby';
@@ -44,9 +45,14 @@ function Stat({ label, value, max }: { label: string; value: number; max: number
 
 export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
   const [sel, setSel] = useState(load);
-  const set = (p: Partial<typeof sel>) => setSel((s) => ({ ...s, ...p }));
+  const set = (p: Partial<typeof sel>) => {
+    setSel((s) => ({ ...s, ...p }));
+    if (p.nation) music.setNation(p.nation);
+  };
 
   const launch = () => {
+    initAudio();
+    playSfx('ui-click');
     const name = sel.name.trim() || `Pilot${Math.floor(Math.random() * 900 + 100)}`;
     try {
       localStorage.setItem(KEY, JSON.stringify({ ...sel, name: sel.name.trim() }));
@@ -57,7 +63,20 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
   };
 
   return (
-    <div className={`lobby ${sel.nation}`}>
+    <div
+      className={`lobby ${sel.nation}`}
+      onPointerDown={(e) => {
+        // First press in the hangar unlocks audio and starts the calm theme.
+        initAudio();
+        music.setMode('lobby');
+        music.setNation(sel.nation);
+        if ((e.target as HTMLElement).closest('button')) playSfx('ui-click');
+      }}
+      onPointerOver={(e) => {
+        const b = (e.target as HTMLElement).closest('button');
+        if (b && b !== e.relatedTarget && !b.contains(e.relatedTarget as Node)) playSfx('ui-hover');
+      }}
+    >
       <div className="lb-grid" />
       <header>
         <h1>SKY<span>RIOT</span></h1>
