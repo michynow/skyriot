@@ -1,4 +1,11 @@
-import type { Sim, ShipId } from '@skyriot/shared';
+import type { NationId, Sim, ShipId, StructureKind } from '@skyriot/shared';
+
+const NATION_IDS: NationId[] = ['concord', 'vex'];
+const STRUCTURE_KINDS: Record<string, StructureKind> = {
+  core: 'core',
+  stations: 'shieldStation',
+  turrets: 'turret',
+};
 
 export interface DevHost {
   sim: Sim;
@@ -38,6 +45,20 @@ export function runDevCommand(host: DevHost, shipId: ShipId, line: string): stri
       const at = sim.getShip(shipId)!.pos;
       return `teleported to ${at.map((v) => v.toFixed(0)).join(' ')}`;
     }
+    case 'base': {
+      const nation = args[0] as NationId;
+      const kind = STRUCTURE_KINDS[args[1] ?? ''];
+      if (!NATION_IDS.includes(nation) || !kind)
+        return 'usage: /base <concord|vex> <stations|core|turrets>';
+      return `destroyed ${sim.destroyStructures(nation, kind)} ${args[1]} of ${nation}`;
+    }
+    case 'battle': {
+      const winner = args[1] as NationId;
+      if (args[0] !== 'end' || !NATION_IDS.includes(winner))
+        return 'usage: /battle end <winner nation>';
+      sim.endBattle(winner);
+      return `battle ended, ${winner} wins; Bases rebuild shortly`;
+    }
     case 'level':
     case 'glory':
     case 'spawn':
@@ -45,7 +66,7 @@ export function runDevCommand(host: DevHost, shipId: ShipId, line: string): stri
     case 'event':
       return 'events: not yet implemented';
     case 'help':
-      return '/god, /bots <n>, /timescale <x>, /tp <x> <y> <z>, /level <n>, /glory <n>, /spawn <item> [+n], /event start <type>, /help';
+      return '/god, /bots <n>, /timescale <x>, /tp <x> <y> <z>, /base <nation> <stations|core|turrets>, /battle end <winner>, /level <n>, /glory <n>, /spawn <item> [+n], /event start <type>, /help';
     default:
       return `unknown command: /${cmd} (try /help)`;
   }

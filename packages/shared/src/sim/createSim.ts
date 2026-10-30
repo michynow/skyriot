@@ -6,11 +6,13 @@ import {
   type FrameDef,
   type FrameId,
   type MapDef,
+  type NationId,
   type PilotInput,
   type ShipId,
   type ShipSpawn,
   type ShipState,
   type SimEvent,
+  type StructureKind,
   type Vec3,
 } from '../types';
 import type { MissileView, Sim, SimOptions, SimTuning } from './index';
@@ -18,8 +20,6 @@ import type { ShipRec, SimCtx } from './ctx';
 import {
   DECK_HALF_THICKNESS,
   BOUNDARY_MARGIN,
-  DOCK_CLEARANCE,
-  DECK_RESPAWN_SPREAD,
   KCC_OFFSET,
   LAG_HISTORY_TICKS,
   SHIP_GROUPS,
@@ -32,11 +32,20 @@ import { deriveLateral, stepFlight, syncBody } from './flight';
 import { forwardOf } from './math';
 import { tickTimers, useHotbar } from './skills';
 import { createMods, initToggles, resolveMods } from './buffs';
+import {
+  applyStructures,
+  createStructures,
+  destroyStructure,
+  endBattle,
+  pushOutOfDomes,
+  stepBattle,
+} from './structures';
+import { enterHangar, leaveQueue, stepLaunch, stepLaunchQueue } from './launch';
+import { stepTurrets } from './turrets';
 
 const IDLE_INPUT: PilotInput = { seq: 0, viewTick: 0, ...EMPTY_INPUT };
 const HALF_SQRT = Math.SQRT1_2;
 const FRAME_IDS = Object.keys(FRAMES) as FrameId[];
-const SPAWN_JITTER = 40;
 
 export function createSim(map: MapDef, opts: SimOptions): Sim {
   const R = opts.rapier;
@@ -54,7 +63,6 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       z: hf.size,
     }).setCollisionGroups(TERRAIN_GROUPS),
   );
-  world.step(); // populate broad phase so queries see the terrain
   for (const nation of ['concord', 'vex'] as const) {
     for (const deck of map.launchDecks[nation]) {
       // Thin cylinder whose top face is the deck surface.
@@ -98,11 +106,22 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     walls: [],
     nextProjectileId: 1,
     events: [],
+    structures: [],
+    structureByCollider: new Map(),
+    match: {
+      phase: 'battle',
+      winner: null,
+      restartAtTick: 0,
+      shielded: { concord: false, vex: false },
+      queues: { concord: [], vex: [] },
+    },
+    tunnelFreeTick: { concord: [], vex: [] },
   };
+  createStructures(ctx);
+  world.step(); // populate broad phase so queries see terrain, decks and structures
   /** Events raised between steps (teleports); flushed into the next step's result. */
   let pending: SimEvent[] = [];
   const discard: SimEvent[] = [];
-  const spawnCursor = { concord: 0, vex: 0 };
 
   function refreshFrames(): void {
     ctx.dt = TICK_DT * Math.min(Math.max(tuning.timescale, TIMESCALE_MIN), TIMESCALE_MAX);
@@ -112,16 +131,6 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       Object.assign(dst, baseFrames[id]);
       if (over) Object.assign(dst, over);
     }
-  }
-
-  function pickSpawn(nation: 'concord' | 'vex'): Vec3 {
-    const list = map.spawns[nation];
-    const base = list[spawnCursor[nation]++ % list.length]!;
-    return [
-      base[0] + (ctx.rng() - 0.5) * SPAWN_JITTER,
-      base[1] + (ctx.rng() - 0.5) * 10,
-      base[2] + (ctx.rng() - 0.5) * SPAWN_JITTER,
-    ];
   }
 
   /** Face the map centre, level: yaw a maps forward (0,0,-1) to (-sin a, 0, -cos a). */
@@ -190,29 +199,6 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.vel[1] = f[1]! * s.speed;
     s.vel[2] = f[2]! * s.speed;
     syncBody(ctx, rec);
-  }
-
-  /** Respawn / first spawn: docked on a deck of the Ship's nation; free-air spawns are only a fallback. */
-  function placeAtBase(rec: ShipRec): void {
-    const s = rec.state;
-    const decks = map.launchDecks[s.nation];
-    if (decks.length === 0) {
-      placeAndLaunch(rec, pickSpawn(s.nation), false);
-      return;
-    }
-    const deck = decks[spawnCursor[s.nation]++ % decks.length]!;
-    const a = ctx.rng() * Math.PI * 2;
-    const r = Math.sqrt(ctx.rng()) * deck.radius * DECK_RESPAWN_SPREAD;
-    const fd = frames[s.frame];
-    placeAndLaunch(
-      rec,
-      [
-        deck.pos[0] + Math.cos(a) * r,
-        deck.pos[1] + fd.radius + DOCK_CLEARANCE,
-        deck.pos[2] + Math.sin(a) * r,
-      ],
-      true,
-    );
   }
 
   function makeRec(id: ShipId, spawn: ShipSpawn, at: Vec3): ShipRec {
@@ -303,13 +289,17 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     ctx.list.push(rec.state);
     ctx.recList.push(rec);
     if (at) placeAndLaunch(rec, at, false);
-    else placeAtBase(rec);
+    else {
+      resetVitals(rec);
+      enterHangar(ctx, rec);
+    }
     return rec.state;
   }
 
   function removeShip(id: ShipId): void {
     const rec = ctx.ships.get(id);
     if (!rec) return;
+    leaveQueue(ctx, rec);
     world.removeRigidBody(rec.body);
     ctx.ships.delete(id);
     ctx.list.splice(ctx.list.indexOf(rec.state), 1);
@@ -317,8 +307,10 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     tuning.god.delete(id);
   }
 
+  /** Back to the hangar with full vitals, at the end of the Launch Queue. */
   function respawn(rec: ShipRec): void {
-    placeAtBase(rec);
+    resetVitals(rec);
+    enterHangar(ctx, rec);
     ctx.events.push({
       type: 'shipRespawned',
       id: rec.state.id,
@@ -339,6 +331,10 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       pending = [];
       ctx.events = events;
       refreshFrames();
+      if (ctx.authoritative) {
+        if (stepBattle(ctx)) for (const rec of ctx.recList) respawn(rec);
+        stepLaunchQueue(ctx);
+      }
       for (const rec of ctx.recList) {
         const s = rec.state;
         const input = inputs.get(s.id) ?? IDLE_INPUT;
@@ -349,8 +345,14 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
         }
         // Frozen = a human whose input hasn't arrived; skipping keeps seq-for-seq lockstep with prediction.
         if (frozen?.has(s.id)) continue;
+        if (s.launchPhase !== 'none') {
+          stepLaunch(ctx, rec, input);
+          tickTimers(rec);
+          continue;
+        }
         resolveMods(ctx, rec);
         stepFlight(ctx, rec, input, ctx.authoritative);
+        pushOutOfDomes(ctx, rec);
         if (!ctx.authoritative) continue;
         if (s.alive) {
           tickTimers(rec);
@@ -366,7 +368,10 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       }
       ctx.tick++;
       pushHistory(ctx);
-      if (ctx.authoritative) stepProjectiles(ctx);
+      if (ctx.authoritative) {
+        stepTurrets(ctx);
+        stepProjectiles(ctx);
+      }
       return events;
     },
 
@@ -418,6 +423,10 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       s.dockTicks = 0;
       s.rollPhase = -1;
       s.rollDir = 0;
+      leaveQueue(ctx, rec);
+      s.launchPhase = 'none';
+      s.tunnel = -1;
+      s.launchTicks = 0;
       s.speed = Math.max(s.speed, frames[s.frame].cruiseSpeed);
       s.angVel[0] = s.angVel[1] = s.angVel[2] = 0;
       rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;
@@ -434,8 +443,15 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       ctx.events = discard;
       refreshFrames();
       // Same order as step(): flight, timers, then Skills.
+      if (rec.state.launchPhase !== 'none') {
+        stepLaunch(ctx, rec, input);
+        tickTimers(rec);
+        discard.length = 0;
+        return;
+      }
       resolveMods(ctx, rec);
       stepFlight(ctx, rec, input, false);
+      pushOutOfDomes(ctx, rec);
       tickTimers(rec);
       useHotbar(ctx, rec, input.hotbar, true);
       discard.length = 0;
@@ -454,6 +470,26 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
         });
       }
       return out;
+    },
+
+    structures: () => ctx.structures.map((st) => st.state),
+    match: () => ctx.match,
+    setStructures: (list) => applyStructures(ctx, list),
+
+    destroyStructures(nation: NationId, kind: StructureKind) {
+      ctx.events = pending;
+      let n = 0;
+      for (const st of ctx.structures)
+        if (st.state.nation === nation && st.state.kind === kind && st.state.alive) {
+          destroyStructure(ctx, st, null);
+          n++;
+        }
+      return n;
+    },
+
+    endBattle(winner: NationId) {
+      ctx.events = pending;
+      endBattle(ctx, winner);
     },
 
     debugLines: () => world.debugRender().vertices,

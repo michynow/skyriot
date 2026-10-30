@@ -10,11 +10,13 @@ import type {
   FrameDef,
   FrameId,
   MapDef,
+  MatchState,
   NationId,
   ProjectileKind,
   ShipId,
   ShipState,
   SimEvent,
+  StructureState,
 } from '../types';
 import type { SimTuning } from './index';
 
@@ -89,6 +91,17 @@ export interface Wall {
   expireTick: number;
 }
 
+export interface StructureRec {
+  state: StructureState;
+  collider: Collider;
+  radius: number;
+  height: number;
+  /** Turret: seconds until the next shot. */
+  fireCd: number;
+  /** Turret as a Projectile owner (spawnProjectile reads `state.id` / `state.nation`). */
+  shooter: { state: { id: string; nation: NationId } };
+}
+
 export interface SimCtx {
   map: MapDef;
   hf: Heightfield;
@@ -112,4 +125,10 @@ export interface SimCtx {
   walls: Wall[];
   nextProjectileId: number;
   events: SimEvent[];
+  structures: StructureRec[];
+  /** Collider handle -> structure, to tell a Projectile hitting a structure from one hitting terrain. */
+  structureByCollider: Map<number, StructureRec>;
+  match: MatchState;
+  /** Per Base, per Launch Tunnel: first tick it may stage the next Ship. */
+  tunnelFreeTick: Record<NationId, number[]>;
 }
