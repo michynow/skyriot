@@ -1,11 +1,22 @@
 import { Vector3, type Camera } from 'three';
-import { EMPTY_INPUT, FRAMES, type PilotInput, type ShipId, type ShipState } from '@skyriot/shared';
+import {
+  EMPTY_INPUT,
+  FRAMES,
+  SIEGE,
+  SIEGE_AIR,
+  WEAPONS,
+  type PilotInput,
+  type ShipId,
+  type ShipState,
+} from '@skyriot/shared';
 import { world } from '../state/world';
 import { useSettings } from '../ui/settings';
 
 /** Mutable input-side state shared with the HUD (read per frame, never React state). */
 export const inputState = {
   targetId: null as ShipId | null,
+  /** True while targetId came from Tab rather than auto-acquire. */
+  manualTarget: false,
   typing: false,
   /** Called when Enter requests the chat line. Set by the HUD. */
   onOpenChat: null as (() => void) | null,
@@ -80,15 +91,72 @@ export function cycleTarget(): void {
   const range = FRAMES[own.frame].radarRangeM;
   const enemies = [...world.ships.values()]
     .filter((s) => s.alive && s.nation !== own.nation)
-    .map((s) => ({ id: s.id, d: Math.hypot(s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]) }))
+    .map((s) => ({
+      id: s.id,
+      d: Math.hypot(s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]),
+    }))
     .filter((e) => e.d <= range)
     .sort((a, b) => a.d - b.d);
   if (!enemies.length) {
     inputState.targetId = null;
+    inputState.manualTarget = false;
     return;
   }
   const i = enemies.findIndex((e) => e.id === inputState.targetId);
   inputState.targetId = enemies[(i + 1) % enemies.length]!.id;
+  inputState.manualTarget = true;
+}
+
+/** Lock cone and range of the Ship's Secondary as the sim applies them (Siege multipliers included). */
+function lockEnvelope(own: ShipState): { cone: number; range: number } | null {
+  const sec = WEAPONS[FRAMES[own.frame].secondary];
+  if (!sec || sec.lockConeRad <= 0) return null;
+  const grounded = own.grounded === true;
+  const rangeMul = own.sieged ? (grounded ? SIEGE : SIEGE_AIR).rangeMul : 1;
+  const coneMul = own.sieged && !grounded ? SIEGE_AIR.lockConeMul : 1;
+  return { cone: sec.lockConeRad * coneMul, range: sec.rangeM * rangeMul };
+}
+
+/**
+ * Missiles only lock onto PilotInput.target, so without a Tab pick the Target is the enemy nearest the nose
+ * inside the lock cone. A Tab pick holds until it leaves the cone while another enemy is inside it.
+ */
+function acquireTarget(own: ShipState): void {
+  const env = lockEnvelope(own);
+  const [qx, qy, qz, qw] = own.rot;
+  const fx = -2 * (qx * qz + qw * qy);
+  const fy = -2 * (qy * qz - qw * qx);
+  const fz = -(1 - 2 * (qx * qx + qy * qy));
+  // cos of the angle off the nose, or -2 when outside range / unlockable (flares).
+  const noseCos = (s: ShipState, coneMul: number): number => {
+    if (!env || s.flareTicks > 0) return -2;
+    const dx = s.pos[0] - own.pos[0];
+    const dy = s.pos[1] - own.pos[1];
+    const dz = s.pos[2] - own.pos[2];
+    const d = Math.hypot(dx, dy, dz);
+    if (d > env.range || d < 1) return -2;
+    const c = (dx * fx + dy * fy + dz * fz) / d;
+    return c >= Math.cos(env.cone * coneMul) ? c : -2;
+  };
+  let best: ShipState | null = null;
+  let bestCos = -2;
+  for (const s of world.ships.values()) {
+    if (s.id === own.id || !s.alive || s.nation === own.nation) continue;
+    const c = noseCos(s, 1);
+    if (c > bestCos) {
+      bestCos = c;
+      best = s;
+    }
+  }
+  const current = inputState.targetId ? world.ships.get(inputState.targetId) : undefined;
+  const valid = !!current && current.alive && current.nation !== own.nation;
+  if (inputState.manualTarget) {
+    if (valid && (!best || noseCos(current, 1) > -2)) return;
+    inputState.manualTarget = false;
+  }
+  // Hold the auto Target inside a slightly wider cone so it doesn't flicker at the edge.
+  if (valid && noseCos(current, 1.25) > -2) return;
+  inputState.targetId = best?.id ?? null;
 }
 
 export function setTyping(on: boolean): void {
@@ -129,8 +197,7 @@ export function attachInput(canvas: HTMLElement): () => void {
     else if (e.code.startsWith('Alt')) {
       world.freeLook = true;
       world.cursor.x = world.cursor.y = 0;
-    }
-    else if (e.code.startsWith('Digit')) {
+    } else if (e.code.startsWith('Digit')) {
       const n = Number(e.code.slice(5));
       hotbar = n === 0 ? 9 : n - 1;
     }
@@ -153,7 +220,10 @@ export function attachInput(canvas: HTMLElement): () => void {
       return;
     }
     aimYaw -= e.movementX * inputSettings.sensitivity;
-    aimPitch = Math.max(-AIM_PITCH_MAX, Math.min(AIM_PITCH_MAX, aimPitch - e.movementY * inputSettings.sensitivity));
+    aimPitch = Math.max(
+      -AIM_PITCH_MAX,
+      Math.min(AIM_PITCH_MAX, aimPitch - e.movementY * inputSettings.sensitivity),
+    );
   };
   const onMouseDown = (e: MouseEvent) => {
     if (isUi(e.target) || inputState.typing) return;
@@ -170,7 +240,10 @@ export function attachInput(canvas: HTMLElement): () => void {
   };
   const onWheel = (e: WheelEvent) => {
     if (isUi(e.target)) return;
-    world.cameraZoom = Math.min(2, Math.max(0.6, world.cameraZoom * (1 + Math.sign(e.deltaY) * 0.08)));
+    world.cameraZoom = Math.min(
+      2,
+      Math.max(0.6, world.cameraZoom * (1 + Math.sign(e.deltaY) * 0.08)),
+    );
   };
   const onLockChange = () => {
     if (!isLocked()) fire1 = fire2 = false;
@@ -259,16 +332,16 @@ export function trackAim(camera: Camera, own: ShipState | undefined): void {
 }
 
 /** Build this tick's PilotInput. One-shot flags (roll, hotbar) are consumed. */
-export function sampleInput(
-  seq: number,
-  viewTick: number,
-  own: ShipState | undefined,
-): PilotInput {
+export function sampleInput(seq: number, viewTick: number, own: ShipState | undefined): PilotInput {
   const typing = inputState.typing;
   const k = (code: string) => (!typing && keys.has(code) ? 1 : 0);
 
   const cp = Math.cos(aimPitch);
-  let aim: [number, number, number] = [-Math.sin(aimYaw) * cp, Math.sin(aimPitch), -Math.cos(aimYaw) * cp];
+  let aim: [number, number, number] = [
+    -Math.sin(aimYaw) * cp,
+    Math.sin(aimPitch),
+    -Math.cos(aimYaw) * cp,
+  ];
   if (own && world.freeLook) {
     // Alt: camera looks around, Ship keeps its heading.
     const [x, y, z, w] = own.rot;
@@ -276,7 +349,8 @@ export function sampleInput(
   }
   if (!aim.every(Number.isFinite)) aim = [0, 0, -1];
   inputState.aim = aim;
-  if (inputState.targetId && !world.ships.get(inputState.targetId)?.alive) inputState.targetId = null;
+  if (own) acquireTarget(own);
+  else inputState.targetId = null;
 
   const input: PilotInput = {
     ...EMPTY_INPUT,
@@ -296,7 +370,8 @@ export function sampleInput(
     launch: !typing && launch,
     target: inputState.targetId,
   };
-  if (import.meta.env.DEV && (input.rollLeft || input.rollRight)) console.debug('[roll] sent', input.rollLeft ? 'left' : 'right', 'seq', seq);
+  if (import.meta.env.DEV && (input.rollLeft || input.rollRight))
+    console.debug('[roll] sent', input.rollLeft ? 'left' : 'right', 'seq', seq);
   rollLeft = rollRight = false;
   launch = false;
   hotbar = -1;
