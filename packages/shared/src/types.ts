@@ -222,6 +222,8 @@ export interface FrameDef {
   rollFuelCost: number;
   deflectChance: number; // 0..0.15
   ammo1Max: number;
+  /** Radar and visibility range (m): enemies beyond it aren't shown or sent to this Pilot. */
+  radarRangeM: number;
   ammo2Max: number;
   /** Capsule radius & half-height for hit tests and terrain collision. */
   radius: number;

@@ -82,6 +82,8 @@ Close third-person chase camera with slight lag. Mouse steering is deliberately 
 
 ### HUD
 - Circular HP/shield gauge around the reticle area, fuel arc, ammo counters for Primary/Secondary.
+- **Radar**: circular, heading-up, range per Frame (`radarRangeM`); blips above/below marked. Enemies beyond radar range are neither shown nor sent by the server.
+- **Crosshair range**: shows distance to what's under the aim; changes state when inside Primary range / missile lock range.
 - Hotbar slots show icons (original art), cooldown sweep, key number.
 - Other Ships: name only — **red = enemy, white = ally** — plus distance. No heavy brackets; the single locked target gets one clear marker.
 
