@@ -62,6 +62,8 @@ function buildDeck(nation: NationId, R: number) {
 }
 
 const cache = new Map<string, ReturnType<typeof buildDeck>>();
+// The beacon is for finding the deck from afar; up close it would wash out half the screen.
+const BEACON_HIDE_NEAR_M = 250;
 const pillarGeo = new THREE.CylinderGeometry(1.2, 2.4, 1, 12, 1, true).translate(0, 0.5, 0);
 const pillarMats = new Map<NationId, THREE.MeshBasicMaterial>();
 function pillarMat(n: NationId) {
@@ -95,7 +97,7 @@ function Deck({ nation, deck }: { nation: NationId; deck: LaunchDeck }) {
       const p = 1 + 0.04 * Math.sin(clock.elapsedTime * 4);
       ring.current.scale.set(p, p, 1);
     }
-    if (beacon.current) { const d = camera.position.distanceTo(beacon.current.position.set(deck.pos[0], deck.pos[1] + 4, deck.pos[2])); beacon.current.position.set(0, 4, 0); const k = Math.min(14, Math.max(0.8, d * 0.0035)) * (1 + 0.1 * Math.sin(clock.elapsedTime * 2)); beacon.current.scale.set(k, 900, k); }
+    if (beacon.current) { const d = camera.position.distanceTo(beacon.current.position.set(deck.pos[0], deck.pos[1] + 4, deck.pos[2])); beacon.current.position.set(0, 4, 0); const k = Math.min(14, Math.max(0.8, d * 0.0035)) * (1 + 0.1 * Math.sin(clock.elapsedTime * 2)); beacon.current.scale.set(k, 900, k); beacon.current.visible = d > BEACON_HIDE_NEAR_M; }
   });
   return (
     <group position={deck.pos}>
