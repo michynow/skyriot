@@ -262,6 +262,11 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       incomingTti: -1,
       canLock: false,
       lockProgress: 0,
+      launchPhase: 'none',
+      queuePos: -1,
+      tunnel: -1,
+      launchTicks: 0,
+      stalled: false,
     };
     const body = world.createRigidBody(
       R.RigidBodyDesc.kinematicPositionBased().setTranslation(at[0], at[1], at[2]),

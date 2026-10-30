@@ -64,8 +64,36 @@ _Avoid_: evasion, dodge chance
 Finite rounds for a Ship's Primary and Secondary, refilled on a Launch Deck.
 
 **Launch Deck**:
-A Nation's floating platform where Ships respawn, Dock, resupply and launch.
+A Nation's floating platform where Ships Dock, resupply and launch.
 _Avoid_: pad, hangar (Hangar is the City loadout screen)
+
+**Base**:
+A Nation's fortress on a Map: Core, two Shield Stations, Turrets and Launch Tunnels. Destroying the enemy Core wins the Battle.
+_Avoid_: HQ, fort, city (City is the safe-zone hub)
+
+**Core**:
+The Base's main building. Invulnerable under its shield dome while any Shield Station stands.
+
+**Shield Station**:
+One of two Base structures that keep the Core's shield dome up.
+_Avoid_: generator, pylon
+
+**Turret**:
+A Base anti-air gun that fires at enemy Ships in range; can be destroyed.
+_Avoid_: AA, tower
+
+**Launch Tunnel**:
+A tunnel in a Base with a hidden catapult runway; Ships are thrown out of it into flight.
+
+**Launch Queue**:
+The order in which Ships waiting in a Base's hangar (after spawning or dying) get staged into a Launch Tunnel. One Ship per tunnel every few seconds.
+
+**Battle**:
+One round on a Map Instance, from Bases intact until one Core falls; then the Bases rebuild and a new Battle starts.
+_Avoid_: match, round
+
+**Stall**:
+Flying slower than the Map's stall speed: the nose drops and steering is weak until speed recovers.
 
 **Docked**:
 A Ship resting on a Launch Deck, stationary and resupplying until it launches.

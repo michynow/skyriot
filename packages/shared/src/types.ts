@@ -134,6 +134,52 @@ export interface ShipState {
   canLock: boolean;
   /** Lock progress 0..1 toward `lockTarget`. */
   lockProgress: number;
+  // Launch Queue: after death a Ship waits in its Base's hangar, then is staged in a Launch Tunnel and catapulted.
+  /** 'none' = flying (or dead, waiting for respawn); see LaunchPhase. */
+  launchPhase: LaunchPhase;
+  /** Position in the Base's Launch Queue (0 = next out) while 'hangar', else -1. */
+  queuePos: number;
+  /** Launch Tunnel index while 'staging' | 'ready' | 'catapult', else -1. */
+  tunnel: number;
+  /** Ticks left in the current launch phase (staging countdown, catapult stroke). */
+  launchTicks: number;
+  /** Stalled: too slow to fly; nose drops and steering is weak until speed recovers. */
+  stalled: boolean;
+}
+
+/**
+ * hangar: waiting in the Launch Queue inside the Base (hidden, not targetable).
+ * staging: platform carries the Ship onto the catapult, doors open, tunnel lights run outward.
+ * ready: catapult charged; full throttle (W) fires it (Bots fire at once).
+ * catapult: being thrown down the Launch Tunnel; ends in free flight ('none').
+ */
+export type LaunchPhase = 'none' | 'hangar' | 'staging' | 'ready' | 'catapult';
+
+export type StructureId = string;
+/** core: the Base itself (destroy = win). shieldStation: keeps the Core's shield dome up. turret: anti-air gun. */
+export type StructureKind = 'core' | 'shieldStation' | 'turret';
+
+export interface StructureState {
+  id: StructureId;
+  kind: StructureKind;
+  nation: NationId;
+  pos: Vec3;
+  hp: number;
+  maxHp: number;
+  alive: boolean;
+  /** Turret barrel direction (unit, world); [0,0,-1] for others. */
+  aim: Vec3;
+}
+
+export interface MatchState {
+  phase: 'battle' | 'ended';
+  winner: NationId | null;
+  /** While 'ended': tick the next battle starts (Bases rebuilt). */
+  restartAtTick: number;
+  /** Core shield dome is up (at least one Shield Station alive). */
+  shielded: Record<NationId, boolean>;
+  /** Launch Queue per Base, next out first. */
+  queues: Record<NationId, ShipId[]>;
 }
 
 export type ProjectileKind = 'tracer' | 'missile' | 'rocket' | 'shell' | 'flare';
@@ -173,11 +219,32 @@ export type SimEvent =
       /** true = shield absorbed it and the Ship bounced; false = no shield, Ship destroyed. */
       bounced: boolean;
     }
-  | { type: 'missileEvaded'; id: number; victim: ShipId; reason: 'roll' | 'terrain' | 'flare' | 'purge' }
+  | {
+      type: 'missileEvaded';
+      id: number;
+      victim: ShipId;
+      reason: 'roll' | 'terrain' | 'flare' | 'purge';
+    }
   | { type: 'teleport'; id: ShipId; pos: Vec3 }
   | { type: 'docked'; id: ShipId }
   | { type: 'resupplied'; id: ShipId }
-  | { type: 'launched'; id: ShipId };
+  | { type: 'launched'; id: ShipId }
+  | {
+      type: 'structureHit';
+      projectile: number;
+      attacker: ShipId;
+      structure: StructureId;
+      damage: number;
+      pos: Vec3;
+      /** true = absorbed by the Core's shield dome (no damage). */
+      shielded: boolean;
+    }
+  | { type: 'structureDestroyed'; structure: StructureId; killer: ShipId | null; pos: Vec3 }
+  | { type: 'shieldDown'; nation: NationId }
+  | { type: 'launchStaged'; id: ShipId; tunnel: number }
+  | { type: 'catapult'; id: ShipId; tunnel: number }
+  | { type: 'matchEnded'; winner: NationId }
+  | { type: 'matchStarted' };
 
 /** S→C at SNAPSHOT_HZ. */
 export interface Snapshot {
@@ -188,6 +255,9 @@ export interface Snapshot {
   ships: ShipState[];
   /** Live missiles (sting/seeker) in radar range or homing on the receiver: their real, server-simulated path. */
   missiles: MissileSnapshot[];
+  /** All Base structures (both Nations). */
+  structures: StructureState[];
+  match: MatchState;
 }
 
 export interface MissileSnapshot {
@@ -231,8 +301,33 @@ export interface MapDef {
   spawns: Record<NationId, Vec3[]>;
   /** Hard ceiling; ships above are pushed down. */
   ceiling: number;
-  /** Floating platforms where Ships respawn docked, resupply and launch. */
+  /** Floating platforms where Ships Dock to resupply. */
   launchDecks: Record<NationId, LaunchDeck[]>;
+  /** One Base per Nation: Launch Tunnels, Shield Stations, Turrets, Core. */
+  bases: Record<NationId, BaseDef>;
+}
+
+export interface BaseDef {
+  /** Core centre at ground level. Destroying the Core wins the battle for the other Nation. */
+  core: Vec3;
+  /** Unit horizontal direction the Base faces (toward the front); Launch Tunnels open this way. */
+  facing: Vec3;
+  /** Terrain is flattened to `core[1]` within this radius (m), blending out over the next 30%. */
+  plateauRadius: number;
+  tunnels: LaunchTunnel[];
+  turrets: Vec3[];
+  shieldStations: Vec3[];
+  /** Shield dome radius around the Core (m). */
+  shieldRadius: number;
+}
+
+export interface LaunchTunnel {
+  /** Catapult start (Ship centre) inside the Base. */
+  start: Vec3;
+  /** Unit launch direction. */
+  dir: Vec3;
+  /** Tunnel length (m) from start to the exit doors. */
+  length: number;
 }
 
 export interface LaunchDeck {

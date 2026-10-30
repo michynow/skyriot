@@ -310,6 +310,14 @@ export class MapRoom extends Room {
         ack: this.humans.get(id)?.ack ?? 0,
         ships,
         missiles: visible,
+        structures: [],
+        match: {
+          phase: 'battle',
+          winner: null,
+          restartAtTick: 0,
+          shielded: { concord: true, vex: true },
+          queues: { concord: [], vex: [] },
+        },
       };
       client.send(MSG.snapshot, snapshot);
     }
