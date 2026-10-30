@@ -1,21 +1,18 @@
-import { Canvas } from '@react-three/fiber';
-import { FRAMES } from '@skyriot/shared';
+import { lazy, Suspense, useState } from 'react';
+import type { JoinOptions } from '@skyriot/shared';
+import { Game } from './Game';
+import { Lobby } from './ui/Lobby';
 
-// M0 placeholder. Real composition: docs/ARCHITECTURE.md §4.
+const RenderDemo = lazy(() => import('./scene/demoEntry').then((m) => ({ default: m.RenderDemo })));
+
 export function App() {
-  return (
-    <>
-      <Canvas camera={{ position: [0, 3, 8] }}>
-        <ambientLight intensity={0.4} />
-        <directionalLight position={[5, 10, 5]} />
-        <mesh>
-          <boxGeometry args={[2, 0.6, 4]} />
-          <meshStandardMaterial color="#e0b040" />
-        </mesh>
-      </Canvas>
-      <div style={{ position: 'absolute', top: 12, left: 12, color: '#fff', font: '14px system-ui' }}>
-        SKYRIOT — {Object.values(FRAMES).map((f) => f.name).join(' / ')}
-      </div>
-    </>
-  );
+  const [options, setOptions] = useState<JoinOptions | null>(null);
+  if (new URLSearchParams(location.search).get('demo') === 'render') {
+    return (
+      <Suspense fallback={null}>
+        <RenderDemo />
+      </Suspense>
+    );
+  }
+  return options ? <Game options={options} onExit={() => setOptions(null)} /> : <Lobby onLaunch={setOptions} />;
 }

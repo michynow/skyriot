@@ -34,6 +34,4 @@ export interface SimOptions {
   authoritative: boolean;
 }
 
-export function createSim(_map: MapDef, _opts: SimOptions): Sim {
-  throw new Error('createSim: not implemented yet');
-}
+export { createSim } from './createSim';

@@ -11,7 +11,9 @@ export const account = pgTable('account', {
 
 export const pilot = pgTable('pilot', {
   id: uuid('id').primaryKey().defaultRandom(),
-  accountId: uuid('account_id').notNull().references(() => account.id),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => account.id),
   name: text('name').notNull().unique(),
   nation: text('nation').notNull(),
   level: integer('level').notNull().default(1),
