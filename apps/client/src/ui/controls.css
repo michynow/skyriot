@@ -1,0 +1,7 @@
+.controls { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 28px; font-size: 16px; }
+.controls.compact { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 15px; }
+.ctl { display: flex; align-items: baseline; gap: 10px; white-space: nowrap; }
+.ctl kbd { font: 700 13px 'Orbitron', sans-serif; letter-spacing: .08em; color: var(--a, #f2c24b); padding: 3px 8px; border: 1px solid color-mix(in srgb, var(--a, #f2c24b) 45%, transparent); background: #ffffff0a; }
+.ctl em { font-style: normal; opacity: .82; }
+.ctl-note { grid-column: 1 / -1; flex-basis: 100%; margin: 6px 0 0; padding: 10px 16px; border-left: 3px solid var(--b, #5fe3ff); color: var(--b, #5fe3ff); font-size: 15px; line-height: 1.4; }
+.ctl-note b { font-family: 'Orbitron', sans-serif; letter-spacing: .15em; margin-right: 8px; }

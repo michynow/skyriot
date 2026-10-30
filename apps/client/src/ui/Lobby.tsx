@@ -1,6 +1,14 @@
 import { useState } from 'react';
-import { FRAMES, RUSTWATER_CANYONS, WEAPONS, type FrameId, type JoinOptions, type NationId } from '@skyriot/shared';
+import {
+  FRAMES,
+  RUSTWATER_CANYONS,
+  WEAPONS,
+  type FrameId,
+  type JoinOptions,
+  type NationId,
+} from '@skyriot/shared';
 import { initAudio, music, playSfx } from '../audio/engine';
+import { Controls } from './Controls';
 import './lobby.css';
 
 const KEY = 'skyriot.lobby';
@@ -8,7 +16,8 @@ const NATIONS: Record<NationId, { name: string; motto: string; blurb: string }> 
   concord: {
     name: 'Aurelian Concord',
     motto: 'Order above the clouds',
-    blurb: 'Gilded wings, disciplined wings. The Concord holds the high ground and never forgets a debt.',
+    blurb:
+      'Gilded wings, disciplined wings. The Concord holds the high ground and never forgets a debt.',
   },
   vex: {
     name: 'Vex Freehold',
@@ -17,7 +26,8 @@ const NATIONS: Record<NationId, { name: string; motto: string; blurb: string }> 
   },
 };
 
-const maxOf = (pick: (f: (typeof FRAMES)[FrameId]) => number) => Math.max(...Object.values(FRAMES).map(pick));
+const maxOf = (pick: (f: (typeof FRAMES)[FrameId]) => number) =>
+  Math.max(...Object.values(FRAMES).map(pick));
 
 function load(): { nation: NationId; frame: FrameId; name: string } {
   try {
@@ -32,6 +42,25 @@ function load(): { nation: NationId; frame: FrameId; name: string } {
   }
 }
 
+function Emblem({ nation }: { nation: NationId }) {
+  return (
+    <svg className="lb-emblem" viewBox="0 0 64 64" aria-hidden>
+      {nation === 'concord' ? (
+        <>
+          <path d="M32 6 L58 24 L32 18 L6 24 Z" />
+          <path d="M32 22 L50 34 L32 58 L14 34 Z" opacity=".55" />
+          <circle cx="32" cy="36" r="5" />
+        </>
+      ) : (
+        <>
+          <path d="M8 46 L16 18 L26 34 L32 8 L38 34 L48 18 L56 46 Z" />
+          <path d="M14 50 H50 L46 58 H18 Z" opacity=".55" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 function Stat({ label, value, max }: { label: string; value: number; max: number }) {
   return (
     <div className="lb-stat">
@@ -39,6 +68,7 @@ function Stat({ label, value, max }: { label: string; value: number; max: number
       <div>
         <i style={{ width: `${(value / max) * 100}%` }} />
       </div>
+      <b>{Math.round(value)}</b>
     </div>
   );
 }
@@ -78,59 +108,115 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
       }}
     >
       <div className="lb-grid" />
-      <header>
-        <h1>SKY<span>RIOT</span></h1>
-        <p>HANGAR — {RUSTWATER_CANYONS.name}</p>
+      <div className="lb-glow" />
+
+      <header className="lb-head">
+        <div>
+          <h1>
+            SKY<span>RIOT</span>
+          </h1>
+          <p>
+            HANGAR <i>/</i> {RUSTWATER_CANYONS.name}
+          </p>
+        </div>
+        <div className="lb-brief">
+          <span>DEPLOYMENT</span>
+          <strong>{NATIONS[sel.nation].name}</strong>
+          <span>
+            {FRAMES[sel.frame].name} · {FRAMES[sel.frame].role}
+          </span>
+        </div>
       </header>
 
       <section className="lb-nations">
-        {(Object.keys(NATIONS) as NationId[]).map((id) => (
-          <button key={id} className={`lb-nation ${id} ${sel.nation === id ? 'on' : ''}`} onClick={() => set({ nation: id })}>
-            <em>{NATIONS[id].motto}</em>
-            <strong>{NATIONS[id].name}</strong>
-            <span>{NATIONS[id].blurb}</span>
-          </button>
-        ))}
+        <h2 className="lb-h">
+          <b>01</b> Nation
+        </h2>
+        <div className="lb-row">
+          {(Object.keys(NATIONS) as NationId[]).map((id) => (
+            <button
+              key={id}
+              className={`lb-nation ${id} ${sel.nation === id ? 'on' : ''}`}
+              onClick={() => set({ nation: id })}
+            >
+              <Emblem nation={id} />
+              <div>
+                <em>{NATIONS[id].motto}</em>
+                <strong>{NATIONS[id].name}</strong>
+                <span>{NATIONS[id].blurb}</span>
+              </div>
+              <small>{sel.nation === id ? 'ENLISTED' : 'ENLIST'}</small>
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="lb-frames">
-        {Object.values(FRAMES).map((f) => (
-          <button key={f.id} className={`lb-frame ${sel.frame === f.id ? 'on' : ''}`} onClick={() => set({ frame: f.id })}>
-            <h3>{f.name}</h3>
-            <small>{f.role}</small>
-            <Stat label="ARMOR" value={f.maxHp} max={maxOf((x) => x.maxHp)} />
-            <Stat label="SHIELD" value={f.maxShield} max={maxOf((x) => x.maxShield)} />
-            <Stat label="SPEED" value={f.maxSpeed} max={maxOf((x) => x.maxSpeed)} />
-            <Stat label="AGILITY" value={f.turnRate} max={maxOf((x) => x.turnRate)} />
-            <div className="lb-wpn">
-              <span>{WEAPONS[f.primary]?.name}</span>
-              <span>{WEAPONS[f.secondary]?.name}</span>
-              {f.canHover && <span>Siege Mode</span>}
-            </div>
-          </button>
-        ))}
+        <h2 className="lb-h">
+          <b>02</b> Frame
+        </h2>
+        <div className="lb-row">
+          {Object.values(FRAMES).map((f) => (
+            <button
+              key={f.id}
+              className={`lb-frame ${sel.frame === f.id ? 'on' : ''}`}
+              data-mark={f.name[0]}
+              onClick={() => set({ frame: f.id })}
+            >
+              <div className="lb-frame-head">
+                <h3>{f.name}</h3>
+                <small>{f.role}</small>
+              </div>
+              <div className="lb-stats">
+                <Stat label="ARMOR" value={f.maxHp} max={maxOf((x) => x.maxHp)} />
+                <Stat label="SHIELD" value={f.maxShield} max={maxOf((x) => x.maxShield)} />
+                <Stat label="SPEED" value={f.maxSpeed} max={maxOf((x) => x.maxSpeed)} />
+                <Stat
+                  label="AGILITY"
+                  value={f.turnRate * 100}
+                  max={maxOf((x) => x.turnRate) * 100}
+                />
+              </div>
+              <dl className="lb-wpn">
+                <dt>Primary</dt>
+                <dd>{WEAPONS[f.primary]?.name}</dd>
+                <dt>Secondary</dt>
+                <dd>{WEAPONS[f.secondary]?.name}</dd>
+                {f.canHover && (
+                  <>
+                    <dt>Special</dt>
+                    <dd>Siege Mode</dd>
+                  </>
+                )}
+              </dl>
+              <i className="lb-check" />
+            </button>
+          ))}
+        </div>
       </section>
 
-      <div className="lb-keys">
-        <span><b>MOUSE</b> steer</span><span><b>W/S</b> throttle</span><span><b>A/D</b> strafe · double-tap = roll</span>
-        <span><b>Q/E</b> down/up</span><span><b>SPACE</b> boost</span><span><b>SHIFT</b> brake{sel.frame === 'bulwark' ? ' / land' : ''}</span>
-        <span><b>LMB/RMB</b> fire</span><span><b>1-0</b> hotbar</span><span><b>TAB</b> target</span><span><b>R</b> launch from deck</span>
-        {sel.frame === 'bulwark' && <span className="lb-bw"><b>BULWARK</b> hold Shift/Q near ground to land · W/S drive · E (up) or Space (boost) lifts off · hotbar 1 = Siege Anchor (first-person gunner)</span>}
-      </div>
-      <footer>
-        <label>
-          CALLSIGN
-          <input
-            value={sel.name}
-            maxLength={16}
-            placeholder="Pilot name"
-            onChange={(e) => set({ name: e.target.value })}
-            onKeyDown={(e) => e.key === 'Enter' && launch()}
-          />
-        </label>
-        <button className="lb-launch" onClick={launch}>
-          LAUNCH
-        </button>
+      <footer className="lb-foot">
+        <details className="lb-controls">
+          <summary>Controls</summary>
+          <Controls frame={sel.frame} compact />
+        </details>
+        <div className="lb-launchbar">
+          <label>
+            <span>
+              <b>03</b> Callsign
+            </span>
+            <input
+              value={sel.name}
+              maxLength={16}
+              placeholder="Pilot name"
+              onChange={(e) => set({ name: e.target.value })}
+              onKeyDown={(e) => e.key === 'Enter' && launch()}
+            />
+          </label>
+          <button className="lb-launch" onClick={launch}>
+            LAUNCH
+          </button>
+        </div>
       </footer>
     </div>
   );

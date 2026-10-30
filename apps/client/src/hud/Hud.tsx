@@ -10,6 +10,7 @@ import { IconDefs, SkillIcon } from './icons';
 import { Incoming } from './Incoming';
 import { Radar } from './Radar';
 import { NATION_COLOR, Reticles } from './Reticles';
+import { EscMenu, openEscMenu } from '../ui/EscMenu';
 import './hud.css';
 
 const ARC = 0.75; // 270-degree gauges
@@ -18,8 +19,22 @@ function Arc({ r, pct, cls, width = 9 }: { r: number; pct: number; cls: string; 
   const v = Math.max(0, Math.min(1, pct)) * ARC * 100;
   return (
     <>
-      <circle r={r} pathLength={100} className="arc-bg" strokeWidth={width} strokeDasharray={`${ARC * 100} 100`} transform="rotate(135)" />
-      <circle r={r} pathLength={100} className={`arc ${cls}`} strokeWidth={width} strokeDasharray={`${v} 100`} transform="rotate(135)" />
+      <circle
+        r={r}
+        pathLength={100}
+        className="arc-bg"
+        strokeWidth={width}
+        strokeDasharray={`${ARC * 100} 100`}
+        transform="rotate(135)"
+      />
+      <circle
+        r={r}
+        pathLength={100}
+        className={`arc ${cls}`}
+        strokeWidth={width}
+        strokeDasharray={`${v} 100`}
+        transform="rotate(135)"
+      />
     </>
   );
 }
@@ -27,13 +42,26 @@ function Arc({ r, pct, cls, width = 9 }: { r: number; pct: number; cls: string; 
 /** Concentric gauge: shield outside, HP inside, fuel innermost; numbers in the middle. */
 function Gauge() {
   const g = useHud(
-    useShallow((h) => ({ hp: h.hp, maxHp: h.maxHp, shield: h.shield, maxShield: h.maxShield, fuel: h.fuel, taken: h.taken, impact: h.impactText, nonce: h.impactNonce })),
+    useShallow((h) => ({
+      hp: h.hp,
+      maxHp: h.maxHp,
+      shield: h.shield,
+      maxShield: h.maxShield,
+      fuel: h.fuel,
+      taken: h.taken,
+      impact: h.impactText,
+      nonce: h.impactNonce,
+    })),
   );
   return (
     <div className="gauge">
       <svg viewBox="-100 -100 200 200">
         <Arc r={88} pct={g.shield / Math.max(1, g.maxShield)} cls="sh" />
-        <Arc r={74} pct={g.hp / Math.max(1, g.maxHp)} cls={g.hp / g.maxHp < 0.3 ? 'hp low' : 'hp'} />
+        <Arc
+          r={74}
+          pct={g.hp / Math.max(1, g.maxHp)}
+          cls={g.hp / g.maxHp < 0.3 ? 'hp low' : 'hp'}
+        />
         <Arc r={62} pct={g.fuel} cls="fu" width={5} />
       </svg>
       <div className="g-num">
@@ -61,21 +89,39 @@ function Gauge() {
 
 function Status() {
   const s = useHud(
-    useShallow((h) => ({ frame: h.frame, name: h.name, nation: h.nation, speed: h.speed, altitude: h.altitude, rollCd: h.rollCd, grounded: h.grounded })),
+    useShallow((h) => ({
+      frame: h.frame,
+      name: h.name,
+      nation: h.nation,
+      speed: h.speed,
+      altitude: h.altitude,
+      rollCd: h.rollCd,
+      grounded: h.grounded,
+    })),
   );
   return (
-    <div className="status" style={{ ['--c' as string]: s.nation ? NATION_COLOR[s.nation] : '#fff' }}>
+    <div
+      className="status"
+      style={{ ['--c' as string]: s.nation ? NATION_COLOR[s.nation] : '#fff' }}
+    >
       <div className="st-head">
         {s.frame ? FRAMES[s.frame].name.toUpperCase() : '—'} <small>{s.name}</small>
       </div>
       <div className="readouts">
-        <div>
-          <b>{Math.round(s.speed)}</b> <small>m/s</small>
+        <div className="ro">
+          <small>SPEED</small>
+          <b>{Math.round(s.speed)}</b>
+          <em>m/s</em>
         </div>
-        <div>
-          <b>{Math.round(s.altitude)}</b> <small>m AGL</small>
+        <div className="ro">
+          <small>ALT</small>
+          <b>{Math.round(s.altitude)}</b>
+          <em>m</em>
         </div>
-        <div className={`roll ${s.rollCd <= 0 ? 'ready' : ''}`} title="Barrel roll: double-tap A / D">
+        <div
+          className={`roll ${s.rollCd <= 0 ? 'ready' : ''}`}
+          title="Barrel roll: double-tap A / D"
+        >
           <div className="roll-bar">
             <i style={{ width: `${(1 - s.rollCd) * 100}%` }} />
           </div>
@@ -87,11 +133,18 @@ function Status() {
   );
 }
 
-const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+const mmss = (sec: number) =>
+  `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
 function Hotbar() {
   const { hotbar, frac, sec, toggles, fx } = useHud(
-    useShallow((h) => ({ hotbar: h.hotbar, frac: h.cooldownFrac, sec: h.cooldownSec, toggles: h.toggles, fx: h.skillFx })),
+    useShallow((h) => ({
+      hotbar: h.hotbar,
+      frac: h.cooldownFrac,
+      sec: h.cooldownSec,
+      toggles: h.toggles,
+      fx: h.skillFx,
+    })),
   );
   const [tip, setTip] = useState<{ i: number; left: number } | null>(null);
   const tipSkill = tip ? SKILLS[hotbar[tip.i] ?? ''] : undefined;
@@ -100,13 +153,21 @@ function Hotbar() {
       {hotbar.map((id, i) => {
         const skill = id ? SKILLS[id] : undefined;
         const cd = frac[i] ?? 0;
-        const on = !!skill && skill.kind === 'toggle' && !!skill.toggleGroup && toggles[skill.toggleGroup] === id;
+        const on =
+          !!skill &&
+          skill.kind === 'toggle' &&
+          !!skill.toggleGroup &&
+          toggles[skill.toggleGroup] === id;
         const punched = fx?.slot === i;
         return (
           <div
             key={`${i}-${punched ? fx!.nonce : 0}`}
             className={`slot ${skill ? '' : 'empty'} ${skill?.kind ?? ''} ${cd > 0 ? 'cooling' : ''} ${on ? 'on' : ''} ${punched ? 'punch' : ''}`}
-            onMouseEnter={(e) => skill && !document.pointerLockElement && setTip({ i, left: e.currentTarget.offsetLeft + e.currentTarget.offsetWidth / 2 })}
+            onMouseEnter={(e) =>
+              skill &&
+              !document.pointerLockElement &&
+              setTip({ i, left: e.currentTarget.offsetLeft + e.currentTarget.offsetWidth / 2 })
+            }
             onMouseLeave={() => setTip(null)}
           >
             {id && <SkillIcon id={id} />}
@@ -122,7 +183,8 @@ function Hotbar() {
           <b>{tipSkill.name}</b>
           <p>{tipSkill.description}</p>
           <small>
-            {tipSkill.durationSec > 0 && `Duration ${mmss(tipSkill.durationSec)}  ·  `}Cooldown {mmss(tipSkill.cooldownSec)}
+            {tipSkill.durationSec > 0 && `Duration ${mmss(tipSkill.durationSec)}  ·  `}Cooldown{' '}
+            {mmss(tipSkill.cooldownSec)}
           </small>
         </div>
       )}
@@ -136,7 +198,11 @@ function BuffBar() {
   return (
     <div className="buffbar">
       {buffs.map((b, i) => (
-        <div key={`${b.skill}${i}`} className={`buff ${b.left < 10 ? 'expiring' : ''}`} title={SKILLS[b.skill]?.name}>
+        <div
+          key={`${b.skill}${i}`}
+          className={`buff ${b.left < 10 ? 'expiring' : ''}`}
+          title={SKILLS[b.skill]?.name}
+        >
           <SkillIcon id={b.skill} />
           {b.ally && <i className="buff-ally" />}
           <div className="buff-t">
@@ -152,11 +218,19 @@ function BuffBar() {
 /** Activation feedback: centred name banner plus the icon flying from its slot to the buff bar. */
 function SkillFx() {
   const fx = useHud((h) => h.skillFx);
-  const [fly, setFly] = useState<{ nonce: number; skill: string; x: number; y: number } | null>(null);
+  const [fly, setFly] = useState<{ nonce: number; skill: string; x: number; y: number } | null>(
+    null,
+  );
   useEffect(() => {
     if (!fx) return;
     const slot = document.querySelectorAll('.hotbar .slot')[fx.slot]?.getBoundingClientRect();
-    if (slot) setFly({ nonce: fx.nonce, skill: fx.skill, x: slot.left + slot.width / 2, y: slot.top + slot.height / 2 });
+    if (slot)
+      setFly({
+        nonce: fx.nonce,
+        skill: fx.skill,
+        x: slot.left + slot.width / 2,
+        y: slot.top + slot.height / 2,
+      });
   }, [fx]);
   if (!fx) return null;
   return (
@@ -168,7 +242,12 @@ function SkillFx() {
         <div
           key={`f${fly.nonce}`}
           className="skill-fly"
-          style={{ left: fly.x, top: fly.y, ['--dx' as string]: `${70 - fly.x}px`, ['--dy' as string]: `${250 - fly.y}px` }}
+          style={{
+            left: fly.x,
+            top: fly.y,
+            ['--dx' as string]: `${70 - fly.x}px`,
+            ['--dy' as string]: `${250 - fly.y}px`,
+          }}
         >
           <SkillIcon id={fly.skill} />
         </div>
@@ -183,9 +262,13 @@ function Killfeed() {
     <div className="killfeed">
       {feed.map((k) => (
         <div key={k.id}>
-          <b style={{ color: k.killerNation ? NATION_COLOR[k.killerNation] : '#ccc' }}>{k.killer}</b>
+          <b style={{ color: k.killerNation ? NATION_COLOR[k.killerNation] : '#ccc' }}>
+            {k.killer}
+          </b>
           <span> ✦ </span>
-          <b style={{ color: k.victimNation ? NATION_COLOR[k.victimNation] : '#ccc' }}>{k.victim}</b>
+          <b style={{ color: k.victimNation ? NATION_COLOR[k.victimNation] : '#ccc' }}>
+            {k.victim}
+          </b>
         </div>
       ))}
     </div>
@@ -234,7 +317,8 @@ function Chat() {
               const text = e.currentTarget.value.trim();
               if (text) {
                 session.conn?.sendChat(text);
-                if (!text.startsWith('/')) addChatLine(`${useHud.getState().name}: ${text}`, 'chat');
+                if (!text.startsWith('/'))
+                  addChatLine(`${useHud.getState().name}: ${text}`, 'chat');
               }
               close();
             }
@@ -249,9 +333,21 @@ function Chat() {
 function Warnings() {
   const h = useHud(
     useShallow((x) => ({
-      locked: x.locked, alive: x.alive, respawnIn: x.respawnIn, sieged: x.sieged, grounded: x.grounded, evadedNonce: x.evadedNonce, outOfBounds: x.outOfBounds,
-      flashes: x.damageFlashes, hitNonce: x.hitNonce, hitDeflected: x.hitDeflected, ping: x.pingMs, frame: x.frame,
-      docked: x.docked, resupply: x.resupply, resupplied: x.resupplied, crashed: x.crashed,
+      locked: x.locked,
+      alive: x.alive,
+      respawnIn: x.respawnIn,
+      sieged: x.sieged,
+      grounded: x.grounded,
+      evadedNonce: x.evadedNonce,
+      outOfBounds: x.outOfBounds,
+      flashes: x.damageFlashes,
+      hitNonce: x.hitNonce,
+      hitDeflected: x.hitDeflected,
+      frame: x.frame,
+      docked: x.docked,
+      resupply: x.resupply,
+      resupplied: x.resupplied,
+      crashed: x.crashed,
     })),
   );
   const fullyStocked = h.resupplied || h.resupply >= 0.999;
@@ -259,10 +355,16 @@ function Warnings() {
     <>
       {h.locked && h.alive && <div className="warn-lock">MISSILE LOCK</div>}
       {h.outOfBounds && h.alive && <div className="oob">RETURN TO COMBAT AREA</div>}
-      {h.evadedNonce > 0 && <div key={h.evadedNonce} className="evaded">EVADED</div>}
+      {h.evadedNonce > 0 && (
+        <div key={h.evadedNonce} className="evaded">
+          EVADED
+        </div>
+      )}
       {h.sieged && (
         <div className="siege">
-          {h.grounded ? 'SIEGE (GROUND) ×1.5 DMG · RANGE ×1.4' : 'SIEGE (AIR) ×1.15 DMG · RANGE ×1.15 · LOCK CONE ×1.4'}
+          {h.grounded
+            ? 'SIEGE (GROUND) ×1.5 DMG · RANGE ×1.4'
+            : 'SIEGE (AIR) ×1.15 DMG · RANGE ×1.15 · LOCK CONE ×1.4'}
         </div>
       )}
       {h.flashes.map((f) => (
@@ -270,7 +372,9 @@ function Warnings() {
           <i />
         </div>
       ))}
-      {h.hitNonce > 0 && <div key={h.hitNonce} className={`hitmark ${h.hitDeflected ? 'defl' : ''}`} />}
+      {h.hitNonce > 0 && (
+        <div key={h.hitNonce} className={`hitmark ${h.hitDeflected ? 'defl' : ''}`} />
+      )}
       {h.docked && h.alive && (
         <div className="dock">
           {fullyStocked ? (
@@ -292,52 +396,31 @@ function Warnings() {
           <p>Redeploying in {h.respawnIn.toFixed(1)}s</p>
         </div>
       )}
-      <div className="ping">{h.ping} ms</div>
     </>
   );
 }
 
-function SettingsGear() {
-  const [open, setOpen] = useState(false);
-  const st = useSettings();
-  const row = (label: string, key: 'master' | 'sfx' | 'music') => (
-    <label>
-      {label}
-      <input type="range" min={0} max={1} step={0.05} value={st[key]} onChange={(e) => st.setAudio({ [key]: Number(e.target.value) })} />
-    </label>
-  );
+function TopBar() {
+  const muted = useSettings((s) => s.muted);
+  const ping = useHud((h) => h.pingMs);
   return (
-    <div className="gear" data-ui>
-      <button onClick={() => setOpen(!open)} title="Settings (M = mute)">
-        {st.muted ? '🔇' : '⚙'}
+    <div className="topbar" data-ui>
+      <span className="ping">{ping} ms</span>
+      {muted && <span className="muted">MUTED</span>}
+      <button onClick={openEscMenu}>
+        MENU <kbd>ESC</kbd>
       </button>
-      {open && (
-        <div className="gear-panel">
-          {row('MASTER', 'master')}
-          {row('EFFECTS', 'sfx')}
-          {row('MUSIC', 'music')}
-          <label>
-            MUTE (M)
-            <input type="checkbox" checked={st.muted} onChange={(e) => st.setAudio({ muted: e.target.checked })} />
-          </label>
-          <label>
-            QUALITY
-            <select value={st.quality} onChange={(e) => st.setQuality(e.target.value as 'low' | 'med' | 'high')}>
-              <option value="low">low</option>
-              <option value="med">med</option>
-              <option value="high">high</option>
-            </select>
-          </label>
-        </div>
-      )}
     </div>
   );
 }
 
-export function Hud() {
+export function Hud({ onLeave }: { onLeave(): void }) {
   useEffect(() => {
     const fit = () => {
-      const scale = Math.max(0.55, Math.min(1, window.innerHeight / 1000, window.innerWidth / 1700));
+      const scale = Math.max(
+        0.55,
+        Math.min(1, window.innerHeight / 1000, window.innerWidth / 1700),
+      );
       document.documentElement.style.setProperty('--hud-scale', String(scale));
     };
     fit();
@@ -351,7 +434,7 @@ export function Hud() {
   return (
     <div className="hud">
       <IconDefs />
-      <SettingsGear />
+      <TopBar />
       <Reticles />
       <Warnings />
       <Floaters />
@@ -364,6 +447,7 @@ export function Hud() {
       <Killfeed />
       <Chat />
       <Radar />
+      <EscMenu onLeave={onLeave} />
     </div>
   );
 }
