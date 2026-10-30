@@ -7,7 +7,13 @@ import {
   BANK_PER_STRAFE,
   BANK_PER_YAW_RATE,
   BANK_RATE_RAD,
+  BOUNDARY_BLEND_M,
   BOUNDARY_MARGIN,
+  BOUNDARY_SOFT_M,
+  BOUNDARY_WARN_M,
+  CEILING_PITCH_DOWN,
+  CEILING_PUSH_SPEED,
+  CEILING_SOFT_M,
   BRAKE_DECEL_MUL,
   DECK_APPROACH_MUL,
   DOCK_CLEARANCE,
@@ -19,7 +25,6 @@ import {
   GROUND_NORMAL_TAU_SEC,
   GROUND_REVERSE_MUL,
   GROUND_SLIDE_SPEED,
-  GROUND_STRAFE_MUL,
   HOVER_GAIN,
   HOVER_CLEARANCE,
   HOVER_MAX_SPEED,
@@ -28,6 +33,8 @@ import {
   LATERAL_TAU_SEC,
   LAUNCH_KICK,
   LIFTOFF_KICK,
+  ROLL_DISPLACEMENT_PER_IMPULSE,
+  ROLL_DURATION_SEC,
   MIN_DIRECTION_LENGTH,
   SHIP_QUERY_GROUPS,
   SIEGE_LOCK_CONE_MUL,
@@ -51,6 +58,7 @@ const _uu = [0, 0, 0];
 const _nn = [0, 0, 0];
 const _vec = { x: 0, y: 0, z: 0 };
 const _rot = { x: 0, y: 0, z: 0, w: 1 };
+const _rv = [0, 0, 0];
 const _move = { x: 0, y: 0, z: 0 };
 
 /** Siege damage/range/turn multipliers for the Ship's current Siege mode (grounded vs airborne). */
@@ -119,6 +127,19 @@ function ownDeck(ctx: SimCtx, s: ShipState, reach: number, radiusMul: number) {
   return null;
 }
 
+/** Barrel Roll lateral velocity: a smooth half-sine bump whose integral is the roll displacement. */
+function rollVelocity(fd: { rollImpulse: number }, s: ShipState, fx: number, fz: number, out: number[]): void {
+  out[0] = out[1] = out[2] = 0;
+  if (s.rollPhase < 0) return;
+  const displacement = fd.rollImpulse * ROLL_DISPLACEMENT_PER_IMPULSE;
+  const peak = (displacement * Math.PI) / (2 * ROLL_DURATION_SEC);
+  const mag = s.rollDir * peak * Math.sin(Math.PI * s.rollPhase);
+  const hx = -fz;
+  const hl = Math.hypot(hx, fx) || 1;
+  out[0] = (hx / hl) * mag;
+  out[2] = (fx / hl) * mag;
+}
+
 /** Terrain normal (smoothed outside) at x/z into `out`. */
 function terrainNormal(ctx: SimCtx, x: number, z: number, out: number[]): void {
   const h = GROUND_NORMAL_SAMPLE_M;
@@ -150,6 +171,16 @@ export function stepFlight(
   if (s.rollTicks > 0) s.rollTicks--;
   if (s.rollCooldownTicks > 0) s.rollCooldownTicks--;
   if (s.dashTicks > 0) s.dashTicks--;
+  if (s.rollPhase >= 0) {
+    s.rollPhase += dt / ROLL_DURATION_SEC;
+    if (s.rollPhase >= 1) {
+      s.rollPhase = -1;
+      s.rollDir = 0;
+    }
+  }
+  const edge = ctx.map.size / 2 - BOUNDARY_SOFT_M;
+  const reach = Math.max(Math.abs(s.pos[0]), Math.abs(s.pos[2]));
+  s.outOfBounds = reach > edge - BOUNDARY_WARN_M;
 
   // ---- Bulwark modes: landing, grounded, siege ----
   s.brakeHeld = input.brake;
@@ -170,6 +201,8 @@ export function stepFlight(
         (input.brake || input.vertical < 0)
       ) {
         s.grounded = true;
+        s.rollPhase = -1;
+        s.rollDir = 0;
         rec.lat[1] = 0;
       }
     }
@@ -186,6 +219,22 @@ export function stepFlight(
   let ax = input.aim[0],
     ay = input.aim[1],
     az = input.aim[2];
+  if (!s.docked) {
+    const al0 = Math.hypot(ax, ay, az) || 1;
+    ax /= al0;
+    ay /= al0;
+    az /= al0;
+    if (reach > edge) {
+      // Past the soft edge: steering is overridden, blending toward the map centre.
+      const w = clamp((reach - edge) / BOUNDARY_BLEND_M, 0, 1);
+      const cl = Math.hypot(s.pos[0], s.pos[2]) || 1;
+      ax = ax * (1 - w) - (s.pos[0] / cl) * w;
+      ay = ay * (1 - w);
+      az = az * (1 - w) - (s.pos[2] / cl) * w;
+    }
+    const ceilK = clamp((s.pos[1] - (ctx.map.ceiling - CEILING_SOFT_M)) / CEILING_SOFT_M, 0, 1);
+    if (ceilK > 0) ay = ay * (1 - ceilK) - ceilK * CEILING_PITCH_DOWN;
+  }
   if (s.docked || grounded) {
     ay = 0;
     const fl0 = Math.hypot(_f0[0]!, _f0[2]!);
@@ -320,7 +369,9 @@ export function stepFlight(
       -BANK_MAX_RAD,
       BANK_MAX_RAD,
     );
-    const bank = bank0 + clamp(bankTarget - bank0, -BANK_RATE_RAD * dt, BANK_RATE_RAD * dt);
+    const bank = s.docked
+      ? 0
+      : bank0 + clamp(bankTarget - bank0, -BANK_RATE_RAD * dt, BANK_RATE_RAD * dt);
     uprightFrame(_f1, s.rot, _r1, _u1);
     const cb = Math.cos(bank),
       sb = Math.sin(bank);
@@ -358,15 +409,13 @@ export function stepFlight(
     (input.rollLeft || input.rollRight) &&
     s.rollCooldownTicks === 0 &&
     s.fuel >= fd.rollFuelCost &&
+    s.rollPhase < 0 &&
     !sieged &&
     !grounded
   ) {
     const dir = input.rollLeft ? -1 : 1;
-    const hx = -_f1[2]!,
-      hz = _f1[0]!;
-    const hl = Math.hypot(hx, hz) || 1;
-    rec.lat[0] += (hx / hl) * dir * fd.rollImpulse;
-    rec.lat[2] += (hz / hl) * dir * fd.rollImpulse;
+    s.rollPhase = 0;
+    s.rollDir = dir;
     s.rollTicks = Math.ceil(fd.rollInvulnSec * TICK_HZ);
     s.rollCooldownTicks = Math.ceil(fd.rollCooldownSec * TICK_HZ);
     s.fuel -= fd.rollFuelCost;
@@ -397,13 +446,8 @@ export function stepFlight(
       const hl2 = Math.hypot(_nn[0]!, _nn[2]!) || 1;
       tx = (_nn[0]! / hl2) * GROUND_SLIDE_SPEED;
       tz = (_nn[2]! / hl2) * GROUND_SLIDE_SPEED;
-    } else if (!sieged) {
-      const hx = -_f1[2]!,
-        hz = _f1[0]!;
-      const hl2 = Math.hypot(hx, hz) || 1;
-      tx = (hx / hl2) * input.strafe * fd.strafeSpeed * GROUND_STRAFE_MUL;
-      tz = (hz / hl2) * input.strafe * fd.strafeSpeed * GROUND_STRAFE_MUL;
     }
+    // Grounded: no strafe (A/D does nothing); movement is W/S along the heading only.
     rec.lat[0] += (tx - rec.lat[0]) * kLat;
     rec.lat[1] = 0;
     rec.lat[2] += (tz - rec.lat[2]) * kLat;
@@ -484,14 +528,17 @@ export function stepFlight(
       ty -= env.gravity * STALL_FALL_SECONDS * (1 - s.speed / env.stallSpeed);
     }
   }
+  const ceilPush = clamp((s.pos[1] - (ctx.map.ceiling - CEILING_SOFT_M)) / CEILING_SOFT_M, 0, 1);
+  if (ceilPush > 0) ty = Math.min(ty, -ceilPush * CEILING_PUSH_SPEED);
   rec.lat[0] += (tx - rec.lat[0]) * kLat;
   rec.lat[1] += (ty - rec.lat[1]) * kLat;
   rec.lat[2] += (tz - rec.lat[2]) * kLat;
 
   // ---- move through the world ----
-  const vx = _f1[0]! * s.speed + rec.lat[0];
+  rollVelocity(fd, s, _f1[0]!, _f1[2]!, _rv);
+  const vx = _f1[0]! * s.speed + rec.lat[0] + _rv[0]!;
   const vy = _f1[1]! * s.speed + rec.lat[1];
-  const vz = _f1[2]! * s.speed + rec.lat[2];
+  const vz = _f1[2]! * s.speed + rec.lat[2] + _rv[2]!;
   s.vel[0] = vx;
   s.vel[1] = vy;
   s.vel[2] = vz;
@@ -522,6 +569,8 @@ export function stepFlight(
       s.speed = 0;
       s.sieged = false;
       s.siegePending = false;
+      s.rollPhase = -1;
+      s.rollDir = 0;
       s.pos[1] = deck.pos[1] + fd.radius + DOCK_CLEARANCE;
       rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;
       s.vel[0] = s.vel[1] = s.vel[2] = 0;
@@ -598,7 +647,8 @@ export function stepFlight(
 }
 
 /** Recompute hidden lateral velocity after a state overwrite (reconciliation). */
-export function deriveLateral(rec: ShipRec): void {
+export function deriveLateral(rec: ShipRec, fd: { rollImpulse: number }): void {
   forwardOf(rec.state.rot, _f0);
-  for (let i = 0; i < 3; i++) rec.lat[i] = rec.state.vel[i]! - _f0[i]! * rec.state.speed;
+  rollVelocity(fd, rec.state, _f0[0]!, _f0[2]!, _rv);
+  for (let i = 0; i < 3; i++) rec.lat[i] = rec.state.vel[i]! - _f0[i]! * rec.state.speed - _rv[i]!;
 }

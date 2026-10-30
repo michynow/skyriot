@@ -29,11 +29,11 @@ export function saveInputSettings(): void {
 }
 const RECENTER_RATE = 1.5; // 1/s decay of the cursor toward centre when enabled
 
-const DOUBLE_TAP_MS = 250;
+const DOUBLE_TAP_MS = 300; // max gap from the first key release to the second press
 export const AIM_DISTANCE = 600;
 
 const keys = new Set<string>();
-const lastTap: Record<string, number> = {};
+const lastUp: Record<string, number> = {};
 let rollLeft = false;
 let rollRight = false;
 let hotbar = -1;
@@ -105,13 +105,13 @@ export function attachInput(canvas: HTMLElement): () => void {
     if (e.repeat) return;
     keys.add(e.code);
     if (e.code === 'KeyA' || e.code === 'KeyD') {
-      const now = performance.now();
-      const prev = lastTap[e.code];
-      if (prev !== undefined && now - prev <= DOUBLE_TAP_MS) {
+      // Roll = second press within DOUBLE_TAP_MS of the first key's release (a held-then-released key counts).
+      const up = lastUp[e.code];
+      if (up !== undefined && performance.now() - up <= DOUBLE_TAP_MS) {
         if (e.code === 'KeyA') rollLeft = true;
         else rollRight = true;
-        lastTap[e.code] = -1e9;
-      } else lastTap[e.code] = now;
+        lastUp[e.code] = -1e9;
+      }
     } else if (e.code === 'Tab') cycleTarget();
     else if (e.code === 'KeyR' && !e.repeat) launch = true;
     else if (e.code.startsWith('Alt')) world.freeLook = true;
@@ -122,6 +122,7 @@ export function attachInput(canvas: HTMLElement): () => void {
   };
   const onKeyUp = (e: KeyboardEvent) => {
     keys.delete(e.code);
+    if (e.code === 'KeyA' || e.code === 'KeyD') lastUp[e.code] = performance.now();
     if (e.code.startsWith('Alt')) world.freeLook = false;
   };
   const onMouseMove = (e: MouseEvent) => {
@@ -242,6 +243,7 @@ export function sampleInput(
     launch: !typing && launch,
     target: inputState.targetId,
   };
+  if (import.meta.env.DEV && (input.rollLeft || input.rollRight)) console.debug('[roll] sent', input.rollLeft ? 'left' : 'right', 'seq', seq);
   rollLeft = rollRight = false;
   launch = false;
   hotbar = -1;

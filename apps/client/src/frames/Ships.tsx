@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import type { FrameId, NationId, ShipId } from '@skyriot/shared';
 import { world } from '../state/world';
 import { FrameModel } from './FrameModel';
+import { rollAngle } from './roll';
 
 interface Entry {
   id: ShipId;
@@ -12,6 +13,9 @@ interface Entry {
   tier: number;
   upgrade: number;
 }
+
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
+const rq = new THREE.Quaternion();
 
 /** Syncs one group per Ship in `world.ships`; React only re-renders when the roster/look changes. */
 export function Ships() {
@@ -46,6 +50,8 @@ export function Ships() {
       g.visible = s.alive;
       g.position.set(s.pos[0], s.pos[1], s.pos[2]);
       g.quaternion.set(s.rot[0], s.rot[1], s.rot[2], s.rot[3]);
+      const ra = rollAngle(s);
+      if (ra !== 0) g.quaternion.multiply(rq.setFromAxisAngle(Z_AXIS, ra)); // spin about the forward axis; camera ignores it
     }
   });
 

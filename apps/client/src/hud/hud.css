@@ -136,3 +136,13 @@
 /* graceful scale-down: --hud-scale is set from the viewport size in Hud.tsx */
 .status, .gauge, .hotbar, .radar, .killfeed, .chat, .siege, .dock, .warn-lock, .incoming, .evaded, .oob { zoom: var(--hud-scale, 1); }
 .oob { position: absolute; left: 50%; top: 18%; transform: translateX(-50%); white-space: nowrap; font: 800 30px 'Orbitron', sans-serif; letter-spacing: .15em; color: #ff3b3b; animation: blink .3s infinite alternate; text-shadow: 0 0 10px #f00; }
+
+.skill-icon { width: 100%; height: 100%; position: absolute; inset: 0; filter: drop-shadow(0 1px 2px #000a); }
+.slot { padding: 0; }
+.wpn-icon { width: 34px; height: 34px; color: inherit; filter: drop-shadow(0 1px 2px #000); }
+.curs-arrow { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 18px solid #7fe7ff; margin: -9px 0 0 -9px; filter: drop-shadow(0 0 4px #000); }
+.roll { flex-direction: column; align-items: flex-end; gap: 2px; }
+.roll-bar { width: 70px; height: 8px; background: #0009; border: 1px solid #fff4; transform: skewX(-20deg); }
+.roll i { max-width: none; height: 100%; box-shadow: none; }
+.roll.ready i { background: #6fffa0; box-shadow: 0 0 8px #6fffa0; }
+.roll.ready small { color: #6fffa0; font-weight: 700; }

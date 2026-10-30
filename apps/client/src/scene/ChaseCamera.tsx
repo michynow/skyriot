@@ -23,6 +23,9 @@ function spring(x: number, v: number, target: number, w: number, dt: number, out
   out[1] = (v - w * t) * e;
 }
 
+/** Set by the FX layer on a `teleport` of the own Ship: next frame the camera hard-snaps (no spring travel). */
+export const camSnap = { pending: false };
+
 /** Third-person chase camera for the own Ship. Mount inside <Canvas>. Writes the default camera. */
 export function ChaseCamera() {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
@@ -63,6 +66,12 @@ export function ChaseCamera() {
     if (!ship) return;
     const def = FRAMES[ship.frame];
 
+    if (camSnap.pending) {
+      camSnap.pending = false;
+      st.init = false;
+      st.ancInit = false;
+      st.vel.set(0, 0, 0);
+    }
     st.qs.set(ship.rot[0], ship.rot[1], ship.rot[2], ship.rot[3]);
     if (!st.init) {
       st.q.copy(st.qs);

@@ -5,7 +5,7 @@ import { session } from '../net/session';
 import { inputState, setTyping } from '../input/input';
 import { addChatLine, startHudFeed, useHud } from './hudStore';
 import { Floaters } from './Floaters';
-import { SkillIcon } from './icons';
+import { IconDefs, SkillIcon } from './icons';
 import { Incoming } from './Incoming';
 import { Radar } from './Radar';
 import { NATION_COLOR, Reticles } from './Reticles';
@@ -74,8 +74,11 @@ function Status() {
         <div>
           <b>{Math.round(s.altitude)}</b> <small>m AGL</small>
         </div>
-        <div className="roll" title="Barrel roll">
-          <i style={{ width: `${(1 - s.rollCd) * 100}%` }} /> <small>ROLL</small>
+        <div className={`roll ${s.rollCd <= 0 ? 'ready' : ''}`} title="Barrel roll: double-tap A / D">
+          <div className="roll-bar">
+            <i style={{ width: `${(1 - s.rollCd) * 100}%` }} />
+          </div>
+          <small>{s.rollCd <= 0 ? 'ROLL READY' : 'ROLL'}</small>
         </div>
       </div>
       {s.grounded && <div className="grounded">GROUNDED</div>}
@@ -239,6 +242,7 @@ export function Hud() {
   }, []);
   return (
     <div className="hud">
+      <IconDefs />
       <Reticles />
       <Warnings />
       <Floaters />

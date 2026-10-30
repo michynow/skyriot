@@ -137,10 +137,12 @@ export class MapRoom extends Room {
       dev: isDevAllowed(client),
     };
     client.send(MSG.welcome, welcome);
+    console.log(`[MapRoom] join ${id} ${nation}/${frame} ships=${[...this.sim.ships()].length}`);
   }
 
-  onLeave(client: Client) {
+  onLeave(client: Client, code?: number) {
     const id = client.sessionId;
+    console.log(`[MapRoom] leave ${id} code=${code ?? '-'}`);
     this.sim.removeShip(id);
     this.humans.delete(id);
     this.byId.delete(id);
@@ -252,7 +254,16 @@ export class MapRoom extends Room {
         slot.ack = extra.seq;
       }
     }
-    if (events.length > 0) this.broadcast(MSG.events, events);
+    if (events.length > 0) {
+      this.broadcast(MSG.events, events);
+      // Humans' deaths/respawns are logged so a "mystery" return to deck can be traced.
+      for (const e of events) {
+        if (e.type === 'shipDestroyed' && this.humans.has(e.victim))
+          console.log(`[MapRoom] ${e.victim} destroyed by ${e.killer ?? 'terrain'}`);
+        else if (e.type === 'shipRespawned' && this.humans.has(e.id))
+          console.log(`[MapRoom] ${e.id} respawned`);
+      }
+    }
     const ms = performance.now() - t0;
     if (ms > SLOW_TICK_MS && t0 - this.lastSlowLog > SLOW_LOG_INTERVAL_MS) {
       this.lastSlowLog = t0;

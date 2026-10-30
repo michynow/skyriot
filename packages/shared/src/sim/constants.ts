@@ -18,7 +18,16 @@ export const KCC_OFFSET = 0.15;
 /** Forward speed retained after a terrain impact. */
 export const IMPACT_SPEED_RETAIN = 0.55;
 export const FLOOR_CLEARANCE = 0.5;
+/** Hard clamp (last resort) sits this far inside the map edge. */
 export const BOUNDARY_MARGIN = 20;
+/** Steering override starts this far inside the map edge, blending to full over BOUNDARY_BLEND_M. */
+export const BOUNDARY_SOFT_M = 450;
+export const BOUNDARY_BLEND_M = 120;
+/** outOfBounds (HUD warning) is set this far before the override starts. */
+export const BOUNDARY_WARN_M = 200;
+export const CEILING_SOFT_M = 150;
+export const CEILING_PUSH_SPEED = 40;
+export const CEILING_PITCH_DOWN = 0.5;
 export const TIMESCALE_MIN = 0.05;
 export const TIMESCALE_MAX = 4;
 export const MIN_DIRECTION_LENGTH = 1e-6;
@@ -89,3 +98,7 @@ export const SIEGE_LOCK_CONE_MUL = 2;
 export const MORTAR_LOCK_SEC = 1.2;
 export const MORTAR_LOFT_RAD = 0.6;
 export const MORTAR_GUIDE_TURN = 0.9;
+
+// Barrel Roll: displacement = rollImpulse * factor over ROLL_DURATION_SEC (half-sine velocity curve).
+export const ROLL_DURATION_SEC = 0.35;
+export const ROLL_DISPLACEMENT_PER_IMPULSE = 0.25;

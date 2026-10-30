@@ -98,7 +98,7 @@ export function SkyDome({ env }: { env: EnvironmentProfile }) {
     [env.sky, env.fogColor],
   );
   useFrame((_, dt) => {
-    uniforms.uTime.value += dt;
+    if (mat.current) mat.current.uniforms.uTime!.value += dt;
   });
   return (
     <mesh frustumCulled={false} renderOrder={-1000}>

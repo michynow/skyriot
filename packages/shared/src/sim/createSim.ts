@@ -17,6 +17,7 @@ import type { Sim, SimOptions, SimTuning } from './index';
 import type { ShipRec, SimCtx } from './ctx';
 import {
   DECK_HALF_THICKNESS,
+  BOUNDARY_MARGIN,
   DOCK_CLEARANCE,
   DECK_RESPAWN_SPREAD,
   KCC_OFFSET,
@@ -97,6 +98,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     nextProjectileId: 1,
     events: [],
   };
+  /** Events raised between steps (teleports); flushed into the next step's result. */
+  let pending: SimEvent[] = [];
   const discard: SimEvent[] = [];
   const spawnCursor = { concord: 0, vex: 0 };
 
@@ -150,6 +153,9 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.ammo2 = fd.ammo2Max;
     s.docked = false;
     s.siegePending = false;
+    s.rollPhase = -1;
+    s.rollDir = 0;
+    s.outOfBounds = false;
     s.incomingDist = s.incomingTti = -1;
     s.canLock = false;
     s.lockProgress = 0;
@@ -244,6 +250,9 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       flareTicks: 0,
       dockTicks: 0,
       siegePending: false,
+      rollPhase: -1,
+      rollDir: 0,
+      outOfBounds: false,
       incomingDist: -1,
       incomingTti: -1,
       canLock: false,
@@ -315,7 +324,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     removeShip,
 
     step(inputs, frozen) {
-      const events: SimEvent[] = [];
+      const events: SimEvent[] = pending;
+      pending = [];
       ctx.events = events;
       refreshFrames();
       for (const rec of ctx.recList) {
@@ -355,6 +365,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
         rec = ctx.ships.get(id)!;
       }
       const { pos, rot, vel, cooldowns, angVel, ...scalars } = state;
+      // `state` may alias the live state (callers spread it), so copy arrays before touching them.
+      const cooldownsCopy = cooldowns.slice();
       const s = rec.state;
       Object.assign(s, scalars);
       for (let i = 0; i < 3; i++) {
@@ -364,9 +376,35 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       }
       for (let i = 0; i < 4; i++) s.rot[i] = rot[i]!;
       s.cooldowns.length = 0;
-      for (const c of cooldowns) s.cooldowns.push(c);
-      deriveLateral(rec);
+      for (const c of cooldownsCopy) s.cooldowns.push(c);
+      deriveLateral(rec, frames[s.frame]);
       syncBody(ctx, rec);
+    },
+
+    teleport(id, to) {
+      const rec = ctx.ships.get(id);
+      if (!rec) return;
+      const s = rec.state;
+      const lim = map.size / 2 - BOUNDARY_MARGIN;
+      s.pos[0] = Math.min(Math.max(to[0], -lim), lim);
+      s.pos[1] = Math.min(Math.max(to[1], 0), map.ceiling);
+      s.pos[2] = Math.min(Math.max(to[2], -lim), lim);
+      // A teleported Ship is airborne and flying, never left docked or grounded mid-air.
+      s.docked = false;
+      s.grounded = false;
+      s.sieged = false;
+      s.siegePending = false;
+      s.dockTicks = 0;
+      s.rollPhase = -1;
+      s.rollDir = 0;
+      s.speed = Math.max(s.speed, frames[s.frame].cruiseSpeed);
+      s.angVel[0] = s.angVel[1] = s.angVel[2] = 0;
+      rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;
+      const f = [0, 0, 0];
+      forwardOf(s.rot, f);
+      for (let i = 0; i < 3; i++) s.vel[i] = f[i]! * s.speed;
+      syncBody(ctx, rec);
+      pending.push({ type: 'teleport', id, pos: [s.pos[0], s.pos[1], s.pos[2]] });
     },
 
     stepLocal(id, input) {

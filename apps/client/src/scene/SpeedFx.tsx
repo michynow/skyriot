@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { BlendFunction, Effect } from 'postprocessing';
@@ -19,27 +19,28 @@ void main(){
   vec2 p = vec2(vP.x * uAspect, vP.y);
   float r = length(p);
   float a = atan(p.y, p.x) / 6.2831853 + 0.5;
-  const float N = 140.0;
+  const float N = 90.0;
   float id = floor(a * N);
   float cell = fract(a * N);
   float h = h11(id), h2 = h11(id + 17.0), h3 = h11(id + 53.0);
   // streak exists only if its hash is under the density
   float on = step(h, uAmt * 0.9 + uKick * 0.2);
   // thin line across the sector
-  float w = 0.04 + 0.07 * h2;
+  float w = 0.1 + 0.12 * h2;
   float line = smoothstep(0.5 - w, 0.5, cell) * smoothstep(0.5 + w, 0.5, cell);
   // moving segment along the radius (travels outward)
   float speed = 1.6 + 2.4 * h3;
   float s = fract(r * 0.9 - uTime * speed - h2 * 3.0);
   float seg = smoothstep(0.0, 0.05, s) * smoothstep(0.55 + 0.3 * h, 0.0, s);
   float radial = smoothstep(0.32, 0.95, r);
-  float alpha = line * seg * on * radial * (0.35 * uAmt + 0.45 * uKick);
+  float alpha = line * seg * on * radial * (0.8 * uAmt + 0.5 * uKick);
   gl_FragColor = vec4(uTint * (0.9 + 1.2 * uKick), alpha);
 }`;
 
 /** Anime-style radial speed lines (full-screen quad) + boost state tracking. Works at every quality level. */
 export function SpeedLines() {
   const size = useThree((s) => s.size);
+  const mat = useRef<THREE.ShaderMaterial>(null);
   const u = useMemo(
     () => ({
       uAmt: { value: 0 },
@@ -62,15 +63,19 @@ export function SpeedLines() {
     boostState.was = on;
     boostState.sustained += ((on ? 1 : 0) - boostState.sustained) * (1 - Math.exp(-6 * dt));
     boostState.kick = Math.max(0, boostState.kick - dt / 0.35);
-    u.uAmt.value = boostState.sustained;
-    u.uKick.value = boostState.kick;
-    u.uTime.value += dt;
-    u.uAspect.value = size.width / Math.max(1, size.height);
+    // r3f clones the `uniforms` prop, so write through the live material, not the memo object
+    const m = mat.current;
+    if (!m) return;
+    m.uniforms.uAmt!.value = boostState.sustained;
+    m.uniforms.uKick!.value = boostState.kick;
+    m.uniforms.uTime!.value += dt;
+    m.uniforms.uAspect!.value = size.width / Math.max(1, size.height);
   });
   return (
     <mesh frustumCulled={false} renderOrder={1000}>
       <planeGeometry args={[2, 2]} />
       <shaderMaterial
+        ref={mat}
         vertexShader={vert}
         fragmentShader={frag}
         uniforms={u}

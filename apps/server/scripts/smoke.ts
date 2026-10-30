@@ -179,11 +179,20 @@ function missileTrial(roll: boolean, k: number): 'hit' | 'evaded' | 'miss' {
     const events = sim2.step(
       new Map([
         ['tgt', mk(i, { aim: [0, 0, -1], rollLeft: rolling })],
-        ['sh', mk(i, { aim: [0, 0, -1], target: 'tgt', fire2: shooter.lockTarget !== null, throttle: -0.2 })],
+        [
+          'sh',
+          mk(i, {
+            aim: [0, 0, -1],
+            target: 'tgt',
+            fire2: shooter.lockTarget !== null,
+            throttle: -0.2,
+          }),
+        ],
       ]),
     );
     for (const e of events) {
-      if (e.type === 'projectileSpawned' && e.kind === 'missile' && e.target && missileId < 0) missileId = e.id;
+      if (e.type === 'projectileSpawned' && e.kind === 'missile' && e.target && missileId < 0)
+        missileId = e.id;
       if (e.type === 'missileEvaded' && e.id === missileId) result = 'evaded';
       if (e.type === 'hit' && e.projectile === missileId) result = 'hit';
     }
@@ -200,6 +209,105 @@ const tally = (roll: boolean) => {
 const rollRes = tally(true);
 const straightRes = tally(false);
 console.log('missile trials (30 each) roll@60m:', rollRes, 'straight:', straightRes);
+
+// 2c. Soft boundary, ceiling, teleport, Barrel Roll curve, grounded/docked purity.
+function edgeTest() {
+  const sim2 = fresh(true);
+  sim2.addShip('e', spawn('wasp'), [1500, 500, 0]);
+  const e = sim2.getShip('e')!;
+  let maxReach = 0,
+    warned = false,
+    turnedBack = false;
+  for (let i = 0; i < 900; i++) {
+    sim2.step(new Map([['e', mk(i, { aim: [1, 0, 0] })]]));
+    maxReach = Math.max(maxReach, Math.abs(e.pos[0]));
+    warned ||= e.outOfBounds;
+    if (Math.abs(e.pos[0]) > 1560 && e.vel[0] < -20) turnedBack = true;
+  }
+  const hard = map.size / 2 - 20;
+  const out = { maxReach, warned, returned: turnedBack };
+  sim2.addShip('c', spawn('wasp'), [0, map.ceiling - 20, 0]);
+  const c = sim2.getShip('c')!;
+  let maxY = 0;
+  for (let i = 0; i < 300; i++) {
+    sim2.step(new Map([['c', mk(i, { aim: [0, 1, -0.3] })]]));
+    maxY = Math.max(maxY, c.pos[1]);
+  }
+  sim2.dispose();
+  return { ...out, hard, maxY, ceilingPinned: c.pos[1] > map.ceiling - 1 };
+}
+const edge = edgeTest();
+console.log('edge/ceiling', edge);
+
+function teleportTest() {
+  const sim2 = fresh(true);
+  sim2.addShip('t', spawn('wasp', 'concord')); // spawns docked
+  const was = sim2.getShip('t')!.docked;
+  sim2.teleport('t', [100, 600, 100]);
+  const events = sim2.step(new Map([['t', mk(1, {})]]));
+  const s = sim2.getShip('t')!;
+  const ok =
+    was &&
+    !s.docked &&
+    Math.hypot(s.pos[0] - 100, s.pos[2] - 100) < 30 &&
+    events.some((e) => e.type === 'teleport');
+  sim2.dispose();
+  return ok;
+}
+const tpOk = teleportTest();
+
+function rollTest() {
+  const run = (roll: boolean) => {
+    const sim2 = fresh(true);
+    sim2.addShip('r', spawn('wasp'), [0, 600, 0]);
+    const r = sim2.getShip('r')!;
+    let phaseSeen = false;
+    for (let i = 0; i < 30; i++) {
+      sim2.step(new Map([['r', mk(i, { aim: [0, 0, -1], rollRight: roll && i === 2 })]]));
+      phaseSeen ||= r.rollPhase > 0 && r.rollPhase < 1;
+    }
+    const pos = [...r.pos];
+    sim2.dispose();
+    return { pos, phaseSeen };
+  };
+  const a = run(true);
+  const b = run(false);
+  return { lateral: Math.abs(a.pos[0]! - b.pos[0]!), phaseSeen: a.phaseSeen };
+}
+const rollInfo = rollTest();
+console.log('roll lateral displacement (m)', rollInfo.lateral.toFixed(1), 'tp', tpOk);
+
+function purity() {
+  const sim2 = fresh(true);
+  const g = sampleHeight(hf, 0, 0);
+  sim2.addShip('b', spawn('bulwark'), [0, g + 40, 0]);
+  const b = sim2.getShip('b')!;
+  let seq = 0;
+  for (let i = 0; i < 400 && !b.grounded; i++)
+    sim2.step(new Map([['b', mk(++seq, { vertical: -1, throttle: -1 })]]));
+  for (let i = 0; i < 40; i++) sim2.step(new Map([['b', mk(++seq, {})]]));
+  const x0 = b.pos[0],
+    z0 = b.pos[2];
+  for (let i = 0; i < 30; i++)
+    sim2.step(new Map([['b', mk(++seq, { strafe: 1, rollRight: true })]]));
+  const drift = Math.hypot(b.pos[0] - x0, b.pos[2] - z0);
+  const grounded = b.grounded && b.rollPhase < 0;
+  sim2.dispose();
+  const sim3 = fresh(true);
+  sim3.addShip('d', spawn('wasp', 'concord')); // docked
+  const d = sim3.getShip('d')!;
+  for (let i = 0; i < 20; i++)
+    sim3.step(new Map([['d', mk(i, { aim: [Math.sin(i / 5), 0, -Math.cos(i / 5)], strafe: 1 })]]));
+  const [qx, qy, qz, qw] = d.rot;
+  const upY = 1 - 2 * (qx * qx + qz * qz);
+  void qy;
+  void qw;
+  const dockOk = d.docked && upY > 0.999 && Math.hypot(d.vel[0], d.vel[1], d.vel[2]) === 0;
+  sim3.dispose();
+  return { drift, grounded, dockOk, upY };
+}
+const pure = purity();
+console.log('grounded strafe drift', pure.drift.toFixed(2), 'docked upY', pure.upY.toFixed(4));
 
 // 3. Prediction equality: stepLocal vs server step, identical inputs, bit-compare.
 function prediction(
@@ -245,6 +353,7 @@ const sweep = (i: number): Partial<PilotInput> => ({
 });
 const eq = {
   flightRollBoostDash: prediction(false, 'wasp', [0, 600, 0], sweep),
+  edgeOverride: prediction(false, 'wasp', [1500, 500, 0], () => ({ aim: [1, 0, 0] })),
   dockedLaunch: prediction(false, 'wasp', undefined, (i) => ({
     launch: i === 40,
     aim: [1, 0, -1],
@@ -283,6 +392,20 @@ check(
   'no-shield crash rule',
 );
 check(bw.ok, 'bulwark ground mode');
+check(
+  edge.maxReach < edge.hard - 5 && edge.warned && edge.returned,
+  'soft boundary should turn the ship back before the hard clamp',
+);
+check(!edge.ceilingPinned, 'ceiling should not pin the ship');
+check(tpOk, '/tp teleport');
+check(
+  rollInfo.lateral > 20 && rollInfo.lateral < 40 && rollInfo.phaseSeen,
+  'roll displacement ~30 m with rollPhase',
+);
+check(
+  pure.drift < 0.5 && pure.grounded && pure.dockOk,
+  'grounded strafe/roll and docked bank must be inert',
+);
 check(rollRes.hit <= TRIALS * 0.25, 'rolling target should mostly evade');
 check(straightRes.hit >= TRIALS * 0.7, 'straight-flying target should mostly get hit');
 for (const [k, v] of Object.entries(eq)) check(v === 0, `prediction mismatch ${k}: ${v}`);

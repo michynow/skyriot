@@ -145,6 +145,7 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
         for (const ev of events) {
           world.fxQueue.push(ev);
           handleHudEvent(ev);
+          if (ev.type === 'teleport' && ev.id === world.ownId) session.predictor?.teleport();
         }
         if (world.fxQueue.length > FX_QUEUE_MAX) world.fxQueue.splice(0, world.fxQueue.length - FX_QUEUE_MAX);
       },

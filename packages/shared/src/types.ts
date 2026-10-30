@@ -96,6 +96,10 @@ export interface ShipState {
   cooldowns: number[];
   /** Missile lock target, if any. */
   lockTarget: ShipId | null;
+  /** Timed buffs currently on this Ship (own casts and ally auras). */
+  buffs: ActiveBuff[];
+  /** Active toggle Skill per toggleGroup, e.g. { bombing: 'ground-strike-mode' }. */
+  toggles: Record<string, SkillId>;
   /** Rounds left for Primary / Secondary. Refilled on a Launch Deck. */
   ammo1: number;
   ammo2: number;
@@ -116,6 +120,12 @@ export interface ShipState {
   dockTicks: number;
   /** Siege skill used while airborne and fast: auto-brake until slow, then enter airborne Siege. */
   siegePending: boolean;
+  /** Barrel Roll progress 0..1 (spin the model 360 degrees about its forward axis); -1 when not rolling. */
+  rollPhase: number;
+  /** -1 left / +1 right while rolling, else 0. */
+  rollDir: number;
+  /** Near or past the map edge: show "RETURN TO COMBAT AREA". Past the edge steering is overridden. */
+  outOfBounds: boolean;
   // HUD values the client cannot derive exactly (server-computed).
   /** Distance (m) / time to impact (s) of the nearest guided missile homing on this Ship; -1 = none. */
   incomingDist: number;
@@ -164,6 +174,7 @@ export type SimEvent =
       bounced: boolean;
     }
   | { type: 'missileEvaded'; id: number; victim: ShipId; reason: 'roll' | 'terrain' | 'flare' }
+  | { type: 'teleport'; id: ShipId; pos: Vec3 }
   | { type: 'docked'; id: ShipId }
   | { type: 'resupplied'; id: ShipId }
   | { type: 'launched'; id: ShipId };
@@ -284,7 +295,35 @@ export interface SkillDef {
   frames: FrameId[] | 'all';
   cooldownSec: number;
   durationSec: number;
-  kind: 'consumable' | 'skill';
+  kind: 'consumable' | 'skill' | 'buff' | 'toggle';
+  /** For 'buff': stat changes while active (durationSec). Applied to self, or to allies in `auraRadiusM`. */
+  buff?: BuffEffect;
+  /** Buff also/only applies to allies within this radius (self included). */
+  auraRadiusM?: number;
+  /** For 'toggle': Skills sharing a group are mutually exclusive modes (e.g. Anvil bombing modes). */
+  toggleGroup?: string;
+}
+
+/** Multipliers default to 1, additions to 0. */
+export interface BuffEffect {
+  fireRateMul?: number;
+  speedMul?: number;
+  turnRateMul?: number;
+  deflectAdd?: number; // may exceed the normal Deflect cap
+  damageMul?: number;
+  damageTakenMul?: number;
+  maxHpMul?: number;
+  shieldRegenMul?: number;
+  fuelRegenMul?: number;
+  lockTimeMul?: number;
+  splashMul?: number;
+}
+
+export interface ActiveBuff {
+  skill: SkillId;
+  /** Ship that cast it (aura buffs on allies). */
+  source: ShipId;
+  ticksLeft: number;
 }
 
 // ---- Wire ----

@@ -37,7 +37,7 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
   const padFlames = useRef<(THREE.Group | null)[]>([]);
   const hull = useRef<THREE.Group>(null);
   const hover = useRef<THREE.Group>(null);
-  const st = useRef({ boost: 0, siege: sieged ? 1 : 0, ground: 0, leg: 0, fin: 0, kick: 0, was: false, t: Math.random() * 100 });
+  const st = useRef({ boost: 0, siege: sieged ? 1 : 0, ground: 0, leg: 0, fin: 0, kick: 0, was: false, idle: 1, t: Math.random() * 100 });
 
   useFrame((_, dt) => {
     const s = st.current;
@@ -74,7 +74,7 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
       if (!g) continue;
       const e = data.engines[i]!;
       const flick = 1 + 0.14 * Math.sin(s.t * 47 + i * 2.1) + 0.08 * Math.sin(s.t * 91 + i);
-      const len = (0.55 + s.boost * 3.4) * e.r * 4 * flick * (sg ? 0.35 : 1) * (1 + s.kick * 0.7);
+      const len = (0.55 + s.boost * 3.4) * e.r * 4 * flick * (sg ? 0.35 : 1) * (1 + s.kick * 0.7) * s.idle;
       const dm = diamonds.current[i];
       if (dm) {
         dm.visible = s.boost > 0.35;
@@ -83,7 +83,11 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
       }
       g.scale.set(e.r * (1 + s.boost * 0.3), e.r * (1 + s.boost * 0.3), len);
     }
-    const gr = !!(shipId && (world.ships.get(shipId) as { grounded?: boolean } | undefined)?.grounded);
+    const me = shipId ? world.ships.get(shipId) : undefined;
+    const docked = !!me?.docked;
+    const gr = docked || !!(me as { grounded?: boolean } | undefined)?.grounded;
+    const idle = docked ? 0.25 : gr ? 0.45 + Math.min(1, Math.hypot(me!.vel[0], me!.vel[2]) / 25) * 0.35 : 1;
+    s.idle += (idle - s.idle) * (1 - Math.exp(-6 * dt));
     s.ground += ((gr ? 1 : 0) - s.ground) * (1 - Math.exp(-5 * dt));
     if (hover.current) hover.current.position.y = -0.55 * s.ground;
     const hv = !(shipId && fpv.id === shipId && fpv.amount > 0.6);

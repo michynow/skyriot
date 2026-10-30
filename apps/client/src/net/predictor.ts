@@ -22,6 +22,8 @@ export interface Predictor {
    */
   ownState(alpha: number): ShipState | null;
   stats(): PredictorStats;
+  /** Server teleported the own Ship: drop the error offset and replay buffer, hard-snap on the next snapshot. */
+  teleport(): void;
 }
 
 function cloneShip(s: ShipState): ShipState {
@@ -42,6 +44,7 @@ export function createPredictor(sim: Sim, ownId: ShipId): Predictor {
   let lastRender = performance.now();
   let render: ShipState | null = null;
   const errors: { at: number; err: number }[] = [];
+  let forceSnap = false;
 
   function capture() {
     const s = sim.getShip(ownId);
@@ -87,6 +90,11 @@ export function createPredictor(sim: Sim, ownId: ShipId): Predictor {
       }
       const before: Vec3 = [currPos[0], currPos[1], currPos[2]];
       const wasAlive = existing.alive;
+      if (forceSnap) {
+        forceSnap = false;
+        pending = [];
+        offset[0] = offset[1] = offset[2] = 0;
+      }
       pending = pending.filter((p) => p.seq > snap.ack);
       sim.setShipState(ownId, cloneShip(own));
       resetHistory();
@@ -131,6 +139,12 @@ export function createPredictor(sim: Sim, ownId: ShipId): Predictor {
       rot[2] = _a.z;
       rot[3] = _a.w;
       return render;
+    },
+
+    teleport() {
+      pending = [];
+      offset[0] = offset[1] = offset[2] = 0;
+      forceSnap = true;
     },
 
     stats() {

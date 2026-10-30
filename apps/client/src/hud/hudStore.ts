@@ -272,7 +272,7 @@ export function startHudFeed(): () => void {
         altitude: hf ? own.pos[1] - sampleHeight(hf, own.pos[0], own.pos[2]) : own.pos[1],
         sieged: own.sieged,
         grounded,
-        outOfBounds: (own as { outOfBounds?: boolean }).outOfBounds === true,
+        outOfBounds: own.outOfBounds,
         locked,
         respawnIn: own.alive ? 0 : Math.min(RESPAWN_SEC, Math.max(0, (own.respawnAtTick - tick) / TICK_HZ)),
         rollCd: Math.min(1, own.rollCooldownTicks / Math.max(1, def.rollCooldownSec * TICK_HZ)),

@@ -46,6 +46,17 @@ Every pilot owns all four Frames and swaps in the hangar. Each Frame has its own
 | **Halo** | Support | Medium | Heals, shields, buffs, debuff fields, resurrection beacon |
 | **Bulwark** | Armored hover-gunship | Hovers, **lands and drives on terrain** (hull in space), slow | **Siege mode** (grounded = full strength; airborne = hover-locked, weaker multipliers; rooted, first-person gunner view, Target lock for mortar, +damage/+range), artillery, area denial |
 
+### Core kits (v1)
+
+| Frame | Core Skills |
+|---|---|
+| Wasp | **Overdrive** (frenzy: +fire rate, +speed, 90 s), **Phantom Weave** (evasion: +Deflect beyond cap, 90 s), **Hunter Sight** (faster lock, 60 s), Afterburn Dash, Ghost Skin, Flares |
+| Anvil | **Air Barrage Mode** / **Ground Strike Mode** (mutually exclusive bombing modes changing the Secondary), **Bulk Plating** (+max HP, 120 s), Carpet Drop, Iron Hide, Flares |
+| Halo | **Rally Field** (ally damage aura, 120 s), **Overcharge** (ally regen aura, 90 s), **Purge** (break locks on allies), Mend Beam, Aegis Bubble, Flares |
+| Bulwark | **Fortify** (−30% damage taken, 120 s), **Barrage Calibration** (+mortar damage/splash, 90 s), Siege Anchor, Scrap Wall, Flares |
+
+Long buffs last 1–3 minutes with multi-minute cooldowns; active buffs show as timed icons in the HUD and as visual auras on the Ship. **Every Skill activation has its own animation** (Ship VFX + HUD flash).
+
 Skill kits are our own designs covering these roles (no 1:1 renames of any existing game's skills). Each Frame: ~12 skills unlocked across levels, player slots up to 10 on the hotbar alongside consumables.
 
 ## 4. Controls

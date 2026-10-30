@@ -25,6 +25,8 @@ export interface Sim {
   setShipState(id: ShipId, state: ShipState): void;
   /** Client prediction: step only these Ships, no Projectile damage authority. */
   stepLocal(id: ShipId, input: PilotInput): void;
+  /** Move a Ship (dev /tp): clears dock/ground state, syncs the body, emits a `teleport` event next step. */
+  teleport(id: ShipId, pos: Vec3): void;
   /** Static-world collider wireframe for the dev debug view: flat [x,y,z,...] line segments. */
   debugLines(): Float32Array;
   dispose(): void;

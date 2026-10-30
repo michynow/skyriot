@@ -21,7 +21,7 @@ function mk(id: string, frame: FrameId, nation: NationId, tier: number, upgrade:
     id, nation, frame, name: id, isBot: true, tier, upgrade,
     pos: [0, 0, 0], rot: [0, 0, 0, 1], vel: [0, 0, 0], hp: d.maxHp, maxHp: d.maxHp, shield: d.maxShield, maxShield: d.maxShield,
     fuel: 1, speed: 100, alive: true, respawnAtTick: 0, rollTicks: 0, rollCooldownTicks: 0, sieged: false, cooldowns: [], lockTarget: null, ammo1: 100, ammo2: 4, docked: false,
-    angVel: [0, 0, 0], brakeHeld: false, dashTicks: 0, ghostTicks: 0, ironTicks: 0, flareTicks: 0, dockTicks: 0, grounded: false,
+    angVel: [0, 0, 0], brakeHeld: false, dashTicks: 0, ghostTicks: 0, ironTicks: 0, flareTicks: 0, dockTicks: 0, grounded: false, buffs: [], toggles: {}, rollPhase: -1, rollDir: 1, outOfBounds: false,
     siegePending: false, incomingDist: -1, incomingTti: -1, canLock: false, lockProgress: 0,
   };
 }
@@ -56,6 +56,8 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
   }, [map, opts.showcase, opts.focus]);
 
   (window as unknown as { __world: unknown }).__world = world;
+  const spam = location.search.includes('missiles=1');
+  const boostAll = location.search.includes('boost=1');
   const o = useMemo(() => new THREE.Object3D(), []);
   const v = useMemo(() => new THREE.Vector3(), []);
   const gl = useThree((s) => s.gl);
@@ -105,7 +107,8 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
       s.pos = [x, y, z];
       s.rot = [o.quaternion.x, o.quaternion.y, o.quaternion.z, o.quaternion.w];
       s.sieged = false;
-      if (i === 0 || i % 3 === 0) world.boosting.add(s.id); else world.boosting.delete(s.id);
+      if (i === 0 || i % 3 === 0 || boostAll) world.boosting.add(s.id); else world.boosting.delete(s.id);
+      if (s.rollPhase >= 0) s.rollPhase = s.rollPhase + dt / 0.7 > 1 ? -1 : s.rollPhase + dt / 0.7;
       const dead = demo.deadUntil.get(s.id);
       if (dead !== undefined && t > dead) { demo.deadUntil.delete(s.id); s.alive = true; s.hp = s.maxHp; push({ type: 'shipRespawned', id: s.id, pos: s.pos }); }
       s.hp = Math.max(s.maxHp * 0.2, s.maxHp * (0.6 + 0.4 * Math.sin(t * 0.3 + i)) );
@@ -126,10 +129,10 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
       }
       T.missile -= dt;
       if (T.missile < 0) {
-        T.missile = 2.5;
-        const a = pick()!, b = pick()!;
+        T.missile = spam ? 0.25 : 2.5;
+        const a = pick()!, b = spam && rnd() < 0.5 ? list[0]! : pick()!;
         v.set(0, 0, -1).applyQuaternion(o.quaternion.set(a.rot[0], a.rot[1], a.rot[2], a.rot[3]));
-        push({ type: 'projectileSpawned', id: demo.nextId++, owner: a.id, kind: 'missile', weapon: 'sting-missile', origin: [a.pos[0], a.pos[1] - 1, a.pos[2]], dir: [v.x, v.y, v.z], speed: 190, target: b.id, tick: 0 });
+        push({ type: 'projectileSpawned', id: demo.nextId++, owner: a.id, kind: 'missile', weapon: spam && rnd() < 0.4 ? 'seeker-pod' : 'sting-missile', origin: [a.pos[0], a.pos[1] - 1, a.pos[2]], dir: [v.x, v.y, v.z], speed: 190, target: b.id, tick: 0 });
         const r = list[0]!;
         v.set(0, 0, -1).applyQuaternion(o.quaternion.set(r.rot[0], r.rot[1], r.rot[2], r.rot[3]));
         push({ type: 'projectileSpawned', id: demo.nextId++, owner: r.id, kind: 'rocket', weapon: 'brick-bomb', origin: [r.pos[0], r.pos[1] - 1, r.pos[2]], dir: [v.x, v.y - 0.1, v.z], speed: 140, target: null, tick: 0 });
@@ -149,7 +152,7 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
         push({ type: 'shipDestroyed', victim: s.id, killer: 'own', pos: s.pos });
       }
       T.roll -= dt;
-      if (T.roll < 0) { T.roll = 4; push({ type: 'barrelRoll', id: pick()!.id, dir: rnd() < 0.5 ? -1 : 1 }); }
+      if (T.roll < 0) { T.roll = 4; const rs = rnd() < 0.5 ? list[0]! : pick()!; rs.rollPhase = 0; rs.rollDir = rnd() < 0.5 ? -1 : 1; push({ type: 'barrelRoll', id: rs.id, dir: rnd() < 0.5 ? -1 : 1 }); }
       T.impact -= dt;
       if (T.impact < 0) {
         T.impact = 6;

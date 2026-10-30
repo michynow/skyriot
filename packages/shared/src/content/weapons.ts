@@ -28,6 +28,105 @@ export const WEAPONS: Record<string, WeaponDef> = {
 };
 
 export const SKILLS: Record<string, SkillDef> = {
+  // ---- Core Frame kits: long buffs (minutes), modes ----
+  overdrive: b(
+    'overdrive',
+    'Overdrive',
+    'Frenzy: +35% Primary fire rate, +12% speed.',
+    ['wasp'],
+    240,
+    90,
+    {
+      fireRateMul: 1.35,
+      speedMul: 1.12,
+    },
+  ),
+  'phantom-weave': b(
+    'phantom-weave',
+    'Phantom Weave',
+    'Evasion: +20% Deflect (beyond cap), +10% turn rate.',
+    ['wasp'],
+    240,
+    90,
+    {
+      deflectAdd: 0.2,
+      turnRateMul: 1.1,
+    },
+  ),
+  'hunter-sight': b('hunter-sight', 'Hunter Sight', 'Missile lock time -40%.', ['wasp'], 180, 60, {
+    lockTimeMul: 0.6,
+  }),
+  'air-barrage-mode': t(
+    'air-barrage-mode',
+    'Air Barrage Mode',
+    'Bombing mode: Secondary fires a forward salvo of 3 rockets at air targets.',
+    ['anvil'],
+    'bombing',
+  ),
+  'ground-strike-mode': t(
+    'ground-strike-mode',
+    'Ground Strike Mode',
+    'Bombing mode: Secondary drops heavy bombs straight down, +40% damage vs Grounded/Docked targets and splash.',
+    ['anvil'],
+    'bombing',
+  ),
+  'bulk-plating': b(
+    'bulk-plating',
+    'Bulk Plating',
+    '+25% max HP, -10% speed.',
+    ['anvil'],
+    240,
+    120,
+    { maxHpMul: 1.25, speedMul: 0.9 },
+  ),
+  'rally-field': b(
+    'rally-field',
+    'Rally Field',
+    'Allies within 150 m deal +15% damage.',
+    ['halo'],
+    240,
+    120,
+    { damageMul: 1.15 },
+    150,
+  ),
+  overcharge: b(
+    'overcharge',
+    'Overcharge',
+    'Allies within 150 m: shield and fuel regen x2.',
+    ['halo'],
+    200,
+    90,
+    {
+      shieldRegenMul: 2,
+      fuelRegenMul: 2,
+    },
+    150,
+  ),
+  purge: s(
+    'purge',
+    'Purge',
+    'Break every missile lock on you and allies within 120 m.',
+    ['halo'],
+    45,
+    0.5,
+  ),
+  fortify: b('fortify', 'Fortify', 'Take 30% less damage, -15% turn rate.', ['bulwark'], 240, 120, {
+    damageTakenMul: 0.7,
+    turnRateMul: 0.85,
+  }),
+  'barrage-calibration': b(
+    'barrage-calibration',
+    'Barrage Calibration',
+    'Mortar/Secondary +25% damage, +30% splash.',
+    ['bulwark'],
+    200,
+    90,
+    {
+      damageMul: 1.25,
+      splashMul: 1.3,
+    },
+  ),
+
   flares: s(
     'flares',
     'Flares',
@@ -135,6 +234,48 @@ function s(
   durationSec: number,
 ): SkillDef {
   return { id, name, description, frames, cooldownSec, durationSec, kind: 'skill' };
+}
+
+function b(
+  id: string,
+  name: string,
+  description: string,
+  frames: SkillDef['frames'],
+  cooldownSec: number,
+  durationSec: number,
+  buff: SkillDef['buff'],
+  auraRadiusM?: number,
+): SkillDef {
+  return {
+    id,
+    name,
+    description,
+    frames,
+    cooldownSec,
+    durationSec,
+    kind: 'buff',
+    buff,
+    auraRadiusM,
+  };
+}
+
+function t(
+  id: string,
+  name: string,
+  description: string,
+  frames: SkillDef['frames'],
+  toggleGroup: string,
+): SkillDef {
+  return {
+    id,
+    name,
+    description,
+    frames,
+    cooldownSec: 2,
+    durationSec: 0,
+    kind: 'toggle',
+    toggleGroup,
+  };
 }
 
 function c(id: string, name: string, description: string, cooldownSec: number): SkillDef {

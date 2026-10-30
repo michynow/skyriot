@@ -4,6 +4,8 @@ import * as THREE from 'three';
 import { FRAMES, WEAPONS, sampleHeight, type NationId, type ProjectileKind, type ShipId, type SimEvent } from '@skyriot/shared';
 import { PALETTES } from '../frames/palette';
 import { MODEL_SCALE, getModel } from '../frames/models';
+import { camSnap } from '../scene/ChaseCamera';
+import { rollAngle, rollDirs } from '../frames/roll';
 import { world } from '../state/world';
 import { ParticlePool, SpriteBatch } from './sprites';
 
@@ -279,7 +281,8 @@ function handleEvents(fx: Fx, _dt: number) {
       case 'barrelRoll': {
         if (fx.rN < MAX_ROLLS) {
           const r = fx.rolls[fx.rN++]!;
-          r.id = e.id; r.t = 0.55; r.dir = e.dir;
+          r.id = e.id; r.t = 0.8; r.dir = e.dir;
+          rollDirs.set(e.id, e.dir);
         }
         break;
       }
@@ -314,6 +317,9 @@ function handleEvents(fx: Fx, _dt: number) {
         }
         break;
       }
+      case 'teleport':
+        if (e.id === world.ownId) camSnap.pending = true;
+        break;
       case 'skillUsed':
       case 'docked':
         break;
@@ -398,7 +404,7 @@ function shockwave(fx: Fx, p: [number, number, number], k: number, heavy: boolea
   for (let i = 0; i < (heavy ? 14 : 6); i++) {
     const dx = rnd() - 0.5, dy = rnd() - 0.2, dz = rnd() - 0.5;
     const l = (1 / Math.hypot(dx, dy, dz)) * rr(1, 5) * k;
-    fx.puffs.emit(x, y, z, dx * l, dy * l, dz * l, rr(2.5, heavy ? 5 : 4), 5 * k, 20 * k, 0.5, 0.45, 0.42, 0.55, 0.9, -0.5, 0.26, 0.25, 0.25);
+    fx.puffs.emit(x, y, z, dx * l, dy * l, dz * l, rr(2.5, heavy ? 5 : 4), 5 * k, 20 * k, 0.5, 0.45, 0.42, 0.4, 0.9, -0.5, 0.26, 0.25, 0.25);
   }
   fx.boomLight.position.set(x, y, z);
   fx.boomLight.intensity = Math.max(fx.boomLight.intensity, 1400 * Math.min(k, 3));
@@ -543,13 +549,13 @@ function updateProjectiles(fx: Fx, dt: number) {
         fx.additive.push(x, y, z, 5 * fl, 0.25, 1.3, 2.2, 0.75);
         f[o + 10]! += dt;
         let n = 0;
-        while (f[o + 10]! > 0.006) {
-          f[o + 10]! -= 0.006;
+        while (f[o + 10]! > 0.0035) {
+          f[o + 10]! -= 0.0035;
           const back = f[o + 10]! * sp, ph = age * 26 - n++ * 0.4;
           const c1 = Math.cos(ph) * 0.55, s1 = Math.sin(ph) * 0.55;
           for (const sgn of [1, -1]) {
             fx.glow.emit(x - dx * back + (ux * c1 + wx * s1) * sgn, y - dy * back + (uy * c1 + wy * s1) * sgn, z - dz * back + (uz * c1 + wz * s1) * sgn,
-              0, 0, 0, 0.55, 1.0, 0.1, 0.7, 2.2, 3.2, 0.7, 0, 0, 0.1, 0.4, 1.4);
+              0, 0, 0, 0.5, 1.2, 0.1, 0.7, 2.2, 3.2, 0.45, 0, 0, 0.1, 0.4, 1.4);
           }
         }
       } else {
@@ -560,7 +566,7 @@ function updateProjectiles(fx: Fx, dt: number) {
         const sc = (big * 6) / sp;
         fx.streaks.push(x, y, z, 0.5 * big, 2.4, 1.3, 0.4, 0.9, vx * sc, vy * sc, vz * sc);
         f[o + 10]! += dt;
-        const step = mine ? 0.007 : 0.011;
+        const step = mine ? 0.014 : 0.02;
         let n = 0;
         while (f[o + 10]! > step) {
           f[o + 10]! -= step;
@@ -569,8 +575,8 @@ function updateProjectiles(fx: Fx, dt: number) {
           const c1 = Math.cos(ph) * rad, s1 = Math.sin(ph) * rad;
           const px = x - dx * back + ux * c1 + wx * s1, py = y - dy * back + uy * c1 + wy * s1, pz = z - dz * back + uz * c1 + wz * s1;
           // lingering smoke: pale -> grey, curls via the spiral spawn offset
-          fx.puffs.emit(px, py, pz, rr(-1.2, 1.2), rr(-1.2, 1.2), rr(-1.2, 1.2), rr(2.0, 3.6), 1.1 * big, 5.6 * big * (mine ? 1.4 : 1),
-            0.97, 0.92, 0.86, mine ? 0.72 : 0.55, 0.4, -0.3, 0.38, 0.36, 0.35);
+          fx.puffs.emit(px, py, pz, rr(-1.2, 1.2), rr(-1.2, 1.2), rr(-1.2, 1.2), rr(1.8, 3.0), 1.0 * big, 4.6 * big * (mine ? 1.3 : 1),
+            0.85, 0.8, 0.75, mine ? 0.5 : 0.28, 0.4, -0.3, 0.38, 0.36, 0.35);
           // hot flame core: white -> orange
           fx.glow.emit(px, py, pz, 0, 0, 0, 0.32, 1.3 * big, 0.3, 3, 2.3, 1.3, 0.75, 0, 0, 1.3, 0.35, 0.05);
         }
@@ -747,10 +753,16 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
     }
     q.set(s.rot[0], s.rot[1], s.rot[2], s.rot[3]);
     const w = FRAMES[s.frame].radius * 1.05;
+    const ang = rollAngle(s), ca = Math.cos(ang), sa = Math.sin(ang);
     for (const side of [-1, 1]) {
-      v.set(side * w, 0, 0.3).applyQuaternion(q);
-      fx.glow.emit(s.pos[0] + v.x, s.pos[1] + v.y, s.pos[2] + v.z, 0, 0, 0, 0.55, 0.9, 0.1, 1.6, 1.8, 2.2, 0.8);
+      // wingtip follows the visual roll: rotate (side*w, 0) about the forward axis
+      v.set(side * w * ca, side * w * sa, 0.3).applyQuaternion(q);
+      const x = s.pos[0] + v.x, y = s.pos[1] + v.y, z = s.pos[2] + v.z;
+      fx.glow.emit(x, y, z, 0, 0, 0, 0.6, 1.1, 0.15, 1.6, 1.9, 2.4, 0.8);
+      fx.puffs.emit(x, y, z, rr(-0.5, 0.5), rr(-0.5, 0.5), rr(-0.5, 0.5), 1.0, 0.9, 2.4, 0.95, 0.97, 1.0, 0.45, 0.8, 0, 0.8, 0.85, 0.9);
     }
+    // whoosh streak trailing behind the roll
+    fx.streaks.push(s.pos[0], s.pos[1], s.pos[2], w * 0.6, 1.4, 1.7, 2.2, 0.35, -s.vel[0] * 0.07, -s.vel[1] * 0.07, -s.vel[2] * 0.07);
     i++;
   }
 }

@@ -13,10 +13,11 @@ export function runDevCommand(host: DevHost, shipId: ShipId, line: string): stri
   const { sim } = host;
   switch (cmd.toLowerCase()) {
     case 'god': {
-      const on = !sim.tuning.god.has(shipId);
+      const arg = args[0]?.toLowerCase();
+      const on = arg === 'on' ? true : arg === 'off' ? false : !sim.tuning.god.has(shipId);
       if (on) sim.tuning.god.add(shipId);
       else sim.tuning.god.delete(shipId);
-      return `god ${on ? 'on' : 'off'}`;
+      return `god ${on ? 'on' : 'off'} (ship ${shipId})`;
     }
     case 'bots': {
       const n = Number(args[0]);
@@ -31,11 +32,11 @@ export function runDevCommand(host: DevHost, shipId: ShipId, line: string): stri
     }
     case 'tp': {
       const p = args.map(Number);
-      const ship = sim.getShip(shipId);
-      if (!ship || p.length !== 3 || p.some((v) => !Number.isFinite(v)))
+      if (!sim.getShip(shipId) || p.length !== 3 || p.some((v) => !Number.isFinite(v)))
         return 'usage: /tp <x> <y> <z>';
-      sim.setShipState(shipId, { ...ship, pos: [p[0]!, p[1]!, p[2]!] });
-      return `teleported to ${p.join(' ')}`;
+      sim.teleport(shipId, [p[0]!, p[1]!, p[2]!]);
+      const at = sim.getShip(shipId)!.pos;
+      return `teleported to ${at.map((v) => v.toFixed(0)).join(' ')}`;
     }
     case 'level':
     case 'glory':

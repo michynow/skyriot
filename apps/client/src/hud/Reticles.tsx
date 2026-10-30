@@ -11,7 +11,7 @@ import {
   type WeaponDef,
 } from '@skyriot/shared';
 import { world } from '../state/world';
-import { inputState } from '../input/input';
+import { inputSettings, inputState } from '../input/input';
 import { isGrounded } from './hudStore';
 import { project } from './view';
 import { Ammo } from './Ammo';
@@ -78,6 +78,7 @@ export function Reticles() {
   const crTag = useRef<HTMLSpanElement>(null);
   const crMax = useRef<HTMLSpanElement>(null);
   const noseEl = useRef<HTMLDivElement>(null);
+  const arrowEl = useRef<HTMLDivElement>(null);
   const leadEl = useRef<HTMLDivElement>(null);
   const targetEl = useRef<HTMLDivElement>(null);
   const targetLabel = useRef<HTMLSpanElement>(null);
@@ -102,8 +103,24 @@ export function Reticles() {
       const W = window.innerWidth;
       const H = window.innerHeight;
       const own = world.ownId ? world.ships.get(world.ownId) : undefined;
-      const cx = (world.cursor.x * 0.5 + 0.5) * W;
-      const cy = (-world.cursor.y * 0.5 + 0.5) * H;
+      // The crosshair is fixed at screen centre (the Ship's nose); the cursor only steers.
+      const cx = W / 2;
+      const cy = H / 2;
+      const off = Math.hypot(world.cursor.x, world.cursor.y);
+      const dz = inputSettings.deadzone;
+      const arrow = arrowEl.current;
+      if (arrow) {
+        if (off <= dz) arrow.style.display = 'none';
+        else {
+          const mag = Math.min(1, (off - dz) / (1 - dz));
+          const dx = world.cursor.x / off;
+          const dy = -world.cursor.y / off;
+          const dist = 34 + mag * 46;
+          arrow.style.display = 'block';
+          arrow.style.opacity = String(0.25 + 0.75 * mag);
+          arrow.style.transform = `translate(${cx + dx * dist}px,${cy + dy * dist}px) rotate(${(Math.atan2(dy, dx) * 180) / Math.PI + 90}deg) scale(${0.7 + mag * 0.9})`;
+        }
+      }
       if (!own || !own.alive) {
         place(cursorEl.current, cx, cy, true);
         place(noseEl.current, 0, 0, false);
@@ -148,7 +165,7 @@ export function Reticles() {
       const targetD = rel ? Math.hypot(rel[0]!, rel[1]!, rel[2]!) : Infinity;
 
       // What's under the aim: nearest enemy near the aim ray, else terrain hit.
-      const aim = inputState.aim;
+      const aim: [number, number, number] = [fx, fy, fz]; // range cues use the nose/centre, not the cursor
       let underD: number | null = null;
       let underEnemy = false;
       for (const o of others) {
@@ -199,7 +216,7 @@ export function Reticles() {
 
       // Nose reticle (where the guns point).
       const noseOk = project(own.pos[0] + fx * NOSE_DISTANCE, own.pos[1] + fy * NOSE_DISTANCE, own.pos[2] + fz * NOSE_DISTANCE, p);
-      place(noseEl.current, p.x, p.y, noseOk && !sieged);
+      place(noseEl.current, p.x, p.y, false && noseOk);
 
       // Name tags: name + distance only, red enemy / white ally.
       for (let i = 0; i < MARKERS; i++) {
@@ -300,6 +317,7 @@ export function Reticles() {
       </div>
       <div className="lead" ref={leadEl} style={{ display: 'none' }} />
       <div className="nose" ref={noseEl} style={{ display: 'none' }} />
+      <div className="curs-arrow" ref={arrowEl} style={{ display: 'none' }} />
       <div className="cursor" ref={cursorEl}>
         <span className="cr-dist" ref={crDist} />
         <span className="cr-tag" ref={crTag} />

@@ -307,8 +307,8 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
           ty = t.state.pos[1] - s.pos[1],
           tz = t.state.pos[2] - s.pos[2];
         const td = Math.hypot(tx, ty, tz) || 1;
-        const al = Math.hypot(input.aim[0], input.aim[1], input.aim[2]) || 1;
-        const cosAim = (tx * input.aim[0] + ty * input.aim[1] + tz * input.aim[2]) / (td * al);
+        // The assist cone is measured from the nose (the centre crosshair), not the steering aim.
+        const cosAim = (tx * _f[0]! + ty * _f[1]! + tz * _f[2]!) / td;
         if (td <= w.rangeM * (mods ? mods.rangeMul : 1) && cosAim >= Math.cos(AIM_ASSIST.coneRad)) {
           const rx = t.state.pos[0] - ox,
             ry = t.state.pos[1] - oy,

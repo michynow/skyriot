@@ -30,6 +30,7 @@ const SKILL_CHANCE = 0.01;
 const RESUPPLY_AMMO_FRACTION = 0.05;
 const DECK_APPROACH_HEIGHT = 20;
 const DECK_BRAKE_DISTANCE = 250;
+const BOT_EDGE_MARGIN = 600;
 const SIEGE_SLOT = 0; // siege-anchor is hotbar slot 0 on the Bulwark
 const FLARE_SLOT = 2;
 const ROLL_WINDOW_MIN_M = 30;
@@ -91,6 +92,15 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     tx = enemy.pos[0] + enemy.vel[0] * lead;
     ty = enemy.pos[1] + enemy.vel[1] * lead;
     tz = enemy.pos[2] + enemy.vel[2] * lead;
+  }
+
+  // Stay inside the map: head for the centre well before the sim's own edge override kicks in.
+  const reach = Math.max(Math.abs(me.pos[0]), Math.abs(me.pos[2]));
+  const edgeBot = reach > mem.hf.size / 2 - BOT_EDGE_MARGIN;
+  if (edgeBot) {
+    tx = 0;
+    tz = 0;
+    ty = Math.max(me.pos[1], CRUISE_ALTITUDE);
   }
 
   // Launch Deck logic: relaunch right after resupply; return when out of ammo.

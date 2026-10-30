@@ -72,6 +72,9 @@ function parseSnapshot(m: unknown): Snapshot | null {
     incomingTti: isNum(s.incomingTti) ? s.incomingTti : -1,
     canLock: s.canLock === true,
     lockProgress: isNum(s.lockProgress) ? s.lockProgress : 0,
+    rollPhase: isNum(s.rollPhase) ? s.rollPhase : -1,
+    rollDir: isNum(s.rollDir) ? s.rollDir : 0,
+    outOfBounds: s.outOfBounds === true,
   }));
   return { tick: m.tick, serverTimeMs: m.serverTimeMs, ack: isNum(m.ack) ? m.ack : -1, ships };
 }
