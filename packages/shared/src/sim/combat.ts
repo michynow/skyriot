@@ -23,6 +23,9 @@ import {
   NAV_MAX_LEAD_SEC,
   ROCKET_WOBBLE_AMP_M,
   ROCKET_WOBBLE_PERIOD_SEC,
+  SEEKER_CONE_RAD,
+  BREAK_TURN_ACCEL,
+  MISSILE_MOTOR_SEC,
   WEAVE_AMP_MIN_M,
   WEAVE_AMP_SPAN_M,
   WEAVE_PERIOD_MIN_SEC,
@@ -602,12 +605,21 @@ export function stepProjectiles(ctx: SimCtx): void {
         ty /= tl;
         tz /= tl;
         const missile = p.kind === 'missile';
-        let broke: 'roll' | 'terrain' | 'flare' | null = null;
+        let broke: 'roll' | 'terrain' | 'flare' | 'lost' | null = null;
         if (ts.flareTicks > 0) {
           broke = 'flare';
         } else if (missile) {
           if (ts.rollTicks > 0 && tl < MISSILE_EVADE.rollBreakDistM) {
             broke = 'roll';
+          } else if (
+            age * dt > MISSILE_MOTOR_SEC ||
+            (tl < MISSILE_EVADE.endgameDistM &&
+              (p.dx * tx + p.dy * ty + p.dz * tz < Math.cos(SEEKER_CONE_RAD) ||
+                ts.speed * Math.hypot(ts.angVel[0], ts.angVel[1], ts.angVel[2]) >=
+                  BREAK_TURN_ACCEL))
+          ) {
+            // Motor burnt out, the target slipped out of the seeker cone, or it out-turns the missile up close.
+            broke = 'lost';
           } else {
             // Terrain line of sight to the target.
             ray.origin.x = p.x;

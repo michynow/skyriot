@@ -223,7 +223,7 @@ export type SimEvent =
       type: 'missileEvaded';
       id: number;
       victim: ShipId;
-      reason: 'roll' | 'terrain' | 'flare' | 'purge';
+      reason: 'roll' | 'terrain' | 'flare' | 'purge' | 'lost';
     }
   | { type: 'teleport'; id: ShipId; pos: Vec3 }
   | { type: 'docked'; id: ShipId }
