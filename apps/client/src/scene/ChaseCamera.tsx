@@ -81,8 +81,8 @@ export function ChaseCamera() {
     st.qo.setFromEuler(st.eu.set(st.pitch, st.yaw, 0));
     st.qs.copy(st.q).multiply(st.qo);
 
-    const dist = def.halfLength * 1.8 * st.zoom;
-    const height = dist * 0.3;
+    const dist = def.halfLength * 1.1 * st.zoom;
+    const height = dist * 0.38;
     st.off.set(0, height, dist).applyQuaternion(st.qs);
     // Pitch so the screen-centre ray meets the Ship's flight line at AIM_DISTANCE: centred cursor = fly straight.
     st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(height, dist + AIM_DISTANCE));
