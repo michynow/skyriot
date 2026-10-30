@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { createRef, useRef, useState, type RefObject } from 'react';
 import {
   FRAMES,
   RUSTWATER_CANYONS,
@@ -9,6 +9,7 @@ import {
 } from '@skyriot/shared';
 import { initAudio, music, playSfx } from '../audio/engine';
 import { Controls } from './Controls';
+import { HangarCanvas, ShipStage } from './FramePreview';
 import './lobby.css';
 
 const KEY = 'skyriot.lobby';
@@ -25,6 +26,7 @@ const NATIONS: Record<NationId, { name: string; motto: string; blurb: string }> 
     blurb: 'Scrapyard crowns and burning thrusters. The Freehold takes what it can fly away with.',
   },
 };
+const FRAME_IDS = Object.keys(FRAMES) as FrameId[];
 
 const maxOf = (pick: (f: (typeof FRAMES)[FrameId]) => number) =>
   Math.max(...Object.values(FRAMES).map(pick));
@@ -75,10 +77,18 @@ function Stat({ label, value, max }: { label: string; value: number; max: number
 
 export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
   const [sel, setSel] = useState(load);
+  const stage = useRef<HTMLDivElement>(null);
+  const thumbs = useRef(
+    Object.fromEntries(FRAME_IDS.map((id) => [id, createRef<HTMLDivElement>()])) as Record<
+      FrameId,
+      RefObject<HTMLDivElement | null>
+    >,
+  );
   const set = (p: Partial<typeof sel>) => {
     setSel((s) => ({ ...s, ...p }));
     if (p.nation) music.setNation(p.nation);
   };
+  const frame = FRAMES[sel.frame];
 
   const launch = () => {
     initAudio();
@@ -109,30 +119,29 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
     >
       <div className="lb-grid" />
       <div className="lb-glow" />
+      <HangarCanvas>
+        <ShipStage frame={sel.frame} nation={sel.nation} track={stage} />
+        {FRAME_IDS.map((id) => (
+          <ShipStage
+            key={id}
+            frame={id}
+            nation={sel.nation}
+            track={thumbs.current[id]}
+            speed={0.5}
+          />
+        ))}
+      </HangarCanvas>
 
       <header className="lb-head">
-        <div>
-          <h1>
-            SKY<span>RIOT</span>
-          </h1>
-          <p>
-            HANGAR <i>/</i> {RUSTWATER_CANYONS.name}
-          </p>
-        </div>
-        <div className="lb-brief">
-          <span>DEPLOYMENT</span>
-          <strong>{NATIONS[sel.nation].name}</strong>
-          <span>
-            {FRAMES[sel.frame].name} · {FRAMES[sel.frame].role}
-          </span>
-        </div>
+        <h1>
+          SKY<span>RIOT</span>
+        </h1>
+        <p>Hangar — {RUSTWATER_CANYONS.name}</p>
       </header>
 
-      <section className="lb-nations">
-        <h2 className="lb-h">
-          <b>01</b> Nation
-        </h2>
-        <div className="lb-row">
+      <aside className="lb-rail">
+        <h2>Nation</h2>
+        <div className="lb-nations">
           {(Object.keys(NATIONS) as NationId[]).map((id) => (
             <button
               key={id}
@@ -140,58 +149,60 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
               onClick={() => set({ nation: id })}
             >
               <Emblem nation={id} />
-              <div>
-                <em>{NATIONS[id].motto}</em>
+              <span>
                 <strong>{NATIONS[id].name}</strong>
-                <span>{NATIONS[id].blurb}</span>
-              </div>
-              <small>{sel.nation === id ? 'ENLISTED' : 'ENLIST'}</small>
+                <em>{NATIONS[id].motto}</em>
+              </span>
             </button>
           ))}
         </div>
-      </section>
+        <p className="lb-blurb">{NATIONS[sel.nation].blurb}</p>
 
-      <section className="lb-frames">
-        <h2 className="lb-h">
-          <b>02</b> Frame
-        </h2>
-        <div className="lb-row">
-          {Object.values(FRAMES).map((f) => (
+        <h2>Frame</h2>
+        <div className="lb-frames">
+          {FRAME_IDS.map((id) => (
             <button
-              key={f.id}
-              className={`lb-frame ${sel.frame === f.id ? 'on' : ''}`}
-              data-mark={f.name[0]}
-              onClick={() => set({ frame: f.id })}
+              key={id}
+              className={`lb-frame ${sel.frame === id ? 'on' : ''}`}
+              onClick={() => set({ frame: id })}
             >
-              <div className="lb-frame-head">
-                <h3>{f.name}</h3>
-                <small>{f.role}</small>
-              </div>
-              <div className="lb-stats">
-                <Stat label="ARMOR" value={f.maxHp} max={maxOf((x) => x.maxHp)} />
-                <Stat label="SHIELD" value={f.maxShield} max={maxOf((x) => x.maxShield)} />
-                <Stat label="SPEED" value={f.maxSpeed} max={maxOf((x) => x.maxSpeed)} />
-                <Stat
-                  label="AGILITY"
-                  value={f.turnRate * 100}
-                  max={maxOf((x) => x.turnRate) * 100}
-                />
-              </div>
-              <dl className="lb-wpn">
-                <dt>Primary</dt>
-                <dd>{WEAPONS[f.primary]?.name}</dd>
-                <dt>Secondary</dt>
-                <dd>{WEAPONS[f.secondary]?.name}</dd>
-                {f.canHover && (
-                  <>
-                    <dt>Special</dt>
-                    <dd>Siege Mode</dd>
-                  </>
-                )}
-              </dl>
-              <i className="lb-check" />
+              <div className="lb-thumb" ref={thumbs.current[id]} />
+              <span>
+                <strong>{FRAMES[id].name}</strong>
+                <em>{FRAMES[id].role}</em>
+              </span>
             </button>
           ))}
+        </div>
+      </aside>
+
+      <section className="lb-stage" key={sel.frame}>
+        <div className="lb-view" ref={stage} />
+        <div className="lb-sheet">
+          <h3>{frame.name}</h3>
+          <p>{frame.role}</p>
+          <div className="lb-stats">
+            <Stat label="Armor" value={frame.maxHp} max={maxOf((x) => x.maxHp)} />
+            <Stat label="Shield" value={frame.maxShield} max={maxOf((x) => x.maxShield)} />
+            <Stat label="Speed" value={frame.maxSpeed} max={maxOf((x) => x.maxSpeed)} />
+            <Stat
+              label="Agility"
+              value={frame.turnRate * 100}
+              max={maxOf((x) => x.turnRate) * 100}
+            />
+          </div>
+          <dl className="lb-wpn">
+            <dt>Primary</dt>
+            <dd>{WEAPONS[frame.primary]?.name}</dd>
+            <dt>Secondary</dt>
+            <dd>{WEAPONS[frame.secondary]?.name}</dd>
+            {frame.canHover && (
+              <>
+                <dt>Special</dt>
+                <dd>Siege Mode</dd>
+              </>
+            )}
+          </dl>
         </div>
       </section>
 
@@ -200,23 +211,19 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
           <summary>Controls</summary>
           <Controls frame={sel.frame} compact />
         </details>
-        <div className="lb-launchbar">
-          <label>
-            <span>
-              <b>03</b> Callsign
-            </span>
-            <input
-              value={sel.name}
-              maxLength={16}
-              placeholder="Pilot name"
-              onChange={(e) => set({ name: e.target.value })}
-              onKeyDown={(e) => e.key === 'Enter' && launch()}
-            />
-          </label>
-          <button className="lb-launch" onClick={launch}>
-            LAUNCH
-          </button>
-        </div>
+        <label className="lb-callsign">
+          <span>Callsign</span>
+          <input
+            value={sel.name}
+            maxLength={16}
+            placeholder="Pilot name"
+            onChange={(e) => set({ name: e.target.value })}
+            onKeyDown={(e) => e.key === 'Enter' && launch()}
+          />
+        </label>
+        <button className="lb-launch" onClick={launch}>
+          Launch
+        </button>
       </footer>
     </div>
   );
