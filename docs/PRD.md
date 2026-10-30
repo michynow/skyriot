@@ -55,7 +55,7 @@ Every pilot owns all four Frames and swaps in the hangar. Each Frame has its own
 | Halo | **Rally Field** (ally damage aura, 120 s), **Overcharge** (ally regen aura, 90 s), **Purge** (break locks on allies), Mend Beam, Aegis Bubble, Flares |
 | Bulwark | **Fortify** (−30% damage taken, 120 s), **Barrage Calibration** (+mortar damage/splash, 90 s), Siege Anchor, Scrap Wall, Flares |
 
-Long buffs last 1–3 minutes with multi-minute cooldowns; active buffs show as timed icons in the HUD and as visual auras on the Ship. **Every Skill activation has its own animation** (Ship VFX + HUD flash).
+Long buffs last 1–3 minutes and are recastable the moment they expire (no extra cooldown); active buffs show as timed icons in the HUD and as visual auras on the Ship. **Every Skill activation has its own animation** (Ship VFX + HUD flash).
 
 Skill kits are our own designs covering these roles (no 1:1 renames of any existing game's skills). Each Frame: ~12 skills unlocked across levels, player slots up to 10 on the hotbar alongside consumables.
 
@@ -84,7 +84,7 @@ Close third-person chase camera with slight lag. Mouse steering is deliberately 
 - **Easy to hit, hard to master.** Ships are large relative to the map. Primary has **aim assist**: with a Target inside a small cone around the centre crosshair, rounds lead onto it. The crosshair advises when the Secondary is in range/lockable.
 - **Missile lock is relative to the Ship's nose**, not the cursor. Evading missiles is a skill: a well-timed Barrel Roll makes a close missile overshoot, terrain breaks line of sight and eats missiles, flares break locks.
 - Siege Mode is a hotbar Skill (`Siege Anchor`), not a dedicated key.
-- **All projectiles are real.** Primaries: fast tracer rounds (dodgeable at range by strafing). Secondaries: missiles, rockets, bombs — slower; homing missiles have a turn-rate limit and can be outflown.
+- **All projectiles are real.** Primaries: fast tracer rounds (dodgeable at range by strafing). Secondaries: missiles, rockets, bombs — slower; homing missiles visibly manoeuvre (pursuit guidance with a weave) under a turn-rate limit and can be outflown.
 - **Flares** skill breaks missile locks.
 - **Deflect** stat: chance (hard cap 15%) for a hit to glance for 30% damage. Wasp stacks highest.
 - **Shield → HP.** Shield regenerates after 4 s without damage.
