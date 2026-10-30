@@ -55,6 +55,8 @@ export interface Projectile {
   target: ShipId | null;
   spawnTick: number;
   rewind: number;
+  /** Seconds the terrain has blocked line of sight to the target (missiles). */
+  losTime: number;
 }
 
 export interface Wall {

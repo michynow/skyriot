@@ -97,3 +97,77 @@ export function SkillIcon({ id }: { id: string }) {
     </svg>
   );
 }
+
+const WEAPON_ICONS: Record<string, ReactElement> = {
+  // tracer gun: long barrel with rounds
+  'needle-cannon': (
+    <>
+      <path d="M4 20h30l6 4-6 4H4z" fill="currentColor" />
+      <path {...sw} stroke={A} d="M38 12l8-2M38 36l8 2M42 24h4" />
+    </>
+  ),
+  // flak: wide burst with shrapnel
+  'flak-repeater': (
+    <>
+      <path d="M4 26h16v8H4z" fill="currentColor" />
+      <circle cx="32" cy="24" r="6" fill={A} />
+      <path {...sw} d="M32 8v8M32 32v8M16 24h8M40 12l-5 5M40 36l-5-5M24 12l5 5" />
+    </>
+  ),
+  // pulse blaster: energy bolts
+  'pulse-blaster': (
+    <>
+      <path d="M4 20h12v8H4z" fill="currentColor" />
+      <circle cx="26" cy="24" r="4" fill={A} />
+      <circle cx="38" cy="24" r="3" fill={A} opacity=".7" />
+      <circle cx="46" cy="24" r="2" fill={A} opacity=".4" />
+    </>
+  ),
+  // twin autocannon: two barrels
+  'twin-autocannon': (
+    <>
+      <path d="M4 14h30l6 3-6 3H4zM4 28h30l6 3-6 3H4z" fill="currentColor" />
+      <path {...sw} stroke={A} d="M42 17h4M42 31h4" />
+    </>
+  ),
+  // missile: tapered body with fins and flame
+  'sting-missile': (
+    <>
+      <path d="M44 24L30 17H12v14h18z" fill="currentColor" />
+      <path d="M12 17L5 10v8zM12 31l-7 7v-8z" fill="currentColor" />
+      <path d="M12 24H3" {...sw} stroke={A} />
+    </>
+  ),
+  // seeker pod: tube cluster
+  'seeker-pod': (
+    <>
+      <rect x="6" y="8" width="36" height="32" rx="4" fill="currentColor" />
+      {[16, 32].flatMap((x) => [16, 32].map((y) => <circle key={`${x}${y}`} cx={x} cy={y} r="4.5" fill="#06121f" stroke={A} strokeWidth="2" />))}
+    </>
+  ),
+  // bomb: teardrop with fins
+  'brick-bomb': (
+    <>
+      <ellipse cx="24" cy="28" rx="11" ry="14" fill="currentColor" />
+      <path d="M17 12h14l-3 6H20z" fill={A} />
+      <path {...sw} d="M24 4v6" />
+    </>
+  ),
+  // mortar: angled tube with arcing shell
+  'mortar-battery': (
+    <>
+      <path d="M8 40l10-18 8 5-6 13z" fill="currentColor" />
+      <path {...sw} d="M4 42h20" />
+      <path {...sw} stroke={A} strokeDasharray="3 5" d="M24 20Q34 4 44 28" />
+      <circle cx="44" cy="30" r="3.5" fill={A} />
+    </>
+  ),
+};
+
+export function WeaponIcon({ id }: { id: string }) {
+  return (
+    <svg viewBox="0 0 48 48" className="wpn-icon" aria-hidden>
+      {WEAPON_ICONS[id] ?? <circle cx="24" cy="24" r="8" fill="currentColor" />}
+    </svg>
+  );
+}

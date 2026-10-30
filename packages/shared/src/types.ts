@@ -114,6 +114,16 @@ export interface ShipState {
   flareTicks: number;
   /** Ticks spent docked (resupply fires at DECK.resupplySec). */
   dockTicks: number;
+  /** Siege skill used while airborne and fast: auto-brake until slow, then enter airborne Siege. */
+  siegePending: boolean;
+  // HUD values the client cannot derive exactly (server-computed).
+  /** Distance (m) / time to impact (s) of the nearest guided missile homing on this Ship; -1 = none. */
+  incomingDist: number;
+  incomingTti: number;
+  /** Secondary can currently lock the selected Target (cone from the nose, range, no flares). */
+  canLock: boolean;
+  /** Lock progress 0..1 toward `lockTarget`. */
+  lockProgress: number;
 }
 
 export type ProjectileKind = 'tracer' | 'missile' | 'rocket' | 'shell' | 'flare';
@@ -153,6 +163,7 @@ export type SimEvent =
       /** true = shield absorbed it and the Ship bounced; false = no shield, Ship destroyed. */
       bounced: boolean;
     }
+  | { type: 'missileEvaded'; id: number; victim: ShipId; reason: 'roll' | 'terrain' | 'flare' }
   | { type: 'docked'; id: ShipId }
   | { type: 'resupplied'; id: ShipId }
   | { type: 'launched'; id: ShipId };

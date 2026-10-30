@@ -21,7 +21,7 @@ import {
   GROUND_SLIDE_SPEED,
   GROUND_STRAFE_MUL,
   HOVER_GAIN,
-  HOVER_HEIGHT,
+  HOVER_CLEARANCE,
   HOVER_MAX_SPEED,
   LAND_HEIGHT,
   LANDING_ASSIST_HEIGHT,
@@ -67,12 +67,17 @@ export function siegeLockConeMul(s: ShipState): number {
   return s.grounded ? SIEGE_LOCK_CONE_MUL : SIEGE_AIR.lockConeMul;
 }
 
-/** Siege toggle shared by the Shift edge and the siege-anchor Skill. */
+/**
+ * The siege-anchor Skill: leave Siege, enter it when grounded or slow, or (airborne and fast)
+ * auto-brake until slow enough (`siegePending`). Using it again cancels a pending request.
+ */
 export function toggleSiege(rec: ShipRec): void {
   const s = rec.state;
   if (s.frame !== 'bulwark' || s.docked) return;
   if (s.sieged) s.sieged = false;
+  else if (s.siegePending) s.siegePending = false;
   else if (s.grounded || s.speed < HOVER_MAX_SPEED) s.sieged = true;
+  else s.siegePending = true;
 }
 
 /** Push body/collider to the ShipState transform. */
@@ -147,29 +152,30 @@ export function stepFlight(
   if (s.dashTicks > 0) s.dashTicks--;
 
   // ---- Bulwark modes: landing, grounded, siege ----
-  const brakeEdge = input.brake && !s.brakeHeld;
   s.brakeHeld = input.brake;
   if (fd.canHover && !s.docked) {
     if (s.grounded) {
-      if (brakeEdge) s.sieged = !s.sieged;
       if (input.vertical > 0 || input.boost) {
         s.grounded = false;
         s.sieged = false;
+        s.siegePending = false;
         rec.lat[1] = LIFTOFF_KICK;
       }
     } else {
       const ground = sampleHeight(ctx.hf, s.pos[0], s.pos[2]);
       if (
         !s.sieged &&
-        s.pos[1] - ground <= LAND_HEIGHT &&
+        s.pos[1] - ground <= fd.radius + LAND_HEIGHT &&
         s.speed < fd.cruiseSpeed &&
         (input.brake || input.vertical < 0)
       ) {
         s.grounded = true;
         rec.lat[1] = 0;
-      } else if (brakeEdge) {
-        toggleSiege(rec);
       }
+    }
+    if (s.siegePending && !s.sieged && (s.grounded || s.speed < HOVER_MAX_SPEED)) {
+      s.sieged = true;
+      s.siegePending = false;
     }
   }
   const grounded = s.grounded;
@@ -431,7 +437,7 @@ export function stepFlight(
   let boosting = false;
   if (sieged) {
     target = 0;
-  } else if (input.brake) {
+  } else if (input.brake || s.siegePending) {
     target = space || fd.canHover ? 0 : fd.minSpeed;
     if (!space && !fd.canHover && ownDeck(ctx, s, LANDING_ASSIST_HEIGHT, DECK_APPROACH_MUL))
       target = 0;
@@ -469,7 +475,7 @@ export function stepFlight(
       if (input.vertical === 0) {
         const ground = sampleHeight(ctx.hf, s.pos[0], s.pos[2]);
         ty = clamp(
-          (ground + HOVER_HEIGHT - s.pos[1]) * HOVER_GAIN,
+          (ground + fd.radius + HOVER_CLEARANCE - s.pos[1]) * HOVER_GAIN,
           -fd.verticalSpeed,
           fd.verticalSpeed,
         );
@@ -515,6 +521,7 @@ export function stepFlight(
       s.dockTicks = 0;
       s.speed = 0;
       s.sieged = false;
+      s.siegePending = false;
       s.pos[1] = deck.pos[1] + fd.radius + DOCK_CLEARANCE;
       rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;
       s.vel[0] = s.vel[1] = s.vel[2] = 0;

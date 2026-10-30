@@ -138,11 +138,12 @@ function bulwark() {
   log.push(
     `grounded=${b.grounded} y-ground=${(b.pos[1] - sampleHeight(hf, b.pos[0], b.pos[2])).toFixed(1)}`,
   );
-  run(1, { brake: true });
-  run(1, { brake: false });
+  run(1, { hotbar: 0 }); // siege-anchor skill: grounded siege
   log.push(`sieged=${b.sieged}`);
-  run(1, { brake: true });
-  run(1, { brake: false });
+  const sieged = b.sieged;
+  run(35, {});
+  run(1, { hotbar: 0 });
+  run(35, {});
   const unsieged = !b.sieged && b.grounded;
   run(60, { throttle: 1 });
   const moved = Math.hypot(b.pos[0], b.pos[2]);
@@ -150,15 +151,55 @@ function bulwark() {
   log.push(
     `unsieged-still-grounded=${unsieged} drove=${moved.toFixed(0)}m liftedOff=${!b.grounded}`,
   );
-  // airborne siege: slow + Shift high above ground
-  run(60, { throttle: -1 });
-  run(1, { brake: true });
-  log.push(`airSiege=${b.sieged && !b.grounded}`);
+  // airborne and fast: the skill auto-brakes, then sieges once slow
+  run(60, { throttle: 1 });
+  run(1, { hotbar: 0 });
+  const pending = b.siegePending && !b.sieged;
+  run(90, {});
+  log.push(`airSiegePending=${pending} airSiege=${b.sieged && !b.grounded}`);
   sim2.dispose();
-  return { log, ok: unsieged && !b.grounded && b.sieged && moved > 20 };
+  return { log, ok: sieged && unsieged && !b.grounded && pending && b.sieged && moved > 20 };
 }
 const bw = bulwark();
 console.log('bulwark', bw.log.join(' | '));
+
+// 2b. Missile evasion: a target that rolls at ~60 m vs one that flies straight.
+function missileTrial(roll: boolean, k: number): 'hit' | 'evaded' | 'miss' {
+  const sim2 = fresh(true);
+  const dx = ((k * 37) % 21) * 10 - 100;
+  const dy = ((k * 53) % 21) * 8 - 80;
+  sim2.addShip('tgt', spawn('wasp', 'vex'), [0, 500, 0]);
+  sim2.addShip('sh', spawn('wasp', 'concord'), [dx, 500 + dy, 420]);
+  const tgt = sim2.getShip('tgt')!;
+  const shooter = sim2.getShip('sh')!;
+  let missileId = -1;
+  let result: 'hit' | 'evaded' | 'miss' = 'miss';
+  for (let i = 0; i < 360 && result === 'miss'; i++) {
+    const rolling = roll && tgt.incomingDist > 0 && tgt.incomingDist < 60;
+    const events = sim2.step(
+      new Map([
+        ['tgt', mk(i, { aim: [0, 0, -1], rollLeft: rolling })],
+        ['sh', mk(i, { aim: [0, 0, -1], target: 'tgt', fire2: shooter.lockTarget !== null, throttle: -0.2 })],
+      ]),
+    );
+    for (const e of events) {
+      if (e.type === 'projectileSpawned' && e.kind === 'missile' && e.target && missileId < 0) missileId = e.id;
+      if (e.type === 'missileEvaded' && e.id === missileId) result = 'evaded';
+      if (e.type === 'hit' && e.projectile === missileId) result = 'hit';
+    }
+  }
+  sim2.dispose();
+  return result;
+}
+const TRIALS = 30;
+const tally = (roll: boolean) => {
+  const r = { hit: 0, evaded: 0, miss: 0 };
+  for (let k = 0; k < TRIALS; k++) r[missileTrial(roll, k)]++;
+  return r;
+};
+const rollRes = tally(true);
+const straightRes = tally(false);
+console.log('missile trials (30 each) roll@60m:', rollRes, 'straight:', straightRes);
 
 // 3. Prediction equality: stepLocal vs server step, identical inputs, bit-compare.
 function prediction(
@@ -213,7 +254,7 @@ const eq = {
     aim: [0.3, 0, -1],
     vertical: i < 100 ? -1 : i > 250 ? 1 : 0,
     throttle: i < 100 ? -1 : 1,
-    brake: i === 150 || i === 160,
+    hotbar: i === 150 || i === 200 ? 0 : -1,
     strafe: i % 40 < 10 ? 1 : 0,
   })),
 };
@@ -242,6 +283,8 @@ check(
   'no-shield crash rule',
 );
 check(bw.ok, 'bulwark ground mode');
+check(rollRes.hit <= TRIALS * 0.25, 'rolling target should mostly evade');
+check(straightRes.hit >= TRIALS * 0.7, 'straight-flying target should mostly get hit');
 for (const [k, v] of Object.entries(eq)) check(v === 0, `prediction mismatch ${k}: ${v}`);
 check(spawned > 0, 'no projectiles spawned');
 check(hits > 0, 'no projectile hit anything');

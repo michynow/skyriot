@@ -22,6 +22,7 @@ function mk(id: string, frame: FrameId, nation: NationId, tier: number, upgrade:
     pos: [0, 0, 0], rot: [0, 0, 0, 1], vel: [0, 0, 0], hp: d.maxHp, maxHp: d.maxHp, shield: d.maxShield, maxShield: d.maxShield,
     fuel: 1, speed: 100, alive: true, respawnAtTick: 0, rollTicks: 0, rollCooldownTicks: 0, sieged: false, cooldowns: [], lockTarget: null, ammo1: 100, ammo2: 4, docked: false,
     angVel: [0, 0, 0], brakeHeld: false, dashTicks: 0, ghostTicks: 0, ironTicks: 0, flareTicks: 0, dockTicks: 0, grounded: false,
+    siegePending: false, incomingDist: -1, incomingTti: -1, canLock: false, lockProgress: 0,
   };
 }
 

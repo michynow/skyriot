@@ -68,7 +68,7 @@ export function Terrain({ map, hf }: { map: MapDef; hf: Heightfield }) {
       t!.anisotropy = 8;
       t!.needsUpdate = true;
     }
-    const m = new THREE.MeshStandardMaterial({ roughness: 0.96, metalness: 0 });
+    const m = new THREE.MeshStandardMaterial({ roughness: 0.96, metalness: 0, envMapIntensity: 0 });
     m.onBeforeCompile = (sh) => {
       sh.uniforms.tSand = { value: sand };
       sh.uniforms.tRed = { value: red };

@@ -16,6 +16,13 @@ export const PALETTES: Record<NationId, Palette> = {
   vex: { primary: '#b92329', secondary: '#1d1c22', dark: '#2c2426', accent: '#ff7418', glass: '#ffa066', trim: '#ffd0a0' },
 };
 
+let shipEnvTex: THREE.Texture | null = null;
+/** Reflection environment for ship materials only (terrain stays unaffected). */
+export function setShipEnv(t: THREE.Texture | null) {
+  shipEnvTex = t;
+  for (const m of mats.values()) for (const k of Object.keys(m) as (keyof typeof m)[]) { m[k].envMap = t; m[k].needsUpdate = true; }
+}
+
 const mats = new Map<string, Record<Slot, THREE.MeshStandardMaterial>>();
 const hot = new THREE.Color('#fff4d8');
 
@@ -27,7 +34,7 @@ export function getMaterials(nation: NationId, upgrade: number) {
   if (m) return m;
   const p = PALETTES[nation];
   const std = (color: string, rough: number, metal: number) =>
-    new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
+    new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, envMapIntensity: 0.6 });
   const accentCol = new THREE.Color(p.accent).lerp(hot, Math.max(0, u - 3) * 0.06);
   const rimCol = new THREE.Color(p.accent);
   /** Distance-scaled rim light so far-away silhouettes pop against terrain. */
@@ -52,12 +59,13 @@ export function getMaterials(nation: NationId, upgrade: number) {
       color: accentCol, emissive: accentCol, emissiveIntensity: 0.9 + u * 0.28, roughness: 0.4,
     }),
     glass: new THREE.MeshStandardMaterial({
-      color: p.glass, emissive: p.glass, emissiveIntensity: 0.25, roughness: 0.08, metalness: 0.6, transparent: true, opacity: 0.8,
+      color: p.glass, emissive: p.glass, emissiveIntensity: 0.25, roughness: 0.08, metalness: 0.9, envMapIntensity: 2.2, transparent: true, opacity: 0.85,
     }),
     trim: new THREE.MeshStandardMaterial({
       color: p.trim, emissive: p.trim, emissiveIntensity: 2.6, roughness: 0.3,
     }),
   };
+  for (const k of Object.keys(m) as (keyof typeof m)[]) m[k].envMap = shipEnvTex;
   mats.set(key, m);
   return m;
 }

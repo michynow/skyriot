@@ -5,7 +5,7 @@ import type { FrameId, NationId, ShipId } from '@skyriot/shared';
 import { world } from '../state/world';
 import { SLOTS } from './bricks';
 import { fpv } from './fpv';
-import { getModel } from './models';
+import { MODEL_SCALE, getModel } from './models';
 import { getFlameMaterials, getMaterials } from './palette';
 
 export interface FrameModelProps {
@@ -94,7 +94,7 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
   });
 
   return (
-    <group>
+    <group scale={MODEL_SCALE}>
       <group ref={hull}>
         {SLOTS.map((slot) => {
           const g = data.body[slot];

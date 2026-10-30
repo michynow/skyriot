@@ -1,3 +1,4 @@
+import { AIM_ASSIST, MISSILE_EVADE } from '../content/frames';
 import { WEAPONS } from '../content/weapons';
 import { siegeLockConeMul, siegeMods } from './flight';
 import {
@@ -171,6 +172,7 @@ export function spawnProjectile(
   p.target = target;
   p.spawnTick = ctx.tick;
   p.rewind = rewind;
+  p.losTime = 0;
   ctx.projectiles.push(p);
   ctx.events.push({
     type: 'projectileSpawned',
@@ -198,6 +200,8 @@ function updateLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, sec: WeaponDef
       lockSec = MORTAR_LOCK_SEC;
     } else {
       s.lockTarget = null;
+      s.canLock = false;
+      s.lockProgress = 0;
       rec.lockCand = null;
       rec.lockTime = 0;
       return;
@@ -218,8 +222,10 @@ function updateLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, sec: WeaponDef
     const d = Math.hypot(dx, dy, dz);
     valid = d <= range && d >= 1 && (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d >= Math.cos(cone);
   }
+  s.canLock = valid;
   if (!valid || !t) {
     s.lockTarget = null;
+    s.lockProgress = 0;
     rec.lockCand = null;
     rec.lockTime = 0;
     return;
@@ -230,6 +236,38 @@ function updateLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, sec: WeaponDef
     rec.lockTime = 0;
   }
   s.lockTarget = rec.lockTime >= lockSec ? t.state.id : null;
+  s.lockProgress = Math.min(rec.lockTime / lockSec, 1);
+}
+
+/** Time for a projectile of `speed` fired from the origin to meet a target moving at (vx,vy,vz). */
+function interceptTime(
+  rx: number,
+  ry: number,
+  rz: number,
+  vx: number,
+  vy: number,
+  vz: number,
+  speed: number,
+): number {
+  const c = rx * rx + ry * ry + rz * rz;
+  const direct = Math.sqrt(c) / speed;
+  const a = vx * vx + vy * vy + vz * vz - speed * speed;
+  const b = 2 * (rx * vx + ry * vy + rz * vz);
+  let t = direct;
+  if (Math.abs(a) < 1e-6) {
+    if (b < 0) t = -c / b;
+  } else {
+    const disc = b * b - 4 * a * c;
+    if (disc >= 0) {
+      const sq = Math.sqrt(disc);
+      const t1 = (-b - sq) / (2 * a);
+      const t2 = (-b + sq) / (2 * a);
+      const lo = Math.min(t1, t2);
+      const hi = Math.max(t1, t2);
+      t = lo > 0 ? lo : hi > 0 ? hi : direct;
+    }
+  }
+  return t;
 }
 
 /** Lock-on progress and Primary/Secondary fire for one Ship. */
@@ -252,18 +290,55 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
     forwardOf(s.rot, _f);
     rightOf(s.rot, _r);
     upOf(s.rot, _u);
+    const mods = s.sieged ? siegeMods(s) : null;
+    const nose = fd.halfLength + NOSE_OFFSET;
+    const ox = s.pos[0] + _f[0]! * nose,
+      oy = s.pos[1] + _f[1]! * nose,
+      oz = s.pos[2] + _f[2]! * nose;
+    // Base direction: the nose, or (Primary aim assist) the Target's lead point.
+    let bx = _f[0]!,
+      by = _f[1]!,
+      bz = _f[2]!;
+    let spreadScale = 1;
+    if (i === 0 && input.target) {
+      const t = ctx.ships.get(input.target);
+      if (t && t.state.alive && t.state.nation !== s.nation) {
+        const tx = t.state.pos[0] - s.pos[0],
+          ty = t.state.pos[1] - s.pos[1],
+          tz = t.state.pos[2] - s.pos[2];
+        const td = Math.hypot(tx, ty, tz) || 1;
+        const al = Math.hypot(input.aim[0], input.aim[1], input.aim[2]) || 1;
+        const cosAim = (tx * input.aim[0] + ty * input.aim[1] + tz * input.aim[2]) / (td * al);
+        if (td <= w.rangeM * (mods ? mods.rangeMul : 1) && cosAim >= Math.cos(AIM_ASSIST.coneRad)) {
+          const rx = t.state.pos[0] - ox,
+            ry = t.state.pos[1] - oy,
+            rz = t.state.pos[2] - oz;
+          const tt = Math.min(
+            interceptTime(rx, ry, rz, t.state.vel[0], t.state.vel[1], t.state.vel[2], w.speed),
+            w.rangeM / w.speed,
+          );
+          bx = rx + t.state.vel[0] * tt;
+          by = ry + t.state.vel[1] * tt;
+          bz = rz + t.state.vel[2] * tt;
+          const bl = Math.hypot(bx, by, bz) || 1;
+          bx /= bl;
+          by /= bl;
+          bz /= bl;
+          spreadScale = AIM_ASSIST.spreadMul;
+        }
+      }
+    }
     const ang = ctx.rng() * Math.PI * 2;
-    const rad = w.spread * Math.sqrt(ctx.rng());
+    const rad = w.spread * spreadScale * Math.sqrt(ctx.rng());
     const sx = Math.cos(ang) * rad,
       sy = Math.sin(ang) * rad;
-    let dx = _f[0]! + _r[0]! * sx + _u[0]! * sy;
-    let dy = _f[1]! + _r[1]! * sx + _u[1]! * sy;
-    let dz = _f[2]! + _r[2]! * sx + _u[2]! * sy;
+    let dx = bx + _r[0]! * sx + _u[0]! * sy;
+    let dy = by + _r[1]! * sx + _u[1]! * sy;
+    let dz = bz + _r[2]! * sx + _u[2]! * sy;
     const dl = Math.hypot(dx, dy, dz);
     dx /= dl;
     dy /= dl;
     dz /= dl;
-    const mods = s.sieged ? siegeMods(s) : null;
     let homing = w.homingTurnRate;
     let target = homing > 0 ? s.lockTarget : null;
     if (i === 1 && w.kind === 'shell' && s.sieged && s.lockTarget) {
@@ -285,7 +360,6 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
         target = s.lockTarget;
       }
     }
-    const nose = fd.halfLength + NOSE_OFFSET;
     spawnProjectile(
       ctx,
       rec,
@@ -345,36 +419,72 @@ function explode(
 export function stepProjectiles(ctx: SimCtx): void {
   const dt = ctx.dt;
   const ray = ctx.ray;
+  for (const r of ctx.recList) {
+    r.state.incomingDist = -1;
+    r.state.incomingTti = -1;
+  }
   for (let i = ctx.projectiles.length - 1; i >= 0; i--) {
     const p = ctx.projectiles[i]!;
     const age = ctx.tick - p.spawnTick;
 
     if (p.homing > 0 && p.target) {
       const t = ctx.ships.get(p.target);
-      if (!t || !t.state.alive || t.state.flareTicks > 0) {
+      if (!t || !t.state.alive) {
         p.target = null;
       } else {
-        let tx = t.state.pos[0] - p.x,
-          ty = t.state.pos[1] - p.y,
-          tz = t.state.pos[2] - p.z;
+        const ts = t.state;
+        let tx = ts.pos[0] - p.x,
+          ty = ts.pos[1] - p.y,
+          tz = ts.pos[2] - p.z;
         const tl = Math.hypot(tx, ty, tz) || 1;
         tx /= tl;
         ty /= tl;
         tz /= tl;
-        const cosA = Math.min(Math.max(p.dx * tx + p.dy * ty + p.dz * tz, -1), 1);
-        const angle = Math.acos(cosA);
-        const maxTurn = p.homing * dt;
-        const frac = angle <= maxTurn ? 1 : maxTurn / angle;
-        let nx = p.dx + (tx - p.dx) * frac,
-          ny = p.dy + (ty - p.dy) * frac,
-          nz = p.dz + (tz - p.dz) * frac;
-        const nl = Math.hypot(nx, ny, nz) || 1;
-        nx /= nl;
-        ny /= nl;
-        nz /= nl;
-        p.dx = nx;
-        p.dy = ny;
-        p.dz = nz;
+        const missile = p.kind === 'missile';
+        let broke: 'roll' | 'terrain' | 'flare' | null = null;
+        if (ts.flareTicks > 0) {
+          broke = 'flare';
+        } else if (missile) {
+          if (ts.rollTicks > 0 && tl < MISSILE_EVADE.rollBreakDistM) {
+            broke = 'roll';
+          } else {
+            // Terrain line of sight to the target.
+            ray.origin.x = p.x;
+            ray.origin.y = p.y;
+            ray.origin.z = p.z;
+            ray.dir.x = tx;
+            ray.dir.y = ty;
+            ray.dir.z = tz;
+            const blocked = ctx.world.castRay(ray, tl, true, undefined, RAY_QUERY_GROUPS) !== null;
+            p.losTime = blocked ? p.losTime + dt : 0;
+            if (p.losTime >= MISSILE_EVADE.losBreakSec) broke = 'terrain';
+          }
+        }
+        if (broke) {
+          p.target = null;
+          p.homing = 0;
+          if (missile)
+            ctx.events.push({ type: 'missileEvaded', id: p.id, victim: ts.id, reason: broke });
+        } else {
+          const turn =
+            p.homing *
+            (missile && tl < MISSILE_EVADE.endgameDistM ? MISSILE_EVADE.endgameTurnMul : 1);
+          const cosA = Math.min(Math.max(p.dx * tx + p.dy * ty + p.dz * tz, -1), 1);
+          const angle = Math.acos(cosA);
+          const maxTurn = turn * dt;
+          const frac = angle <= maxTurn ? 1 : maxTurn / angle;
+          let nx = p.dx + (tx - p.dx) * frac,
+            ny = p.dy + (ty - p.dy) * frac,
+            nz = p.dz + (tz - p.dz) * frac;
+          const nl = Math.hypot(nx, ny, nz) || 1;
+          p.dx = nx / nl;
+          p.dy = ny / nl;
+          p.dz = nz / nl;
+          if (missile && (ts.incomingDist < 0 || tl < ts.incomingDist)) {
+            ts.incomingDist = tl;
+            ts.incomingTti = tl / p.speed;
+          }
+        }
       }
     }
 

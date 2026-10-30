@@ -67,6 +67,11 @@ function parseSnapshot(m: unknown): Snapshot | null {
     ammo1: isNum(s.ammo1) ? s.ammo1 : 0,
     ammo2: isNum(s.ammo2) ? s.ammo2 : 0,
     docked: s.docked === true,
+    siegePending: s.siegePending === true,
+    incomingDist: isNum(s.incomingDist) ? s.incomingDist : -1,
+    incomingTti: isNum(s.incomingTti) ? s.incomingTti : -1,
+    canLock: s.canLock === true,
+    lockProgress: isNum(s.lockProgress) ? s.lockProgress : 0,
   }));
   return { tick: m.tick, serverTimeMs: m.serverTimeMs, ack: isNum(m.ack) ? m.ack : -1, ships };
 }

@@ -10,7 +10,8 @@ export const BANK_PER_YAW_RATE = 0.45;
 export const BANK_PER_STRAFE = 0.3;
 /** Terminal fall speed when fully stalled = gravity * this. */
 export const STALL_FALL_SECONDS = 2;
-export const HOVER_HEIGHT = 6;
+/** Hover gap between the hull's lowest point and the ground. */
+export const HOVER_CLEARANCE = 2.6;
 export const HOVER_MAX_SPEED = 15;
 export const HOVER_GAIN = 2;
 export const KCC_OFFSET = 0.15;

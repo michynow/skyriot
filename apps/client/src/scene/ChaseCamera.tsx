@@ -5,6 +5,7 @@ import { FRAMES, sampleHeight } from '@skyriot/shared';
 import { world } from '../state/world';
 import { AIM_DISTANCE } from '../input/input';
 import { fpv } from '../frames/fpv';
+import { MODEL_SCALE } from '../frames/models';
 
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 
@@ -80,8 +81,8 @@ export function ChaseCamera() {
     st.qo.setFromEuler(st.eu.set(st.pitch, st.yaw, 0));
     st.qs.copy(st.q).multiply(st.qo);
 
-    const dist = (2.4 + def.radius * 1.3) * st.zoom;
-    const height = dist * 0.2;
+    const dist = def.halfLength * 1.8 * st.zoom;
+    const height = dist * 0.3;
     st.off.set(0, height, dist).applyQuaternion(st.qs);
     // Pitch so the screen-centre ray meets the Ship's flight line at AIM_DISTANCE: centred cursor = fly straight.
     st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(height, dist + AIM_DISTANCE));
@@ -114,7 +115,7 @@ export function ChaseCamera() {
     fpv.id = e > 0 ? ship.id : '';
     fpv.amount = e;
     if (e > 0) {
-      const FP_H = 2.5, FP_Z = 0.6;
+      const FP_H = 2.5 * MODEL_SCALE, FP_Z = 0.6 * MODEL_SCALE;
       st.qsh.set(ship.rot[0], ship.rot[1], ship.rot[2], ship.rot[3]);
       st.fpPos.set(0, FP_H, FP_Z).applyQuaternion(st.qsh).add(st.tmp.set(ship.pos[0], ship.pos[1], ship.pos[2]));
       st.qf.copy(st.qsh).multiply(st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(FP_H, AIM_DISTANCE + FP_Z)));

@@ -53,7 +53,7 @@ export function useHotbar(ctx: SimCtx, rec: ShipRec, slot: number, predictOnly: 
       rec.state.flareTicks = Math.max(ticks, 1);
       s.lockTarget = null;
       for (const o of ctx.recList) if (o.state.lockTarget === s.id) o.state.lockTarget = null;
-      for (const p of ctx.projectiles) if (p.target === s.id) p.target = null;
+      // Guided missiles drop their target (reason 'flare') in stepProjectiles while flares are active.
       for (let i = 0; i < FLARE_COUNT; i++) {
         const side = i === 0 ? -1 : 1;
         let dx = -_f[0]! + _r[0]! * side * 0.5,

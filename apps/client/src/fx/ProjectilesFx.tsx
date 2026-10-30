@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FRAMES, WEAPONS, sampleHeight, type NationId, type ProjectileKind, type ShipId, type SimEvent } from '@skyriot/shared';
 import { PALETTES } from '../frames/palette';
-import { getModel } from '../frames/models';
+import { MODEL_SCALE, getModel } from '../frames/models';
 import { world } from '../state/world';
 import { ParticlePool, SpriteBatch } from './sprites';
 
@@ -34,6 +34,7 @@ class Projectiles {
   /** pos(3) vel(3) col(3) misc: range-left / lifetime, emitAcc, splash, turnRate */
   f = new Float32Array(MAX_PROJ * 13);
   target: (ShipId | null)[] = new Array(MAX_PROJ).fill(null);
+  evaded = new Uint8Array(MAX_PROJ);
 
   add(e: Extract<SimEvent, { type: 'projectileSpawned' }>, col: RGB) {
     if (this.n >= MAX_PROJ) return;
@@ -49,6 +50,7 @@ class Projectiles {
     f[o + 11] = w?.splashRadius ?? 0;
     f[o + 12] = w?.homingTurnRate ?? 0;
     this.target[i] = e.target;
+    this.evaded[i] = 0;
   }
   find(id: number) {
     for (let i = 0; i < this.n; i++) if (this.id[i] === id) return i;
@@ -57,7 +59,7 @@ class Projectiles {
   remove(i: number) {
     const l = --this.n;
     if (i !== l) {
-      this.id[i] = this.id[l]!; this.kind[i] = this.kind[l]!; this.target[i] = this.target[l]!;
+      this.id[i] = this.id[l]!; this.kind[i] = this.kind[l]!; this.evaded[i] = this.evaded[l]!; this.target[i] = this.target[l]!;
       for (let k = 0; k < 13; k++) this.f[i * 13 + k] = this.f[l * 13 + k]!;
     }
     this.target[l] = null;
@@ -192,6 +194,19 @@ function handleEvents(fx: Fx, _dt: number) {
   if (!q.length) return;
   const events = q.splice(0, q.length);
   for (const e of events) {
+    // missileEvaded is added to the contract by the sim agent; handled structurally until then
+    const loose = e as unknown as { type: string; projectile?: number; id?: number; pos?: [number, number, number] };
+    if (loose.type === 'missileEvaded') {
+      const i = fx.proj.find(loose.projectile ?? loose.id ?? -1);
+      if (i >= 0) {
+        fx.proj.evaded[i] = 1;
+        fx.proj.target[i] = null; // stops homing: it overshoots
+        const p: [number, number, number] = loose.pos ?? [fx.proj.f[i * 13]!, fx.proj.f[i * 13 + 1]!, fx.proj.f[i * 13 + 2]!];
+        sparks(fx, p, 18, false);
+        fx.glow.emit(p[0], p[1], p[2], 0, 0, 0, 0.25, 6, 1, 1.4, 2.2, 3, 0.9);
+      }
+      continue;
+    }
     switch (e.type) {
       case 'projectileSpawned': {
         const nation = world.ships.get(e.owner)?.nation ?? 'concord';
@@ -227,7 +242,7 @@ function handleEvents(fx: Fx, _dt: number) {
       case 'shipDestroyed': {
         const v = world.ships.get(e.victim);
         if (!boomOnce(fx, e.victim)) break;
-        explosion(fx, e.pos, v ? 1.2 + FRAMES[v.frame].radius * 0.35 : 2, true, v?.nation);
+        explosion(fx, e.pos, v ? 1.2 + FRAMES[v.frame].radius * 0.3 : 2.5, true, v?.nation);
         break;
       }
       case 'shipRespawned': {
@@ -254,7 +269,7 @@ function handleEvents(fx: Fx, _dt: number) {
           sparks(fx, e.pos, 26, false);
           if (s) bubble(fx, e.id, ACCENT[s.nation], 1.4);
         } else if (boomOnce(fx, e.id)) {
-          explosion(fx, e.pos, s ? 1.2 + FRAMES[s.frame].radius * 0.35 : 2, true, s?.nation);
+          explosion(fx, e.pos, s ? 1.2 + FRAMES[s.frame].radius * 0.3 : 2.5, true, s?.nation);
         }
         break;
       }
@@ -435,13 +450,20 @@ function updateProjectiles(fx: Fx, dt: number) {
       const s = (big * 6) / sp;
       fx.streaks.push(x, y, z, 0.5 * big, 2.4, 1.3, 0.4, 0.9, vx * s, vy * s, vz * s);
       fx.additive.push(x - (vx / sp) * 0.8, y - (vy / sp) * 0.8, z - (vz / sp) * 0.8, 1.6 * big, 3, 1.8, 0.7, 1);
+      // blinking beacon so a target can spot incoming missiles; brighter and bigger when it is chasing the own ship
+      const mine = k === 1 && !!P.target[i] && P.target[i] === world.ownId;
+      if (k === 1) {
+        const blink = Math.sin(fx.time * (mine ? 16 : 9) + i) > 0.2 ? 1 : 0.15;
+        fx.additive.push(x, y + 0.4, z, (mine ? 7 : 3.5) * blink, 3.5, 0.25, 0.2, 0.9 * blink);
+        if (P.evaded[i]) fx.glow.emit(x, y, z, rr(-8, 8), rr(-8, 8), rr(-8, 8), 0.4, 0.5, 0.1, 3, 1.8, 0.5, 1, 1, 12);
+      }
       f[o + 10]! += dt;
-      const step = 0.012;
+      const step = mine ? 0.008 : 0.012;
       while (f[o + 10]! > step) {
         f[o + 10]! -= step;
         const back = f[o + 10]! * sp;
         fx.puffs.emit(x - (vx / sp) * (0.9 + back), y - (vy / sp) * (0.9 + back), z - (vz / sp) * (0.9 + back),
-          rr(-1.5, 1.5), rr(-1.5, 1.5), rr(-1.5, 1.5), rr(1.2, 2.2), 0.9 * big, 4.2 * big, 0.62, 0.6, 0.58, 0.4, 0.5, -0.3);
+          rr(-1.5, 1.5), rr(-1.5, 1.5), rr(-1.5, 1.5), rr(1.6, 2.8), 1.1 * big, 5.4 * big * (mine ? 1.4 : 1), 0.95, 0.92, 0.88, mine ? 0.7 : 0.55, 0.4, -0.3);
       }
       if (bodyN < 160) {
         const O = fx.o;
@@ -556,7 +578,7 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
       const e = engines[i]!;
       const t = tr[i];
       if (!t) continue;
-      v.set(e.pos[0], e.pos[1], e.pos[2] + 0.4).applyQuaternion(q);
+      v.set(e.pos[0], e.pos[1], e.pos[2] + 0.4).multiplyScalar(MODEL_SCALE).applyQuaternion(q);
       const x = s.pos[0] + v.x, y = s.pos[1] + v.y, z = s.pos[2] + v.z;
       if (t.has) {
         const mx = x - t.x, my = y - t.y, mz = z - t.z;
@@ -566,7 +588,7 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
           for (let k = 1; k <= n; k++) {
             const u = k / (n + 1);
             const life = boost ? 0.65 : 0.4;
-            const sz = e.r * (boost ? 3.4 : 2.4);
+            const sz = e.r * MODEL_SCALE * (boost ? 3.4 : 2.4);
             if (boost) fx.glow.emit(t.x + mx * u, t.y + my * u, t.z + mz * u, 0, 0, 0, life, sz, sz * 0.25, 2.6, 1.7, 0.8, 0.14);
             else fx.glow.emit(t.x + mx * u, t.y + my * u, t.z + mz * u, 0, 0, 0, life, sz, sz * 0.3, ar * 1.3, ag * 1.3, ab * 1.3, 0.16);
           }

@@ -1,7 +1,9 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { generateHeightfield, type MapDef } from '@skyriot/shared';
+import { setShipEnv } from '../frames/palette';
 import { world } from '../state/world';
 import { LaunchDecks } from './LaunchDecks';
 import { Scatter } from './Scatter';
@@ -73,6 +75,14 @@ export function MapScene({ map }: { map: MapDef }) {
     scene.fog = new THREE.Fog(map.env.fogColor, map.env.fogNear * 1.6, map.env.fogFar * 1.25);
     return () => void (scene.fog = null);
   }, [scene, map]);
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    // soft studio environment so metallic/glass brick parts get reflections (terrain opts out)
+    const pm = new THREE.PMREMGenerator(gl);
+    const env = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    setShipEnv(env);
+    return () => { setShipEnv(null); env.dispose(); pm.dispose(); };
+  }, [gl]);
   const atmos = map.env.kind === 'atmosphere';
   return (
     <>

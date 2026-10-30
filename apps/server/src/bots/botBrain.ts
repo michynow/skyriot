@@ -30,6 +30,12 @@ const SKILL_CHANCE = 0.01;
 const RESUPPLY_AMMO_FRACTION = 0.05;
 const DECK_APPROACH_HEIGHT = 20;
 const DECK_BRAKE_DISTANCE = 250;
+const SIEGE_SLOT = 0; // siege-anchor is hotbar slot 0 on the Bulwark
+const FLARE_SLOT = 2;
+const ROLL_WINDOW_MIN_M = 30;
+const ROLL_WINDOW_MAX_M = 80;
+const FLARE_INCOMING_M = 700;
+const FLARE_CHANCE = 0.25;
 const SIEGE_BOT_CHANCE = 0.5;
 const SIEGE_BOT_ENGAGE_DISTANCE = 700;
 const SIEGE_BOT_LEAVE_DISTANCE = 1100;
@@ -111,10 +117,11 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     if (me.grounded) {
       if (enemy && dist < SIEGE_BOT_LEAVE_DISTANCE) {
         siegeMode = true;
-        if (!me.sieged) input.brake = !mem.lastBrake; // pulse: Shift edge toggles Siege
+        if (!me.sieged && me.cooldowns[SIEGE_SLOT] === 0) input.hotbar = SIEGE_SLOT;
       } else {
-        if (me.sieged) input.brake = !mem.lastBrake;
-        else input.vertical = 1;
+        if (me.sieged) {
+          if (me.cooldowns[SIEGE_SLOT] === 0) input.hotbar = SIEGE_SLOT;
+        } else input.vertical = 1;
         mem.siegeBot = mem.rng() < SIEGE_BOT_CHANCE;
       }
     } else if (mem.siegeBot && enemy && dist < SIEGE_BOT_ENGAGE_DISTANCE) {
@@ -205,7 +212,24 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     input.strafe = mem.dodgeDir;
   }
 
-  if (me.hp < me.maxHp * HEAL_HP_FRACTION && mem.rng() < SKILL_CHANCE * 10) {
+  // Incoming guided missile: roll inside the break window, otherwise pop flares.
+  if (me.incomingDist > 0 && !me.sieged && !me.grounded) {
+    if (
+      me.incomingDist < ROLL_WINDOW_MAX_M &&
+      me.incomingDist > ROLL_WINDOW_MIN_M &&
+      me.rollCooldownTicks === 0 &&
+      me.fuel >= fd.rollFuelCost
+    ) {
+      if (mem.rng() < 0.5) input.rollLeft = true;
+      else input.rollRight = true;
+    } else if (
+      me.incomingDist < FLARE_INCOMING_M &&
+      me.cooldowns[FLARE_SLOT] === 0 &&
+      mem.rng() < FLARE_CHANCE
+    ) {
+      input.hotbar = FLARE_SLOT;
+    }
+  } else if (me.hp < me.maxHp * HEAL_HP_FRACTION && mem.rng() < SKILL_CHANCE * 10) {
     input.hotbar = mem.rng() < 0.5 ? HEAL_SLOT : SHIELD_SLOT;
   }
   mem.lastBrake = input.brake;

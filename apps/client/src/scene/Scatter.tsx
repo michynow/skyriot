@@ -148,8 +148,8 @@ export function Scatter({ map, hf }: { map: MapDef; hf: Heightfield }) {
     const buttes = place(hf, map, rnd, 26, (s) => s.slope < 0.12 && s.y < map.maxHeight * 0.4);
     const towers = place(hf, map, rnd, 34, (s) => s.slope < 0.1 && s.y < map.maxHeight * 0.55);
     const pylons = place(hf, map, rnd, 45, (s) => s.slope < 0.2);
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true });
-    const rockMat = new THREE.MeshStandardMaterial({ color: '#b07050', roughness: 1, flatShading: true });
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true, envMapIntensity: 0 });
+    const rockMat = new THREE.MeshStandardMaterial({ color: '#b07050', roughness: 1, flatShading: true, envMapIntensity: 0 });
     return { rocks, buttes, towers, pylons, mat, rockMat, rg: rockGeo(), bg: butteGeo(), tg: towerGeo(), pg: pylonGeo() };
   }, [map, hf]);
 

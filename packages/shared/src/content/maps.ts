@@ -19,8 +19,8 @@ export const RUSTWATER_CANYONS: MapDef = {
     sky: 'desert-dusk',
   },
   launchDecks: {
-    concord: [{ pos: [-1600, 330, -1600], radius: 45 }],
-    vex: [{ pos: [1600, 340, 1600], radius: 45 }],
+    concord: [{ pos: [-1600, 330, -1600], radius: 60 }],
+    vex: [{ pos: [1600, 340, 1600], radius: 60 }],
   },
   spawns: {
     concord: [

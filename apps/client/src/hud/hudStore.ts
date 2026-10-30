@@ -57,8 +57,6 @@ export interface HudState {
   altitude: number;
   sieged: boolean;
   grounded: boolean;
-  /** Siege hint: Bulwark grounded, or airborne below hover speed. */
-  canSiege: boolean;
   locked: boolean;
   respawnIn: number;
   rollCd: number;
@@ -68,6 +66,9 @@ export interface HudState {
   ammoMax2: number;
   weapon1: string;
   weapon2: string;
+  weaponId1: string;
+  weaponId2: string;
+  evadedNonce: number;
   docked: boolean;
   /** 0..1 resupply fill (average of both ammo counters) while docked. */
   resupply: number;
@@ -106,7 +107,6 @@ export const useHud = create<HudState>(() => ({
   altitude: 0,
   sieged: false,
   grounded: false,
-  canSiege: false,
   locked: false,
   respawnIn: 0,
   rollCd: 0,
@@ -116,6 +116,9 @@ export const useHud = create<HudState>(() => ({
   ammoMax2: 1,
   weapon1: '',
   weapon2: '',
+  weaponId1: '',
+  weaponId2: '',
+  evadedNonce: 0,
   docked: false,
   resupply: 0,
   resupplied: false,
@@ -138,6 +141,18 @@ export const useHud = create<HudState>(() => ({
 
 export const isGrounded = (s: ShipState): boolean => s.grounded === true;
 
+/**
+ * Homing missiles aimed at the own Ship, derived from projectileSpawned events (until the server sends an
+ * explicit `incoming` field). Distance is estimated along the straight spawn->own line at missile speed.
+ */
+export interface IncomingMissile {
+  id: number;
+  origin: [number, number, number];
+  speed: number;
+  bornMs: number;
+}
+export const incoming = new Map<number, IncomingMissile>();
+
 let nextId = 1;
 const KILLFEED_MS = 6000;
 /** Airborne Siege hint threshold (m/s): "slow/hovering". */
@@ -158,6 +173,22 @@ const _d = new Vector3();
 /** Route sim events the HUD cares about (killfeed, hit markers, damage numbers, impacts, deck). */
 export function handleHudEvent(ev: SimEvent): void {
   const ownId = world.ownId;
+  if (ev.type === 'projectileSpawned') {
+    if (ev.kind === 'missile' && ev.target === ownId) {
+      incoming.set(ev.id, { id: ev.id, origin: [...ev.origin], speed: ev.speed, bornMs: performance.now() });
+    }
+    return;
+  }
+  if (ev.type === 'projectileExpired') {
+    incoming.delete(ev.id);
+    return;
+  }
+  if (ev.type === 'missileEvaded') {
+    incoming.delete(ev.id);
+    if (ev.victim === ownId) useHud.setState((st) => ({ evadedNonce: st.evadedNonce + 1 }));
+    return;
+  }
+  if (ev.type === 'hit') incoming.delete(ev.projectile);
   if (ev.type === 'hit') {
     if (ev.attacker === ownId) {
       useHud.setState((s) => ({ hitNonce: s.hitNonce + 1, hitDeflected: ev.deflected }));
@@ -239,7 +270,6 @@ export function startHudFeed(): () => void {
         altitude: hf ? own.pos[1] - sampleHeight(hf, own.pos[0], own.pos[2]) : own.pos[1],
         sieged: own.sieged,
         grounded,
-        canSiege: def.canHover && own.alive && (grounded || own.speed < HOVER_SPEED),
         locked,
         respawnIn: own.alive ? 0 : Math.min(RESPAWN_SEC, Math.max(0, (own.respawnAtTick - tick) / TICK_HZ)),
         rollCd: Math.min(1, own.rollCooldownTicks / Math.max(1, def.rollCooldownSec * TICK_HZ)),
@@ -249,6 +279,8 @@ export function startHudFeed(): () => void {
         ammoMax2: def.ammo2Max,
         weapon1: WEAPONS[def.primary]?.name ?? '',
         weapon2: WEAPONS[def.secondary]?.name ?? '',
+        weaponId1: def.primary,
+        weaponId2: def.secondary,
         docked: own.docked,
         resupply: Math.min(1, (own.ammo1 / def.ammo1Max + own.ammo2 / def.ammo2Max) / 2),
         hotbar,

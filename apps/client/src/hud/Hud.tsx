@@ -6,6 +6,7 @@ import { inputState, setTyping } from '../input/input';
 import { addChatLine, startHudFeed, useHud } from './hudStore';
 import { Floaters } from './Floaters';
 import { SkillIcon } from './icons';
+import { Incoming } from './Incoming';
 import { Radar } from './Radar';
 import { NATION_COLOR, Reticles } from './Reticles';
 import './hud.css';
@@ -53,29 +54,6 @@ function Gauge() {
           {g.impact}
         </div>
       )}
-    </div>
-  );
-}
-
-function Ammo({ side }: { side: 1 | 2 }) {
-  const a = useHud(
-    useShallow((h) =>
-      side === 1
-        ? { n: h.ammo1, max: h.ammoMax1, name: h.weapon1, key: 'LMB' }
-        : { n: h.ammo2, max: h.ammoMax2, name: h.weapon2, key: 'RMB' },
-    ),
-  );
-  const low = a.n / Math.max(1, a.max) < 0.2;
-  return (
-    <div className={`ammo a${side} ${low ? 'low' : ''}`}>
-      <small>
-        {a.key} · {a.name}
-      </small>
-      <b>
-        {Math.round(a.n)}
-        <em>/{a.max}</em>
-      </b>
-      {a.n <= 0 && <span className="resup">RESUPPLY AT LAUNCH DECK</span>}
     </div>
   );
 }
@@ -197,7 +175,7 @@ function Chat() {
 function Warnings() {
   const h = useHud(
     useShallow((x) => ({
-      locked: x.locked, alive: x.alive, respawnIn: x.respawnIn, sieged: x.sieged, grounded: x.grounded, canSiege: x.canSiege,
+      locked: x.locked, alive: x.alive, respawnIn: x.respawnIn, sieged: x.sieged, grounded: x.grounded, evadedNonce: x.evadedNonce,
       flashes: x.damageFlashes, hitNonce: x.hitNonce, hitDeflected: x.hitDeflected, ping: x.pingMs, frame: x.frame,
       docked: x.docked, resupply: x.resupply, resupplied: x.resupplied, crashed: x.crashed,
     })),
@@ -206,12 +184,12 @@ function Warnings() {
   return (
     <>
       {h.locked && h.alive && <div className="warn-lock">MISSILE LOCK</div>}
+      {h.evadedNonce > 0 && <div key={h.evadedNonce} className="evaded">EVADED</div>}
       {h.sieged && (
         <div className="siege">
           {h.grounded ? 'SIEGE (GROUND) ×1.5 DMG · RANGE ×1.4' : 'SIEGE (AIR) ×1.15 DMG · RANGE ×1.15 · LOCK CONE ×1.4'}
         </div>
       )}
-      {h.canSiege && !h.sieged && <div className="siege off">SHIFT: SIEGE</div>}
       {h.flashes.map((f) => (
         <div key={f.id} className="dmg" style={{ transform: `rotate(${f.angleDeg}deg)` }}>
           <i />
@@ -253,8 +231,7 @@ export function Hud() {
       <Floaters />
       <Status />
       <Gauge />
-      <Ammo side={1} />
-      <Ammo side={2} />
+      <Incoming />
       <Hotbar />
       <Killfeed />
       <Chat />

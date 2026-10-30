@@ -149,6 +149,10 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.ammo1 = fd.ammo1Max;
     s.ammo2 = fd.ammo2Max;
     s.docked = false;
+    s.siegePending = false;
+    s.incomingDist = s.incomingTti = -1;
+    s.canLock = false;
+    s.lockProgress = 0;
     s.grounded = false;
     s.dockTicks = 0;
     s.brakeHeld = false;
@@ -239,6 +243,11 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       ironTicks: 0,
       flareTicks: 0,
       dockTicks: 0,
+      siegePending: false,
+      incomingDist: -1,
+      incomingTti: -1,
+      canLock: false,
+      lockProgress: 0,
     };
     const body = world.createRigidBody(
       R.RigidBodyDesc.kinematicPositionBased().setTranslation(at[0], at[1], at[2]),

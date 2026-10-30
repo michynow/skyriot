@@ -33,7 +33,18 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     canHover: false,
     primary: 'needle-cannon',
     secondary: 'sting-missile',
-    hotbar: ['afterburn-dash', 'ghost-skin', 'flares', null, null, null, null, 'repair-kit', 'shield-kit', 'fuel-cell'],
+    hotbar: [
+      'afterburn-dash',
+      'ghost-skin',
+      'flares',
+      null,
+      null,
+      null,
+      null,
+      'repair-kit',
+      'shield-kit',
+      'fuel-cell',
+    ],
   },
   anvil: {
     id: 'anvil',
@@ -66,7 +77,18 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     canHover: false,
     primary: 'flak-repeater',
     secondary: 'brick-bomb',
-    hotbar: ['carpet-drop', 'iron-hide', 'flares', null, null, null, null, 'repair-kit', 'shield-kit', 'fuel-cell'],
+    hotbar: [
+      'carpet-drop',
+      'iron-hide',
+      'flares',
+      null,
+      null,
+      null,
+      null,
+      'repair-kit',
+      'shield-kit',
+      'fuel-cell',
+    ],
   },
   halo: {
     id: 'halo',
@@ -99,7 +121,18 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     canHover: false,
     primary: 'pulse-blaster',
     secondary: 'seeker-pod',
-    hotbar: ['mend-beam', 'aegis-bubble', 'flares', null, null, null, null, 'repair-kit', 'shield-kit', 'fuel-cell'],
+    hotbar: [
+      'mend-beam',
+      'aegis-bubble',
+      'flares',
+      null,
+      null,
+      null,
+      null,
+      'repair-kit',
+      'shield-kit',
+      'fuel-cell',
+    ],
   },
   bulwark: {
     id: 'bulwark',
@@ -132,7 +165,18 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     canHover: true,
     primary: 'twin-autocannon',
     secondary: 'mortar-battery',
-    hotbar: ['siege-anchor', 'scrap-wall', 'flares', null, null, null, null, 'repair-kit', 'shield-kit', 'fuel-cell'],
+    hotbar: [
+      'siege-anchor',
+      'scrap-wall',
+      'flares',
+      null,
+      null,
+      null,
+      null,
+      'repair-kit',
+      'shield-kit',
+      'fuel-cell',
+    ],
   },
 };
 
@@ -166,4 +210,9 @@ export const AIM_ASSIST = { coneRad: 0.12, spreadMul: 0.5 };
  * - terrain between missile and target for `losBreakSec` breaks guidance; missiles hitting terrain explode;
  * - homing missiles get `endgameTurnMul` turn rate inside `endgameDistM` so straight flight is not enough.
  */
-export const MISSILE_EVADE = { rollBreakDistM: 90, losBreakSec: 0.4, endgameDistM: 150, endgameTurnMul: 1.6 };
+export const MISSILE_EVADE = {
+  rollBreakDistM: 55,
+  losBreakSec: 0.4,
+  endgameDistM: 150,
+  endgameTurnMul: 1.6,
+};

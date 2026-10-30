@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import {
+  AIM_ASSIST,
   FRAMES,
   SIEGE,
   SIEGE_AIR,
@@ -13,6 +14,7 @@ import { world } from '../state/world';
 import { inputState } from '../input/input';
 import { isGrounded } from './hudStore';
 import { project } from './view';
+import { Ammo } from './Ammo';
 
 const MARKERS = 40;
 const LADDER = 8;
@@ -79,7 +81,8 @@ export function Reticles() {
   const leadEl = useRef<HTMLDivElement>(null);
   const targetEl = useRef<HTMLDivElement>(null);
   const targetLabel = useRef<HTMLSpanElement>(null);
-  const lockBar = useRef<HTMLDivElement>(null);
+  const tbRing = useRef<SVGCircleElement>(null);
+  const turnEl = useRef<HTMLDivElement>(null);
   const gunnerEl = useRef<HTMLDivElement>(null);
   const ringEl = useRef<SVGCircleElement>(null);
   const ladderEls = useRef<(HTMLDivElement | null)[]>([]);
@@ -164,21 +167,33 @@ export function Reticles() {
       if (underD === null && world.heightfield) underD = terrainHit(world.heightfield, own.pos, aim, 3500);
 
       const inRange = (underEnemy && underD! <= primRange) || targetD <= primRange;
+      // Lock advice. The cone is measured from the Ship's nose, not the cursor.
+      let secInRange = false;
       let lockRange = false;
       if (rel && secondary && secondary.lockTimeSec > 0 && targetD <= secRange) {
+        secInRange = true;
         const cos = (rel[0]! * fx + rel[1]! * fy + rel[2]! * fz) / (targetD || 1);
         lockRange = Math.acos(Math.min(1, Math.max(-1, cos))) < secondary.lockConeRad * coneMul;
       }
+      if (target && own.lockTarget === target.id) lockRange = lockRange || own.canLock;
+      // Aim assist: Target inside the cone around the aim direction and in Primary range.
+      let assist = false;
+      if (rel && targetD <= primRange) {
+        const cos = (rel[0]! * aim[0] + rel[1]! * aim[1] + rel[2]! * aim[2]) / (targetD || 1);
+        assist = Math.acos(Math.min(1, Math.max(-1, cos))) < AIM_ASSIST.coneRad;
+      }
+      const locked = lockProgress >= 1 || (!!target && own.lockTarget === target.id);
 
       const cur = cursorEl.current;
       place(cur, cx, cy, !sieged);
       if (cur) {
         cur.classList.toggle('inrange', inRange);
         cur.classList.toggle('lockrange', lockRange);
+        cur.classList.toggle('assist', assist);
       }
       const distText = underD === null ? '' : `${Math.round(underD)} m`;
       setText(crDist.current, distText);
-      setText(crTag.current, lockRange ? 'LOCK RANGE' : inRange ? 'IN RANGE' : '');
+      setText(crTag.current, locked ? 'LOCKED — FIRE' : inRange ? 'IN RANGE' : '');
       setText(crMax.current, `R ${Math.round(primRange)}`);
 
       // Nose reticle (where the guns point).
@@ -237,6 +252,7 @@ export function Reticles() {
       const t = primary ? leadTime(rel, target.vel, primary.speed) : 0;
       const onLead = project(target.pos[0] + target.vel[0] * t, target.pos[1] + target.vel[1] * t, target.pos[2] + target.vel[2] * t, p);
       place(leadEl.current, p.x, p.y, onLead && targetD <= primRange);
+      leadEl.current?.classList.toggle('assist', assist);
       const onTarget = project(target.pos[0], target.pos[1], target.pos[2], p);
       place(targetEl.current, p.x, p.y, onTarget);
       setText(targetLabel.current, `${target.name} · ${Math.round(targetD)}m`);
@@ -248,11 +264,22 @@ export function Reticles() {
       }
       if (secondary && secondary.lockTimeSec > 0) {
         lockProgress = Math.min(1, Math.max(0, lockProgress + (lockRange ? dt : -dt * 2) / secondary.lockTimeSec));
-        if (own.lockTarget === target.id) lockProgress = 1;
+        if (own.lockTarget === target.id) lockProgress = Math.max(lockProgress, own.lockProgress);
+        if (own.lockTarget === target.id && own.lockProgress >= 1) lockProgress = 1;
       } else lockProgress = 0;
-      if (lockBar.current) lockBar.current.style.width = `${lockProgress * 100}%`;
       if (ringEl.current) ringEl.current.style.strokeDashoffset = String(RING_LEN * (1 - lockProgress));
-      if (targetEl.current) targetEl.current.dataset.locked = lockProgress >= 1 ? '1' : '0';
+      if (targetEl.current) {
+        targetEl.current.dataset.locked = lockProgress >= 1 ? '1' : '0';
+        targetEl.current.dataset.assist = assist ? '1' : '0';
+      }
+      if (tbRing.current) tbRing.current.style.strokeDashoffset = String((2 * Math.PI * 26) * (1 - lockProgress));
+      // "turn to lock": in range but outside the nose cone -> chevron pointing from the nose toward the Target.
+      const tl = turnEl.current;
+      if (tl) {
+        const show = secInRange && !lockRange && onTarget;
+        tl.style.display = show ? 'block' : 'none';
+        if (show) tl.style.transform = `translate(${cx}px,${cy}px) rotate(${(Math.atan2(p.y - cy, p.x - cx) * 180) / Math.PI + 90}deg)`;
+      }
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
@@ -266,9 +293,9 @@ export function Reticles() {
       <div className="target-br" ref={targetEl} style={{ display: 'none' }}>
         <div className="tb" />
         <span className="tb-label" ref={targetLabel} />
-        <div className="lockbar">
-          <div ref={lockBar} />
-        </div>
+        <svg className="tb-ring" viewBox="-30 -30 60 60">
+          <circle ref={tbRing} r="26" strokeDasharray={2 * Math.PI * 26} strokeDashoffset={2 * Math.PI * 26} transform="rotate(-90)" />
+        </svg>
       </div>
       <div className="lead" ref={leadEl} style={{ display: 'none' }} />
       <div className="nose" ref={noseEl} style={{ display: 'none' }} />
@@ -276,6 +303,12 @@ export function Reticles() {
         <span className="cr-dist" ref={crDist} />
         <span className="cr-tag" ref={crTag} />
         <span className="cr-max" ref={crMax} />
+        <Ammo side={1} />
+        <Ammo side={2} />
+      </div>
+      <div className="turnlock" ref={turnEl} style={{ display: 'none' }}>
+        <i />
+        <span>TURN TO LOCK</span>
       </div>
       <div className="gunner" ref={gunnerEl} style={{ display: 'none' }}>
         <svg width="90" height="90" viewBox="-45 -45 90 90">
@@ -283,6 +316,8 @@ export function Reticles() {
           <circle ref={ringEl} r="34" className="g-lock" strokeDasharray={RING_LEN} strokeDashoffset={RING_LEN} transform="rotate(-90)" />
           <path d="M-44 0h24M20 0h24M0 -44v24M0 20v24" className="g-cross" />
         </svg>
+        <Ammo side={1} />
+        <Ammo side={2} />
         <div className="ladder">
           {Array.from({ length: LADDER }, (_, i) => (
             <div key={i} ref={(el) => void (ladderEls.current[i] = el)} className="rung">
