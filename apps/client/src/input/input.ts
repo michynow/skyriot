@@ -1,5 +1,11 @@
 import { Vector3, type Camera } from 'three';
-import { EMPTY_INPUT, FRAMES, TICK_DT, type PilotInput, type ShipId, type ShipState } from '@skyriot/shared';
+import {
+  EMPTY_INPUT,
+  FRAMES,
+  type PilotInput,
+  type ShipId,
+  type ShipState,
+} from '@skyriot/shared';
 import { world } from '../state/world';
 import { useSettings } from '../ui/settings';
 
@@ -13,9 +19,9 @@ export const inputState = {
   aim: [0, 0, -1] as [number, number, number],
 };
 
-const SETTINGS_KEY = 'skyriot.input';
-/** Mouse steering feel. Persisted; edited from the dev panel. */
-export const inputSettings = { sensitivity: 0.0007, deadzone: 0.06, recenter: false };
+const SETTINGS_KEY = 'skyriot.input.v2';
+/** Mouse-aim feel: radians of aim per pixel of mouse travel. Persisted; edited from the dev panel. */
+export const inputSettings = { sensitivity: 0.0012 };
 try {
   Object.assign(inputSettings, JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}'));
 } catch {
@@ -28,7 +34,6 @@ export function saveInputSettings(): void {
     /* ignore */
   }
 }
-const RECENTER_RATE = 1.5; // 1/s decay of the cursor toward centre when enabled
 
 const DOUBLE_TAP_MS = 300; // max gap from the first key release to the second press
 export const AIM_DISTANCE = 600;
@@ -44,9 +49,17 @@ let fire2 = false;
 let lockFailed = false;
 let pointerX = 0;
 let pointerY = 0;
+// Mouse-aim: the mouse turns a world-space aim direction freely; the Ship steers toward it on its own.
+let aimYaw = 0;
+let aimPitch = 0;
+let aimFor: ShipId | null = null;
+const AIM_PITCH_MAX = 1.45;
+/** Cursor is kept inside this NDC box so the aim point never leaves the screen. */
+const CURSOR_EDGE = 0.92;
 
 const _aim = new Vector3();
 const _cam = new Vector3();
+const _p = new Vector3();
 
 const isUi = (t: EventTarget | null) => t instanceof Element && t.closest('[data-ui]') !== null;
 const isLocked = () => document.pointerLockElement !== null;
@@ -73,7 +86,10 @@ export function cycleTarget(): void {
   const range = FRAMES[own.frame].radarRangeM;
   const enemies = [...world.ships.values()]
     .filter((s) => s.alive && s.nation !== own.nation)
-    .map((s) => ({ id: s.id, d: Math.hypot(s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]) }))
+    .map((s) => ({
+      id: s.id,
+      d: Math.hypot(s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]),
+    }))
     .filter((e) => e.d <= range)
     .sort((a, b) => a.d - b.d);
   if (!enemies.length) {
@@ -119,8 +135,10 @@ export function attachInput(canvas: HTMLElement): () => void {
       }
     } else if (e.code === 'Tab') cycleTarget();
     else if (e.code === 'KeyR' && !e.repeat) launch = true;
-    else if (e.code.startsWith('Alt')) world.freeLook = true;
-    else if (e.code.startsWith('Digit')) {
+    else if (e.code.startsWith('Alt')) {
+      world.freeLook = true;
+      world.cursor.x = world.cursor.y = 0;
+    } else if (e.code.startsWith('Digit')) {
       const n = Number(e.code.slice(5));
       hotbar = n === 0 ? 9 : n - 1;
     }
@@ -134,15 +152,19 @@ export function attachInput(canvas: HTMLElement): () => void {
     if (inputState.typing) return;
     pointerX = (e.clientX / window.innerWidth) * 2 - 1;
     pointerY = -((e.clientY / window.innerHeight) * 2 - 1);
-    if (isLocked()) {
-      world.cursor.x += e.movementX * inputSettings.sensitivity;
-      world.cursor.y -= e.movementY * inputSettings.sensitivity;
-    } else if (lockFailed && !isUi(e.target)) {
-      // Pointer lock refused (iframe, headless): fall back to the absolute mouse position.
-      world.cursor.x = pointerX;
-      world.cursor.y = pointerY;
+    if (!isLocked()) return;
+    if (world.freeLook) {
+      // Alt: the cursor orbits the camera instead of moving the aim.
+      world.cursor.x += e.movementX * 0.0015;
+      world.cursor.y -= e.movementY * 0.0015;
+      clampCursor();
+      return;
     }
-    clampCursor();
+    aimYaw -= e.movementX * inputSettings.sensitivity;
+    aimPitch = Math.max(
+      -AIM_PITCH_MAX,
+      Math.min(AIM_PITCH_MAX, aimPitch - e.movementY * inputSettings.sensitivity),
+    );
   };
   const onMouseDown = (e: MouseEvent) => {
     if (isUi(e.target) || inputState.typing) return;
@@ -159,7 +181,10 @@ export function attachInput(canvas: HTMLElement): () => void {
   };
   const onWheel = (e: WheelEvent) => {
     if (isUi(e.target)) return;
-    world.cameraZoom = Math.min(2, Math.max(0.6, world.cameraZoom * (1 + Math.sign(e.deltaY) * 0.08)));
+    world.cameraZoom = Math.min(
+      2,
+      Math.max(0.6, world.cameraZoom * (1 + Math.sign(e.deltaY) * 0.08)),
+    );
   };
   const onLockChange = () => {
     if (!isLocked()) fire1 = fire2 = false;
@@ -193,42 +218,81 @@ export function attachInput(canvas: HTMLElement): () => void {
   };
 }
 
+function setAimFrom(dx: number, dy: number, dz: number) {
+  const len = Math.hypot(dx, dy, dz) || 1;
+  aimPitch = Math.asin(Math.max(-1, Math.min(1, dy / len)));
+  aimYaw = Math.atan2(-dx, -dz);
+}
+
+/**
+ * Per render frame: projects the aim point onto the screen as world.cursor, pinning it to the screen edge
+ * (and pulling the aim back with it) so the crosshair stays visible while the Ship turns to catch up.
+ */
+export function trackAim(camera: Camera, own: ShipState | undefined): void {
+  if (!own || world.freeLook) return;
+  if (aimFor !== own.id) {
+    aimFor = own.id;
+    const [x, y, z, w] = own.rot;
+    setAimFrom(-2 * (x * z + w * y), -2 * (y * z - w * x), -(1 - 2 * (x * x + y * y)));
+  }
+  camera.updateMatrixWorld();
+  let cx: number, cy: number;
+  if (!isLocked() && lockFailed) {
+    // Pointer lock refused (iframe, headless): the absolute mouse position is the cursor.
+    cx = pointerX;
+    cy = pointerY;
+  } else {
+    const cp = Math.cos(aimPitch);
+    _p.set(-Math.sin(aimYaw) * cp, Math.sin(aimPitch), -Math.cos(aimYaw) * cp)
+      .multiplyScalar(AIM_DISTANCE)
+      .add(_aim.set(own.pos[0], own.pos[1], own.pos[2]))
+      .project(camera);
+    cx = _p.x;
+    cy = _p.y;
+    // Behind the camera the projection mirrors: flip and push to the edge.
+    if (_p.z > 1) {
+      cx = -cx * 1e3;
+      cy = -cy * 1e3;
+    }
+  }
+  const m = Math.max(Math.abs(cx), Math.abs(cy)) / CURSOR_EDGE;
+  const pinned = m > 1;
+  if (pinned) {
+    cx /= m;
+    cy /= m;
+  }
+  world.cursor.x = cx;
+  world.cursor.y = cy;
+  if (pinned || (!isLocked() && lockFailed)) {
+    // Re-derive the aim from the on-screen cursor: camera ray to a far point, then direction from the Ship.
+    _aim.set(cx, cy, 0.5).unproject(camera);
+    _cam.setFromMatrixPosition(camera.matrixWorld);
+    _aim.sub(_cam).normalize().multiplyScalar(AIM_DISTANCE).add(_cam);
+    setAimFrom(_aim.x - own.pos[0], _aim.y - own.pos[1], _aim.z - own.pos[2]);
+  }
+}
+
 /** Build this tick's PilotInput. One-shot flags (roll, hotbar) are consumed. */
-export function sampleInput(
-  seq: number,
-  viewTick: number,
-  camera: Camera,
-  own: ShipState | undefined,
-): PilotInput {
+export function sampleInput(seq: number, viewTick: number, own: ShipState | undefined): PilotInput {
   const typing = inputState.typing;
   const k = (code: string) => (!typing && keys.has(code) ? 1 : 0);
 
-  // Aim: cursor ray through the camera, converted to a direction from the Ship to a far point on it.
-  if (inputSettings.recenter) {
-    const k = Math.exp(-RECENTER_RATE * TICK_DT);
-    world.cursor.x *= k;
-    world.cursor.y *= k;
-  }
-  const len = Math.hypot(world.cursor.x, world.cursor.y);
-  const dz = inputSettings.deadzone;
-  const scale = len <= dz ? 0 : (len - dz) / (1 - dz) / len;
-  _aim.set(world.cursor.x * scale, world.cursor.y * scale, 0.5).unproject(camera);
-  _cam.setFromMatrixPosition(camera.matrixWorld);
-  _aim.sub(_cam).normalize();
-  let aim: [number, number, number] = [_aim.x, _aim.y, _aim.z];
-  if (own) {
-    _aim.multiplyScalar(AIM_DISTANCE).add(_cam);
-    _aim.set(_aim.x - own.pos[0], _aim.y - own.pos[1], _aim.z - own.pos[2]).normalize();
-    aim = [_aim.x, _aim.y, _aim.z];
-    if (world.freeLook) {
-      // Alt: camera looks around, Ship keeps its heading.
-      const [x, y, z, w] = own.rot;
-      aim = [-2 * (x * z + w * y), -2 * (y * z - w * x), -(1 - 2 * (x * x + y * y))];
-    }
+  const cp = Math.cos(aimPitch);
+  let aim: [number, number, number] = [
+    -Math.sin(aimYaw) * cp,
+    Math.sin(aimPitch),
+    -Math.cos(aimYaw) * cp,
+  ];
+  if (own && world.freeLook) {
+    // Alt: camera looks around, Ship keeps its heading.
+    const [x, y, z, w] = own.rot;
+    aim = [-2 * (x * z + w * y), -2 * (y * z - w * x), -(1 - 2 * (x * x + y * y))];
   }
   if (!aim.every(Number.isFinite)) aim = [0, 0, -1];
   inputState.aim = aim;
-  if (inputState.targetId && !world.ships.get(inputState.targetId)?.alive) inputState.targetId = null;
+  // The Target is only ever picked with Tab and held until the next Tab; it drops when it dies or leaves view.
+  const target = inputState.targetId ? world.ships.get(inputState.targetId) : undefined;
+  if (!own || !target?.alive) inputState.targetId = null;
 
   const input: PilotInput = {
     ...EMPTY_INPUT,
@@ -248,7 +312,8 @@ export function sampleInput(
     launch: !typing && launch,
     target: inputState.targetId,
   };
-  if (import.meta.env.DEV && (input.rollLeft || input.rollRight)) console.debug('[roll] sent', input.rollLeft ? 'left' : 'right', 'seq', seq);
+  if (import.meta.env.DEV && (input.rollLeft || input.rollRight))
+    console.debug('[roll] sent', input.rollLeft ? 'left' : 'right', 'seq', seq);
   rollLeft = rollRight = false;
   launch = false;
   hotbar = -1;

@@ -75,6 +75,7 @@ export function createPredictor(sim: Sim, ownId: ShipId): Predictor {
     onServerSnapshot(snap) {
       if (snap.tick <= lastTick) return;
       lastTick = snap.tick;
+      sim.setStructures(snap.structures);
       const own = snap.ships.find((s) => s.id === ownId);
       if (!own) return;
       const existing = sim.getShip(ownId);

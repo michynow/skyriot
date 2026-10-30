@@ -7,9 +7,10 @@ import {
   type PilotInput,
   type WeaponDef,
   type ProjectileKind,
+  type NationId,
   type ShipId,
 } from '../types';
-import type { Projectile, ShipRec, SimCtx } from './ctx';
+import type { Projectile, ShipRec, SimCtx, StructureRec } from './ctx';
 import {
   LAG_HISTORY_TICKS,
   AIR_BARRAGE_COUNT,
@@ -22,6 +23,9 @@ import {
   NAV_MAX_LEAD_SEC,
   ROCKET_WOBBLE_AMP_M,
   ROCKET_WOBBLE_PERIOD_SEC,
+  SEEKER_CONE_RAD,
+  BREAK_TURN_ACCEL,
+  MISSILE_MOTOR_SEC,
   WEAVE_AMP_MIN_M,
   WEAVE_AMP_SPAN_M,
   WEAVE_PERIOD_MIN_SEC,
@@ -38,6 +42,7 @@ import {
   WALL_RADIUS,
 } from './constants';
 import { hitShip } from './damage';
+import { damageStructure, domeEntry, domeHitCore, splashStructures } from './structures';
 import { forwardOf, rightOf, upOf } from './math';
 
 const MAX_REWIND_TICKS = Math.floor((LAG_COMP_MAX_MS / 1000) * TICK_HZ);
@@ -149,7 +154,8 @@ function segmentCapsuleDist2(
 
 export function spawnProjectile(
   ctx: SimCtx,
-  owner: ShipRec,
+  /** A Ship, or a Turret's `shooter`. */
+  owner: { state: { id: ShipId; nation: NationId } },
   kind: ProjectileKind,
   weapon: string,
   damage: number,
@@ -259,7 +265,7 @@ function updateLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, sec: WeaponDef
 }
 
 /** Time for a projectile of `speed` fired from the origin to meet a target moving at (vx,vy,vz). */
-function interceptTime(
+export function interceptTime(
   rx: number,
   ry: number,
   rz: number,
@@ -528,12 +534,28 @@ function explode(
   y: number,
   z: number,
   direct: ShipRec | null,
+  structure: StructureRec | null,
 ): void {
   if (direct) hitShip(ctx, direct, p.damage * victimMul(p, direct), p.owner, p.id, x, y, z);
+  if (structure && structure.state.nation !== p.nation)
+    damageStructure(ctx, structure, p.damage, p.owner, p.id, x, y, z);
   if (p.splash <= 0) return;
+  splashStructures(
+    ctx,
+    p.nation,
+    p.damage,
+    p.splash,
+    SPLASH_MIN_FRACTION,
+    structure,
+    p.owner,
+    p.id,
+    x,
+    y,
+    z,
+  );
   for (const o of ctx.recList) {
     const os = o.state;
-    if (o === direct || !os.alive || os.nation === p.nation) continue;
+    if (o === direct || !os.alive || os.nation === p.nation || os.launchPhase !== 'none') continue;
     const d = Math.hypot(os.pos[0] - x, os.pos[1] - y, os.pos[2] - z) - ctx.frames[os.frame].radius;
     if (d >= p.splash) continue;
     const fall = Math.max(1 - Math.max(d, 0) / p.splash, SPLASH_MIN_FRACTION);
@@ -583,12 +605,21 @@ export function stepProjectiles(ctx: SimCtx): void {
         ty /= tl;
         tz /= tl;
         const missile = p.kind === 'missile';
-        let broke: 'roll' | 'terrain' | 'flare' | null = null;
+        let broke: 'roll' | 'terrain' | 'flare' | 'lost' | null = null;
         if (ts.flareTicks > 0) {
           broke = 'flare';
         } else if (missile) {
           if (ts.rollTicks > 0 && tl < MISSILE_EVADE.rollBreakDistM) {
             broke = 'roll';
+          } else if (
+            age * dt > MISSILE_MOTOR_SEC ||
+            (tl < MISSILE_EVADE.endgameDistM &&
+              (p.dx * tx + p.dy * ty + p.dz * tz < Math.cos(SEEKER_CONE_RAD) ||
+                ts.speed * Math.hypot(ts.angVel[0], ts.angVel[1], ts.angVel[2]) >=
+                  BREAK_TURN_ACCEL))
+          ) {
+            // Motor burnt out, the target slipped out of the seeker cone, or it out-turns the missile up close.
+            broke = 'lost';
           } else {
             // Terrain line of sight to the target.
             ray.origin.x = p.x;
@@ -660,6 +691,8 @@ export function stepProjectiles(ctx: SimCtx): void {
       z1 = p.z + p.dz * step;
     let hitT = Infinity; // distance along the step
     let victim: ShipRec | null = null;
+    let structure: StructureRec | null = null;
+    let dome: StructureRec | null = null;
 
     if (p.kind !== 'flare' && step > 0) {
       ray.origin.x = p.x;
@@ -669,12 +702,16 @@ export function stepProjectiles(ctx: SimCtx): void {
       ray.dir.y = p.dy;
       ray.dir.z = p.dz;
       const hit = ctx.world.castRay(ray, step, true, undefined, RAY_QUERY_GROUPS);
-      if (hit) hitT = hit.timeOfImpact;
+      if (hit) {
+        hitT = hit.timeOfImpact;
+        structure = ctx.structureByCollider.get(hit.collider.handle) ?? null;
+      }
 
       const testTick = ctx.tick - Math.max(0, p.rewind - age);
       for (const o of ctx.recList) {
         const os = o.state;
-        if (!os.alive || os.nation === p.nation || os.rollTicks > 0) continue;
+        if (!os.alive || os.nation === p.nation || os.rollTicks > 0 || os.launchPhase !== 'none')
+          continue;
         const fd = ctx.frames[os.frame];
         poseAt(ctx, o, testTick);
         const reach = fd.halfLength + PROJECTILE_RADIUS + step;
@@ -704,13 +741,21 @@ export function stepProjectiles(ctx: SimCtx): void {
         if (Math.hypot(x1 - w.x, y1 - w.y, z1 - w.z) < WALL_RADIUS && hitT === Infinity)
           hitT = step;
       }
+      if (victim) structure = null;
+      const domeT = domeEntry(ctx, p.nation, p.x, p.y, p.z, p.dx, p.dy, p.dz, step);
+      if (domeT < hitT) {
+        hitT = domeT;
+        victim = structure = null;
+        dome = domeHitCore();
+      }
     }
 
     if (hitT !== Infinity) {
       const hx = p.x + p.dx * hitT,
         hy = p.y + p.dy * hitT,
         hz = p.z + p.dz * hitT;
-      explode(ctx, p, hx, hy, hz, victim);
+      if (dome) damageStructure(ctx, dome, p.damage, p.owner, p.id, hx, hy, hz);
+      else explode(ctx, p, hx, hy, hz, victim, structure);
       ctx.events.push({ type: 'projectileExpired', id: p.id, pos: [hx, hy, hz] });
       recycle(ctx, i);
       continue;

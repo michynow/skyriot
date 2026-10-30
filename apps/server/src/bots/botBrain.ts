@@ -4,7 +4,9 @@ import {
   FRAMES,
   SIEGE,
   SKILLS,
+  STRUCTURES,
   TICK_HZ,
+  TURRET,
   WEAPONS,
   mulberry32,
   sampleHeight,
@@ -14,11 +16,16 @@ import {
   type Sim,
   type ShipId,
   type ShipState,
+  type StructureState,
 } from '@skyriot/shared';
 
 // Bot tuning (module constants; no content/ equivalent yet).
 const AVOID_LOOKAHEAD_SEC = 2.2;
 const AVOID_MARGIN = 90;
+const SINK_LOOKAHEAD_SEC = 0.8;
+const CRUISE_THROTTLE = 0.6;
+/** Below stallSpeed times this, Bots go full throttle. */
+const SLOW_SPEED_MUL = 2;
 const CRUISE_ALTITUDE = 160;
 const FIRE_CONE_RAD = 0.07;
 const FAR_BOOST_DISTANCE = 1200;
@@ -43,11 +50,25 @@ const BOMB_RUN_ALTITUDE = 120;
 const SIEGE_BOT_CHANCE = 0.5;
 const SIEGE_BOT_ENGAGE_DISTANCE = 700;
 const SIEGE_BOT_LEAVE_DISTANCE = 1100;
+/** Enemy Ships closer than this are fought; otherwise the bot attacks the enemy Base. Raiders mostly ignore Ships. */
+const SHIP_ENGAGE_DISTANCE = 600;
+const RAIDER_ENGAGE_DISTANCE = 200;
+const RAIDER_CHANCE = 0.5;
+const STRUCTURE_FIRE_CONE_RAD = 0.12;
+/** Steepest dive (as aim y) on a strafing run, the height above ground that ends it, and the climb-out. */
+const STRUCTURE_MAX_DIVE_DY = 0.35;
+const STRUCTURE_PULL_UP_M = 80;
+const STRUCTURE_CLIMB_DY = 0.3;
+const STRUCTURE_BREAK_M = 250;
+const STRUCTURE_RUN_IN_M = 900;
+const STRUCTURE_RUN_ALTITUDE = 150;
 
 export interface BotMemory {
   hf: Heightfield;
   /** Launch Decks of the bot's own nation. */
   decks: LaunchDeck[];
+  /** The Map's stall speed. */
+  stallSpeed: number;
   rng: () => number;
   seq: number;
   lastHealth: number;
@@ -56,13 +77,23 @@ export interface BotMemory {
   /** Bulwark bots with this set land and siege when an enemy is near. */
   siegeBot: boolean;
   lastBrake: boolean;
+  /** Flying away from a structure to line up the next strafing run. */
+  extending: boolean;
+  /** Goes for the enemy Base, fighting only Ships that get very close. */
+  raider: boolean;
 }
 
-export function createBotMemory(hf: Heightfield, seed: number, decks: LaunchDeck[]): BotMemory {
+export function createBotMemory(
+  hf: Heightfield,
+  seed: number,
+  decks: LaunchDeck[],
+  stallSpeed: number,
+): BotMemory {
   const rng = mulberry32(seed);
   return {
     hf,
     decks,
+    stallSpeed,
     rng,
     seq: 0,
     lastHealth: 0,
@@ -70,6 +101,8 @@ export function createBotMemory(hf: Heightfield, seed: number, decks: LaunchDeck
     dodgeDir: 1,
     siegeBot: rng() < SIEGE_BOT_CHANCE,
     lastBrake: false,
+    raider: rng() < RAIDER_CHANCE,
+    extending: false,
   };
 }
 
@@ -78,6 +111,10 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   const me = sim.getShip(id);
   const input: PilotInput = { seq: ++mem.seq, viewTick: sim.tick, ...EMPTY_INPUT, aim: [0, 0, -1] };
   if (!me || !me.alive) return input;
+  if (me.launchPhase !== 'none') {
+    input.throttle = 1;
+    return input;
+  }
 
   const fd = FRAMES[me.frame];
   const primary = WEAPONS[fd.primary]!;
@@ -95,6 +132,27 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     tx = enemy.pos[0] + enemy.vel[0] * lead;
     ty = enemy.pos[1] + enemy.vel[1] * lead;
     tz = enemy.pos[2] + enemy.vel[2] * lead;
+  }
+  // No Ship close: go for the enemy Base (a Turret shooting at us first, then Shield Stations, then the Core).
+  const engage = mem.raider ? RAIDER_ENGAGE_DISTANCE : SHIP_ENGAGE_DISTANCE;
+  const objective = dist > engage ? pickObjective(sim, me) : null;
+  let objectiveDist = Infinity;
+  if (objective) {
+    tx = objective.pos[0];
+    ty = objective.pos[1] + STRUCTURES[objective.kind].height / 2;
+    tz = objective.pos[2];
+    objectiveDist = Math.hypot(tx - me.pos[0], ty - me.pos[1], tz - me.pos[2]);
+    // Strafing run: break off when close, extend away, turn back in from far out.
+    const hx = me.pos[0] - tx,
+      hz = me.pos[2] - tz;
+    const horiz = Math.hypot(hx, hz) || 1;
+    if (horiz < STRUCTURE_BREAK_M) mem.extending = true;
+    else if (horiz > STRUCTURE_RUN_IN_M) mem.extending = false;
+    if (mem.extending) {
+      tx = me.pos[0] + (hx / horiz) * STRUCTURE_RUN_IN_M;
+      tz = me.pos[2] + (hz / horiz) * STRUCTURE_RUN_IN_M;
+      ty = objective.pos[1] + STRUCTURE_RUN_ALTITUDE;
+    }
   }
 
   if (enemy && me.toggles.bombing === 'ground-strike-mode' && (enemy.grounded || enemy.docked)) {
@@ -155,9 +213,21 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   dx /= dl;
   dy /= dl;
   dz /= dl;
+  // Strafing runs on structures: shallow dives only, and pull up near the ground.
+  if (objective) {
+    const low = me.pos[1] - sampleHeight(mem.hf, me.pos[0], me.pos[2]) < STRUCTURE_PULL_UP_M;
+    const minDy = low ? STRUCTURE_CLIMB_DY : -STRUCTURE_MAX_DIVE_DY;
+    if (dy < minDy) {
+      const k = Math.sqrt((1 - minDy * minDy) / Math.max(dx * dx + dz * dz, 1e-6));
+      dx *= k;
+      dz *= k;
+      dy = minDy;
+    }
+  }
 
   // Terrain avoidance: sample ahead along velocity; if too close, climb hard.
   let danger = 0;
+  let pullUp = 0;
   if (!landing && !siegeMode) {
     const speed = Math.max(me.speed, fd.minSpeed);
     const ahead = speed * AVOID_LOOKAHEAD_SEC;
@@ -174,8 +244,10 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       ),
     );
     danger = groundAhead + AVOID_MARGIN - me.pos[1];
-    if (danger > 0) {
-      const w = Math.min(danger / AVOID_MARGIN, 1);
+    // A steep dive needs room to pull out: steering counts the sink rate as lost height.
+    pullUp = danger - Math.min(me.vel[1], 0) * SINK_LOOKAHEAD_SEC;
+    if (pullUp > 0) {
+      const w = Math.min(pullUp / AVOID_MARGIN, 1);
       dx = dx * (1 - w) + (hx / hl) * 0.3 * w;
       dz = dz * (1 - w) + (hz / hl) * 0.3 * w;
       dy = dy * (1 - w) + w;
@@ -186,8 +258,12 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     }
   }
   input.aim = [dx, dy, dz];
-  if (!siegeMode || me.grounded) input.throttle = siegeMode ? 0 : 0.5;
-  input.boost = dist > FAR_BOOST_DISTANCE && danger <= 0 && !landing && !siegeMode;
+  // Full throttle when slow or climbing away from terrain: climbs bleed speed and a stall drops the nose.
+  const slow = me.speed < mem.stallSpeed * SLOW_SPEED_MUL;
+  if (!siegeMode || me.grounded)
+    input.throttle = siegeMode ? 0 : slow || pullUp > 0 ? 1 : CRUISE_THROTTLE;
+  input.boost =
+    Math.min(dist, objectiveDist) > FAR_BOOST_DISTANCE && danger <= 0 && !landing && !siegeMode;
 
   // Fire when the nose is on target.
   if (enemy && danger <= 0 && !landing) {
@@ -205,6 +281,14 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       secondary.lockConeRad > 0 || (me.sieged && secondary.kind === 'shell')
         ? me.lockTarget !== null
         : angle < FIRE_CONE_RAD && dist < secondary.rangeM * 0.6 * rangeMul;
+  }
+  if (objective && !mem.extending && danger <= 0 && !landing) {
+    const f = noseOf(me);
+    const cos =
+      (f[0] * (tx - me.pos[0]) + f[1] * (ty - me.pos[1]) + f[2] * (tz - me.pos[2])) / objectiveDist;
+    const onTarget = cos > Math.cos(STRUCTURE_FIRE_CONE_RAD);
+    input.fire1 = onTarget && objectiveDist < primary.rangeM;
+    input.fire2 = onTarget && secondary.lockConeRad === 0 && objectiveDist < secondary.rangeM * 0.6;
   }
 
   // Evade when taking damage (never while rooted).
@@ -287,11 +371,33 @@ function norm3(x: number, y: number, z: number): [number, number, number] {
   return [x / l, y / l, z / l];
 }
 
+function pickObjective(sim: Sim, me: ShipState): StructureState | null {
+  const threatRange2 = WEAPONS[TURRET.weapon]!.rangeM ** 2;
+  let turret: StructureState | null = null;
+  let station: StructureState | null = null;
+  let core: StructureState | null = null;
+  let turretD = Infinity;
+  let stationD = Infinity;
+  for (const st of sim.structures()) {
+    if (!st.alive || st.nation === me.nation) continue;
+    const d =
+      (st.pos[0] - me.pos[0]) ** 2 + (st.pos[1] - me.pos[1]) ** 2 + (st.pos[2] - me.pos[2]) ** 2;
+    if (st.kind === 'turret' && d < threatRange2 && d < turretD) {
+      turret = st;
+      turretD = d;
+    } else if (st.kind === 'shieldStation' && d < stationD) {
+      station = st;
+      stationD = d;
+    } else if (st.kind === 'core') core = st;
+  }
+  return turret ?? station ?? core;
+}
+
 function nearestEnemy(sim: Sim, me: ShipState): ShipState | null {
   let best: ShipState | null = null;
   let bestD = Infinity;
   for (const o of sim.ships()) {
-    if (!o.alive || o.nation === me.nation) continue;
+    if (!o.alive || o.nation === me.nation || o.launchPhase !== 'none') continue;
     const d =
       (o.pos[0] - me.pos[0]) ** 2 + (o.pos[1] - me.pos[1]) ** 2 + (o.pos[2] - me.pos[2]) ** 2;
     if (d < bestD) {
