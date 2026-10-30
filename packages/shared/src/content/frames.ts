@@ -15,7 +15,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     maxSpeed: 170,
     boostSpeed: 260,
     accel: 90,
-    turnRate: 2.6,
+    turnRate: 1.56,
     strafeSpeed: 45,
     verticalSpeed: 40,
     fuelBurnPerSec: 0.22,
@@ -48,7 +48,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     maxSpeed: 115,
     boostSpeed: 170,
     accel: 45,
-    turnRate: 1.1,
+    turnRate: 0.66,
     strafeSpeed: 22,
     verticalSpeed: 22,
     fuelBurnPerSec: 0.18,
@@ -81,7 +81,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     maxSpeed: 145,
     boostSpeed: 220,
     accel: 70,
-    turnRate: 1.8,
+    turnRate: 1.08,
     strafeSpeed: 34,
     verticalSpeed: 34,
     fuelBurnPerSec: 0.2,
@@ -114,7 +114,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     maxSpeed: 85,
     boostSpeed: 130,
     accel: 40,
-    turnRate: 1.3,
+    turnRate: 0.78,
     strafeSpeed: 30,
     verticalSpeed: 18,
     fuelBurnPerSec: 0.2,
@@ -138,6 +138,9 @@ export const FRAMES: Record<FrameId, FrameDef> = {
 
 /** Bulwark Siege Mode multipliers. */
 export const SIEGE = { damageMul: 1.5, rangeMul: 1.4, turnRateMul: 0.6 };
+
+/** Airborne Siege Mode (hover-locked in place): weaker than grounded. */
+export const SIEGE_AIR = { damageMul: 1.15, rangeMul: 1.15, turnRateMul: 0.7, lockConeMul: 1.4 };
 
 /**
  * Terrain impact above `minSpeed` (m/s into the surface): with shield up the Ship bounces,

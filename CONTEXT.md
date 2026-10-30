@@ -77,7 +77,7 @@ The single enemy Ship a Pilot has selected; missiles can only lock onto it.
 A Bulwark that has landed and drives on terrain (or a hull in space).
 
 **Siege Mode**:
-Grounded-only Bulwark toggle that roots the Ship, switches to first-person gunner view and extends damage, range and lock.
+Bulwark toggle that roots the Ship (full strength when Grounded, weaker hover-locked in the air), switches to first-person gunner view and extends damage, range and lock.
 
 ## Progression & economy
 
