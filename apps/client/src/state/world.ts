@@ -1,4 +1,13 @@
-import type { Heightfield, MapDef, ShipId, ShipState, SimEvent } from '@skyriot/shared';
+import type {
+  Heightfield,
+  MapDef,
+  MatchState,
+  ShipId,
+  ShipState,
+  SimEvent,
+  StructureId,
+  StructureState,
+} from '@skyriot/shared';
 
 /**
  * Mutable per-frame view of the world, the seam between net/game loop (writer) and
@@ -25,6 +34,10 @@ export interface ClientWorld {
   shake: number;
   /** Guided missiles from the latest snapshot (id -> pos/vel). Written by the net layer; read by ProjectilesFx. */
   missiles: Map<number, { pos: [number, number, number]; vel: [number, number, number] }>;
+  /** Base structures from the latest snapshot. Empty until the server sends them: treat as all alive. */
+  structures: Map<StructureId, StructureState>;
+  /** Battle state from the latest snapshot. */
+  match: MatchState | null;
 }
 
 export const world: ClientWorld = {
@@ -39,4 +52,6 @@ export const world: ClientWorld = {
   cameraZoom: 1,
   shake: 0,
   missiles: new Map(),
+  structures: new Map(),
+  match: null,
 };
