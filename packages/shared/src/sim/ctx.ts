@@ -128,7 +128,11 @@ export interface SimCtx {
   structures: StructureRec[];
   /** Collider handle -> structure, to tell a Projectile hitting a structure from one hitting terrain. */
   structureByCollider: Map<number, StructureRec>;
+  /** Index of each Nation's Core in `structures`. */
+  coreIndex: Record<NationId, number>;
   match: MatchState;
   /** Per Base, per Launch Tunnel: first tick it may stage the next Ship. */
   tunnelFreeTick: Record<NationId, number[]>;
+  /** Next free formation slot per Nation for pre-deployed Bots (reset each Battle). */
+  formationSlot: Record<NationId, number>;
 }

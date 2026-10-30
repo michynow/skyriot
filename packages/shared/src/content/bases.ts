@@ -33,6 +33,18 @@ export const LAUNCH = {
   hangarDepthM: 25,
 };
 
+/** Bots joining a Map Instance or starting a Battle skip the queue and start flying in rows ahead of their Base. */
+export const FORMATION = {
+  perRow: 5,
+  /** First row this far ahead of the Core, next rows further out. */
+  aheadM: 320,
+  rowSpacingM: 80,
+  columnSpacingM: 60,
+  /** Height above the Core, and the least clearance over the ground below. */
+  altitudeM: 150,
+  minClearanceM: 100,
+};
+
 export const SHIELD_DOME = {
   /** Enemy Ship touching the dome is put back outside it with this outward speed. */
   bounceSpeed: 60,

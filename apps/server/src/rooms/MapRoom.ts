@@ -27,6 +27,7 @@ import {
 } from '@skyriot/shared';
 import { botBrain, createBotMemory, type BotMemory } from '../bots/botBrain';
 import { runDevCommand } from './devCommands';
+import { packShared, snapshotFrame } from './snapshotFrame';
 
 const TICK_MS = 1000 / TICK_HZ;
 const SNAPSHOT_MS = 1000 / SNAPSHOT_HZ;
@@ -233,6 +234,7 @@ export class MapRoom extends Room {
 
   private tickOnce(): void {
     const t0 = performance.now();
+    const cpu0 = process.cpuUsage();
     const inputs = this.stepInputs;
     inputs.clear();
     const frozen = this.frozen;
@@ -277,37 +279,41 @@ export class MapRoom extends Room {
       }
     }
     const ms = performance.now() - t0;
+    const cpu = process.cpuUsage(cpu0);
     if (ms > SLOW_TICK_MS && t0 - this.lastSlowLog > SLOW_LOG_INTERVAL_MS) {
       this.lastSlowLog = t0;
       console.warn(
-        `[MapRoom] slow tick ${ms.toFixed(1)} ms (ships=${[...this.sim.ships()].length})`,
+        // cpu << wall means the process was descheduled (machine load), not slow code.
+        `[MapRoom] slow tick ${ms.toFixed(1)} ms, cpu ${((cpu.user + cpu.system) / 1000).toFixed(1)} ms (ships=${[...this.sim.ships()].length})`,
       );
     }
   }
 
   private sendSnapshots(): void {
     const all = [...this.sim.ships()];
+    const shared = packShared(all, this.sim.structures(), this.sim.match());
+    const packed = shared.ships;
     const missiles = this.sim.missiles();
     const base = { tick: this.sim.tick, serverTimeMs: Date.now() };
-    const structures = this.sim.structures();
-    const match = this.sim.match();
     for (const [id, client] of this.byId) {
       const me = this.sim.getShip(id);
-      let ships = all;
+      let ships = packed;
       if (me) {
         // Radar: allies always, enemies only within this Frame's radar range.
         const range2 = FRAMES[me.frame].radarRangeM ** 2;
         // Ships in the enemy hangar are hidden.
-        ships = all.filter(
-          (o) =>
+        ships = packed.filter((_, i) => {
+          const o = all[i]!;
+          return (
             o.id === id ||
             o.nation === me.nation ||
             (o.launchPhase !== 'hangar' &&
               (o.pos[0] - me.pos[0]) ** 2 +
                 (o.pos[1] - me.pos[1]) ** 2 +
                 (o.pos[2] - me.pos[2]) ** 2 <=
-                range2),
-        );
+                range2)
+          );
+        });
       }
       const range2 = me ? FRAMES[me.frame].radarRangeM ** 2 : Infinity;
       const visible = missiles
@@ -321,15 +327,8 @@ export class MapRoom extends Room {
               range2,
         )
         .map((k) => ({ id: k.id, pos: k.pos, vel: k.vel, guided: k.guided }));
-      const snapshot: Snapshot = {
-        ...base,
-        ack: this.humans.get(id)?.ack ?? 0,
-        ships,
-        missiles: visible,
-        structures,
-        match,
-      };
-      client.send(MSG.snapshot, snapshot);
+      const per = { ...base, ack: this.humans.get(id)?.ack ?? 0, missiles: visible };
+      client.raw(snapshotFrame(MSG.snapshot, per, shared, ships));
     }
   }
 }

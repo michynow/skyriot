@@ -40,7 +40,7 @@ import {
   pushOutOfDomes,
   stepBattle,
 } from './structures';
-import { enterHangar, leaveQueue, stepLaunch, stepLaunchQueue } from './launch';
+import { deployInFormation, enterHangar, leaveQueue, stepLaunch, stepLaunchQueue } from './launch';
 import { stepTurrets } from './turrets';
 
 const IDLE_INPUT: PilotInput = { seq: 0, viewTick: 0, ...EMPTY_INPUT };
@@ -108,6 +108,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     events: [],
     structures: [],
     structureByCollider: new Map(),
+    coreIndex: { concord: 0, vex: 0 },
     match: {
       phase: 'battle',
       winner: null,
@@ -116,8 +117,10 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       queues: { concord: [], vex: [] },
     },
     tunnelFreeTick: { concord: [], vex: [] },
+    formationSlot: { concord: 0, vex: 0 },
   };
   createStructures(ctx);
+  const structureStates = ctx.structures.map((st) => st.state);
   world.step(); // populate broad phase so queries see terrain, decks and structures
   /** Events raised between steps (teleports); flushed into the next step's result. */
   let pending: SimEvent[] = [];
@@ -291,7 +294,9 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     if (at) placeAndLaunch(rec, at, false);
     else {
       resetVitals(rec);
-      enterHangar(ctx, rec);
+      // Bots joining fill the sky in front of their Base; only humans go through the hangar.
+      if (rec.state.isBot) deployInFormation(ctx, rec);
+      else enterHangar(ctx, rec);
     }
     return rec.state;
   }
@@ -307,10 +312,11 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     tuning.god.delete(id);
   }
 
-  /** Back to the hangar with full vitals, at the end of the Launch Queue. */
-  function respawn(rec: ShipRec): void {
+  /** Full vitals, then into the Launch Queue (or, for Bots at a Battle start, straight into formation). */
+  function respawn(rec: ShipRec, battleStart = false): void {
     resetVitals(rec);
-    enterHangar(ctx, rec);
+    if (battleStart && rec.state.isBot) deployInFormation(ctx, rec);
+    else enterHangar(ctx, rec);
     ctx.events.push({
       type: 'shipRespawned',
       id: rec.state.id,
@@ -332,7 +338,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       ctx.events = events;
       refreshFrames();
       if (ctx.authoritative) {
-        if (stepBattle(ctx)) for (const rec of ctx.recList) respawn(rec);
+        if (stepBattle(ctx)) for (const rec of ctx.recList) respawn(rec, true);
         stepLaunchQueue(ctx);
       }
       for (const rec of ctx.recList) {
@@ -472,7 +478,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       return out;
     },
 
-    structures: () => ctx.structures.map((st) => st.state),
+    structures: () => structureStates,
     match: () => ctx.match,
     setStructures: (list) => applyStructures(ctx, list),
 
