@@ -141,7 +141,8 @@ export const isGrounded = (s: ShipState): boolean => s.grounded === true;
 let nextId = 1;
 const KILLFEED_MS = 6000;
 /** Airborne Siege hint threshold (m/s): "slow/hovering". */
-const HOVER_SPEED = 20;
+// Must match HOVER_MAX_SPEED in packages/shared/src/sim/constants.ts (airborne siege threshold).
+const HOVER_SPEED = 15;
 
 export function addChatLine(text: string, kind: ChatLine['kind']): void {
   useHud.setState((s) => ({ chat: [...s.chat.slice(-7), { id: nextId++, text, kind }] }));
