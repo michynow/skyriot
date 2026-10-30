@@ -27,9 +27,19 @@ export interface Sim {
   stepLocal(id: ShipId, input: PilotInput): void;
   /** Move a Ship (dev /tp): clears dock/ground state, syncs the body, emits a `teleport` event next step. */
   teleport(id: ShipId, pos: Vec3): void;
+  /** Live missiles with server-side path (for snapshots). `target` is the Ship each homes on. */
+  missiles(): MissileView[];
   /** Static-world collider wireframe for the dev debug view: flat [x,y,z,...] line segments. */
   debugLines(): Float32Array;
   dispose(): void;
+}
+
+export interface MissileView {
+  id: number;
+  pos: Vec3;
+  vel: Vec3;
+  guided: boolean;
+  target: ShipId | null;
 }
 
 export interface SimOptions {

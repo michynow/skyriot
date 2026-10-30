@@ -13,7 +13,7 @@ import {
   type SimEvent,
   type Vec3,
 } from '../types';
-import type { Sim, SimOptions, SimTuning } from './index';
+import type { MissileView, Sim, SimOptions, SimTuning } from './index';
 import type { ShipRec, SimCtx } from './ctx';
 import {
   DECK_HALF_THICKNESS,
@@ -434,6 +434,21 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       tickTimers(rec);
       useHotbar(ctx, rec, input.hotbar, true);
       discard.length = 0;
+    },
+
+    missiles() {
+      const out: MissileView[] = [];
+      for (const p of ctx.projectiles) {
+        if (p.kind !== 'missile') continue;
+        out.push({
+          id: p.id,
+          pos: [p.x, p.y, p.z],
+          vel: [p.dx * p.speed, p.dy * p.speed, p.dz * p.speed],
+          guided: p.homing > 0 && p.target !== null,
+          target: p.target,
+        });
+      }
+      return out;
     },
 
     debugLines: () => world.debugRender().vertices,

@@ -275,6 +275,7 @@ export class MapRoom extends Room {
 
   private sendSnapshots(): void {
     const all = [...this.sim.ships()];
+    const missiles = this.sim.missiles();
     const base = { tick: this.sim.tick, serverTimeMs: Date.now() };
     for (const [id, client] of this.byId) {
       const me = this.sim.getShip(id);
@@ -292,7 +293,24 @@ export class MapRoom extends Room {
               range2,
         );
       }
-      const snapshot: Snapshot = { ...base, ack: this.humans.get(id)?.ack ?? 0, ships };
+      const range2 = me ? FRAMES[me.frame].radarRangeM ** 2 : Infinity;
+      const visible = missiles
+        .filter(
+          (k) =>
+            k.target === id ||
+            !me ||
+            (k.pos[0] - me.pos[0]) ** 2 +
+              (k.pos[1] - me.pos[1]) ** 2 +
+              (k.pos[2] - me.pos[2]) ** 2 <=
+              range2,
+        )
+        .map((k) => ({ id: k.id, pos: k.pos, vel: k.vel, guided: k.guided }));
+      const snapshot: Snapshot = {
+        ...base,
+        ack: this.humans.get(id)?.ack ?? 0,
+        ships,
+        missiles: visible,
+      };
       client.send(MSG.snapshot, snapshot);
     }
   }

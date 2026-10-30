@@ -23,6 +23,8 @@ export interface ClientWorld {
    * (exp, ~0.15 s). B's ChaseCamera may read it to jitter the camera.
    */
   shake: number;
+  /** Guided missiles from the latest snapshot (id -> pos/vel). Written by the net layer; read by ProjectilesFx. */
+  missiles: Map<number, { pos: [number, number, number]; vel: [number, number, number] }>;
 }
 
 export const world: ClientWorld = {
@@ -36,4 +38,5 @@ export const world: ClientWorld = {
   freeLook: false,
   cameraZoom: 1,
   shake: 0,
+  missiles: new Map(),
 };

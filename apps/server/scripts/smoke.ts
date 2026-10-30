@@ -45,7 +45,9 @@ let total = 0,
   impacts = 0,
   respawns = 0,
   rolls = 0;
-let negativeAmmo = 0,
+let missileSum = 0,
+  missileMax = 0,
+  negativeAmmo = 0,
   belowTerrain = 0,
   minClearance = Infinity;
 const counts: Record<string, number> = {};
@@ -54,6 +56,9 @@ for (let t = 0; t < TICKS; t++) {
   for (const [id, mem] of mems) inputs.set(id, botBrain(sim, id, mem));
   const t0 = performance.now();
   const events: SimEvent[] = sim.step(inputs);
+  const live = sim.missiles().length;
+  missileSum += live;
+  missileMax = Math.max(missileMax, live);
   const dt = performance.now() - t0;
   total += dt;
   max = Math.max(max, dt);
@@ -80,6 +85,9 @@ console.log(
 );
 console.log(
   `spawned=${spawned} hits=${hits} kills=${kills} respawns=${respawns} terrainImpacts=${impacts} rolls=${rolls}`,
+);
+console.log(
+  `missiles on wire: avg ${(missileSum / TICKS).toFixed(1)} max ${missileMax}; ~${JSON.stringify({ id: 123, pos: [1234.5, 456.7, -890.1], vel: [123.4, -56.7, 189.9], guided: true }).length} B each as JSON`,
 );
 console.log(`minClearance=${minClearance.toFixed(2)}m belowTerrainSamples=${belowTerrain}`, counts);
 

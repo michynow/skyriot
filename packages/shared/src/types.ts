@@ -186,6 +186,16 @@ export interface Snapshot {
   /** Last PilotInput.seq the server applied for the receiving client. */
   ack: number;
   ships: ShipState[];
+  /** Live missiles (sting/seeker) in radar range or homing on the receiver: their real, server-simulated path. */
+  missiles: MissileSnapshot[];
+}
+
+export interface MissileSnapshot {
+  id: number;
+  pos: Vec3;
+  vel: Vec3;
+  /** Still homing on a target (false after roll/terrain/flare/purge broke guidance). */
+  guided: boolean;
 }
 
 /** C→S chat line; lines starting with '/' are dev commands. */

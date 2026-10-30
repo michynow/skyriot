@@ -6,6 +6,7 @@ import {
   type ShipState,
   type SimEvent,
   type Snapshot,
+  type Vec3,
   type Welcome,
 } from '@skyriot/shared';
 import { throughLag } from './lagSim';
@@ -83,7 +84,13 @@ function parseSnapshot(m: unknown): Snapshot | null {
       : [],
     toggles: isObj(s.toggles) ? (s.toggles as Record<string, string>) : {},
   }));
-  return { tick: m.tick, serverTimeMs: m.serverTimeMs, ack: isNum(m.ack) ? m.ack : -1, ships };
+  const isVec3 = (v: unknown): v is Vec3 => Array.isArray(v) && v.length === 3 && v.every(isNum);
+  const missiles = Array.isArray(m.missiles)
+    ? m.missiles.filter(
+        (x): x is Snapshot['missiles'][number] => isObj(x) && isNum(x.id) && isVec3(x.pos) && isVec3(x.vel),
+      )
+    : [];
+  return { tick: m.tick, serverTimeMs: m.serverTimeMs, ack: isNum(m.ack) ? m.ack : -1, ships, missiles };
 }
 
 function parseEvents(m: unknown): SimEvent[] {

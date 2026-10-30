@@ -135,6 +135,8 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
       onSnapshot(s) {
         lastSnap = s;
         interp.push(s, conn?.rtt ?? 0);
+        world.missiles.clear();
+        for (const mi of s.missiles) if (mi.guided) world.missiles.set(mi.id, { pos: mi.pos, vel: mi.vel });
         try {
           session.predictor?.onServerSnapshot(s);
         } catch (err) {

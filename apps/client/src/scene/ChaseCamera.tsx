@@ -94,8 +94,9 @@ export function ChaseCamera() {
     st.qo.setFromEuler(st.eu.set(st.pitch, st.yaw, 0));
     st.qs.copy(st.q).multiply(st.qo);
 
-    const dist = def.halfLength * 1.1 * st.zoom;
-    const height = dist * 0.38;
+    // Close, but sized by the hull's radius so tall Frames (Bulwark) sit below the centre crosshair.
+    const dist = Math.max(def.halfLength * 1.1, def.radius * 2.4) * st.zoom;
+    const height = Math.max(dist * 0.3, def.radius * 1.15 * st.zoom);
     st.off.set(0, height, dist).applyQuaternion(st.qs);
     // Pitch so the screen-centre ray meets the Ship's flight line at AIM_DISTANCE: centred cursor = fly straight.
     st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(height, dist + AIM_DISTANCE));

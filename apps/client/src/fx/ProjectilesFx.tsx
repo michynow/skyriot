@@ -41,6 +41,9 @@ class Projectiles {
   style = new Uint8Array(MAX_PROJ);
   target: (ShipId | null)[] = new Array(MAX_PROJ).fill(null);
   evaded = new Uint8Array(MAX_PROJ);
+  /** last seen snapshot position (3) + time it changed, per projectile */
+  snap = new Float32Array(MAX_PROJ * 4);
+  hasSnap = new Uint8Array(MAX_PROJ);
 
   add(e: Extract<SimEvent, { type: 'projectileSpawned' }>, col: RGB) {
     if (this.n >= MAX_PROJ) return;
@@ -56,7 +59,7 @@ class Projectiles {
     f[o + 11] = w?.splashRadius ?? 0;
     f[o + 12] = w?.homingTurnRate ?? 0;
     this.target[i] = e.target;
-    this.evaded[i] = 0;
+    this.evaded[i] = 0; this.hasSnap[i] = 0;
     f[o + 13] = 0; f[o + 14] = rnd() * 6.28; f[o + 15] = 0;
     this.style[i] = e.weapon === 'seeker-pod' ? 1 : e.kind === 'rocket' && e.dir[1] < -0.6 ? 3 : e.kind === 'rocket' || e.kind === 'shell' ? 2 : 0;
   }
@@ -67,7 +70,7 @@ class Projectiles {
   remove(i: number) {
     const l = --this.n;
     if (i !== l) {
-      this.id[i] = this.id[l]!; this.kind[i] = this.kind[l]!; this.evaded[i] = this.evaded[l]!; this.style[i] = this.style[l]!; this.target[i] = this.target[l]!;
+      this.id[i] = this.id[l]!; this.kind[i] = this.kind[l]!; this.evaded[i] = this.evaded[l]!; this.hasSnap[i] = this.hasSnap[l]!; for (let m = 0; m < 4; m++) this.snap[i * 4 + m] = this.snap[l * 4 + m]!; this.style[i] = this.style[l]!; this.target[i] = this.target[l]!;
       for (let k = 0; k < PS; k++) this.f[i * PS + k] = this.f[l * PS + k]!;
     }
     this.target[l] = null;
@@ -427,7 +430,8 @@ function updateProjectiles(fx: Fx, dt: number) {
     f[o + 13]! += dt;
     const age = f[o + 13]!;
     let dead = false;
-    if (k === 1 && age > 0.15) {
+    const sm = k === 1 ? world.missiles.get(P.id[i]!) : undefined;
+    if (k === 1 && age > 0.15 && !sm) {
       // missile homing: steer velocity direction toward the target, capped turn rate
       const tgt = P.target[i] ? world.ships.get(P.target[i]!) : undefined;
       if (tgt && tgt.alive) {
@@ -454,6 +458,20 @@ function updateProjectiles(fx: Fx, dt: number) {
       f[o + 9]! -= Math.hypot(f[o + 3]!, f[o + 4]!, f[o + 5]!) * dt;
     }
     f[o]! += f[o + 3]! * dt; f[o + 1]! += f[o + 4]! * dt; f[o + 2]! += f[o + 5]! * dt;
+    if (sm) {
+      // authoritative guided path: render ~100 ms behind the latest snapshot, extrapolating with its velocity
+      const si = i * 4;
+      if (!P.hasSnap[i] || P.snap[si] !== sm.pos[0] || P.snap[si + 1] !== sm.pos[1] || P.snap[si + 2] !== sm.pos[2]) {
+        P.snap[si] = sm.pos[0]; P.snap[si + 1] = sm.pos[1]; P.snap[si + 2] = sm.pos[2]; P.snap[si + 3] = fx.time;
+        P.hasSnap[i] = 1;
+      }
+      const dtS = fx.time - P.snap[si + 3]! - 0.1;
+      const k2 = 1 - Math.exp(-14 * dt); // smooth blend from the local path into the snapshot path
+      f[o] = f[o]! + (sm.pos[0] + sm.vel[0] * dtS - f[o]!) * k2;
+      f[o + 1] = f[o + 1]! + (sm.pos[1] + sm.vel[1] * dtS - f[o + 1]!) * k2;
+      f[o + 2] = f[o + 2]! + (sm.pos[2] + sm.vel[2] * dtS - f[o + 2]!) * k2;
+      f[o + 3] = sm.vel[0]; f[o + 4] = sm.vel[1]; f[o + 5] = sm.vel[2];
+    }
     if (f[o + 9]! <= 0) dead = true;
     else if (hf && f[o + 1]! < sampleHeight(hf, f[o]!, f[o + 2]!)) {
       dead = true;
@@ -501,15 +519,6 @@ function updateProjectiles(fx: Fx, dt: number) {
     if (ul < 0.05) { ux = 0; uy = dz; uz = -dy; ul = Math.hypot(uy, uz) || 1; }
     ux /= ul; uy /= ul; uz /= ul;
     const wx = dy * uz - dz * uy, wy = dz * ux - dx * uz, wz = dx * uy - dy * ux;
-    // visual-only snake that decays to zero at impact
-    let wob = 0;
-    if (k === 1) {
-      const tgt = P.target[i] ? world.ships.get(P.target[i]!) : undefined;
-      const dist = tgt ? Math.hypot(tgt.pos[0] - x, tgt.pos[1] - y, tgt.pos[2] - z) : 250;
-      wob = 2.4 * Math.min(1, dist / 220) * Math.min(1, age / 0.6);
-    }
-    const sa = Math.sin(age * 6.3 + f[o + 14]!) * wob, ca = Math.cos(age * 5.1 + f[o + 14]! * 1.7) * wob;
-    x += ux * sa + wx * ca; y += uy * sa + wy * ca; z += uz * sa + wz * ca;
     const dropping = (k === 1 || k === 2) && age < 0.15;
     if (dropping) y -= age * 14;
     const big = style === 3 ? 2.4 : k === 2 ? 1.7 : k === 3 ? 1.35 : 1;
