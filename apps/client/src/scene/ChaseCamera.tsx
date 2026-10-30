@@ -3,6 +3,9 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FRAMES, sampleHeight } from '@skyriot/shared';
 import { world } from '../state/world';
+import { AIM_DISTANCE } from '../input/input';
+
+const X_AXIS = new THREE.Vector3(1, 0, 0);
 
 const BASE_FOV = 68;
 const BOOST_FOV = 16;
@@ -73,6 +76,8 @@ export function ChaseCamera() {
     const dist = (6 + def.radius * 2.6) * st.zoom;
     const height = dist * 0.26;
     st.off.set(0, height, dist).applyQuaternion(st.qs);
+    // Pitch so the screen-centre ray meets the Ship's flight line at AIM_DISTANCE: centred cursor = fly straight.
+    st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(height, dist + AIM_DISTANCE));
     st.tmp.set(ship.pos[0], ship.pos[1], ship.pos[2]).add(st.off);
 
     for (let i = 0; i < 3; i++) {

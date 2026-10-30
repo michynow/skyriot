@@ -60,6 +60,19 @@ _Avoid_: dodge roll, evade
 The capped chance for a hit to glance and deal reduced damage.
 _Avoid_: evasion, dodge chance
 
+**Ammo**:
+Finite rounds for a Ship's Primary and Secondary, refilled on a Launch Deck.
+
+**Launch Deck**:
+A Nation's floating platform where Ships respawn, Dock, resupply and launch.
+_Avoid_: pad, hangar (Hangar is the City loadout screen)
+
+**Docked**:
+A Ship resting on a Launch Deck, stationary and resupplying until it launches.
+
+**Target**:
+The single enemy Ship a Pilot has selected; missiles can only lock onto it.
+
 **Siege Mode**:
 Bulwark toggle that roots the Ship for extra damage and range.
 

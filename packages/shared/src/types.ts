@@ -35,6 +35,10 @@ export interface PilotInput {
   /** True on the tick a double-tap A / D was detected. */
   rollLeft: boolean;
   rollRight: boolean;
+  /** Rising edge of the launch key (R): take off from a Launch Deck. */
+  launch: boolean;
+  /** Currently selected target (Tab). Missiles only lock onto this Ship. */
+  target: ShipId | null;
   /** Client's estimate of server tick it is viewing remotes at (for lag compensation). */
   viewTick: number;
 }
@@ -51,6 +55,8 @@ export const EMPTY_INPUT: Omit<PilotInput, 'seq' | 'viewTick'> = {
   hotbar: -1,
   rollLeft: false,
   rollRight: false,
+  launch: false,
+  target: null,
 };
 
 export interface ShipSpawn {
@@ -90,6 +96,11 @@ export interface ShipState {
   cooldowns: number[];
   /** Missile lock target, if any. */
   lockTarget: ShipId | null;
+  /** Rounds left for Primary / Secondary. Refilled on a Launch Deck. */
+  ammo1: number;
+  ammo2: number;
+  /** Docked on a Launch Deck: stationary, resupplying, waits for `launch` input. */
+  docked: boolean;
 }
 
 export type ProjectileKind = 'tracer' | 'missile' | 'rocket' | 'shell' | 'flare';
@@ -121,7 +132,17 @@ export type SimEvent =
   | { type: 'shipRespawned'; id: ShipId; pos: Vec3 }
   | { type: 'skillUsed'; id: ShipId; skill: SkillId; slot: number }
   | { type: 'barrelRoll'; id: ShipId; dir: -1 | 1 }
-  | { type: 'terrainImpact'; id: ShipId; damage: number; pos: Vec3 };
+  | {
+      type: 'terrainImpact';
+      id: ShipId;
+      damage: number;
+      pos: Vec3;
+      /** true = shield absorbed it and the Ship bounced; false = no shield, Ship destroyed. */
+      bounced: boolean;
+    }
+  | { type: 'docked'; id: ShipId }
+  | { type: 'resupplied'; id: ShipId }
+  | { type: 'launched'; id: ShipId };
 
 /** S→C at SNAPSHOT_HZ. */
 export interface Snapshot {
@@ -165,6 +186,15 @@ export interface MapDef {
   spawns: Record<NationId, Vec3[]>;
   /** Hard ceiling; ships above are pushed down. */
   ceiling: number;
+  /** Floating platforms where Ships respawn docked, resupply and launch. */
+  launchDecks: Record<NationId, LaunchDeck[]>;
+}
+
+export interface LaunchDeck {
+  /** Centre of the deck surface. */
+  pos: Vec3;
+  /** Deck surface radius (m). Ships slower than DECK.dockMaxSpeed inside it dock. */
+  radius: number;
 }
 
 export interface FrameDef {
@@ -191,6 +221,8 @@ export interface FrameDef {
   rollCooldownSec: number;
   rollFuelCost: number;
   deflectChance: number; // 0..0.15
+  ammo1Max: number;
+  ammo2Max: number;
   /** Capsule radius & half-height for hit tests and terrain collision. */
   radius: number;
   halfLength: number;

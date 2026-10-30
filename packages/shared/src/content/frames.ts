@@ -25,6 +25,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     rollCooldownSec: 3,
     rollFuelCost: 0.12,
     deflectChance: 0.15,
+    ammo1Max: 1200,
+    ammo2Max: 8,
     radius: 2.2,
     halfLength: 3,
     canHover: false,
@@ -55,6 +57,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     rollCooldownSec: 4,
     rollFuelCost: 0.18,
     deflectChance: 0.04,
+    ammo1Max: 500,
+    ammo2Max: 12,
     radius: 3.6,
     halfLength: 5,
     canHover: false,
@@ -85,6 +89,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     rollCooldownSec: 3,
     rollFuelCost: 0.14,
     deflectChance: 0.08,
+    ammo1Max: 800,
+    ammo2Max: 10,
     radius: 2.8,
     halfLength: 3.5,
     canHover: false,
@@ -115,6 +121,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     rollCooldownSec: 4,
     rollFuelCost: 0.2,
     deflectChance: 0.03,
+    ammo1Max: 600,
+    ammo2Max: 16,
     radius: 3.4,
     halfLength: 4,
     canHover: true,
@@ -127,7 +135,13 @@ export const FRAMES: Record<FrameId, FrameDef> = {
 /** Bulwark Siege Mode multipliers. */
 export const SIEGE = { damageMul: 1.5, rangeMul: 1.4, turnRateMul: 0.6 };
 
-/** Terrain impact: damage per m/s of speed into surface above this threshold. */
-export const TERRAIN_IMPACT = { minSpeed: 25, damagePerMs: 6 };
+/**
+ * Terrain impact above `minSpeed` (m/s into the surface): with shield up the Ship bounces,
+ * the shield is emptied and `bounceHpFrac` of max HP is lost; with no shield the Ship is destroyed.
+ */
+export const TERRAIN_IMPACT = { minSpeed: 25, bounceHpFrac: 0.15, restitution: 0.6 };
+
+/** Launch Deck behaviour. */
+export const DECK = { dockMaxSpeed: 30, resupplySec: 2, launchSpeed: 60 };
 
 export const RESPAWN_SEC = 5;

@@ -57,15 +57,16 @@ Skill kits are our own designs covering these roles (no 1:1 renames of any exist
 | A / D | Strafe (visual bank) |
 | **Double-tap A / D** | **Barrel roll** — lateral burst, 0.25 s invulnerability, costs fuel, 3 s cooldown |
 | Q / E | Vertical strafe down / up |
-| Shift | Booster (fuel, regenerates) |
-| Space | Hover/brake; Bulwark: toggle Siege mode |
+| Space | Booster (fuel, regenerates) |
+| Shift | Hover/brake; Bulwark: toggle Siege mode |
+| R | Launch from a Launch Deck |
 | LMB / RMB | Primary / secondary weapon |
 | 1–0 | 10-slot hotbar: skills, Flares (a skill), consumables (shield kit, repair kit, fuel cell) |
-| Tab | Cycle targets |
+| Tab | Cycle target (one locked target at a time unless a Skill says otherwise) |
 | Alt (hold) | Free-look |
 | Scroll | Camera zoom |
 
-Third-person chase camera with slight lag.
+Close third-person chase camera with slight lag. Mouse steering is deliberately damped (sensitivity setting + deadzone).
 
 ## 5. Combat
 
@@ -75,7 +76,14 @@ Third-person chase camera with slight lag.
 - **Shield → HP.** Shield regenerates after 4 s without damage.
 - Server-authoritative hit detection with **lag compensation** (rewind targets to shooter's view time, capped 200 ms).
 - Death → respawn at nation's nearest spawn point after 5 s. Small credit/XP loss? **No** — no death penalty beyond the timer.
-- Collision with terrain/structures: damage scaled by impact speed; no instant death.
+- Terrain/structure impact above a speed threshold: **with shield up the Ship bounces**, shield is emptied and a 15% max-HP chunk is lost; **with no shield the Ship is destroyed.** Low-speed scrapes are harmless.
+- **Ammo**: Primary and Secondary have finite rounds per Frame (counter in HUD). Refill by docking on your Nation's **Launch Deck** (floating platform near spawn): slow down over it, dock, resupply in ~2 s, press **R** to launch. Respawn happens docked on a Launch Deck.
+- **Damage feedback**: floating damage numbers on hits dealt (deflected hits marked), hit markers.
+
+### HUD
+- Circular HP/shield gauge around the reticle area, fuel arc, ammo counters for Primary/Secondary.
+- Hotbar slots show icons (original art), cooldown sweep, key number.
+- Other Ships: name only — **red = enemy, white = ally** — plus distance. No heavy brackets; the single locked target gets one clear marker.
 
 ## 6. Progression
 

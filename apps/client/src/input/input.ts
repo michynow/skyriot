@@ -12,7 +12,7 @@ export const inputState = {
 
 const DOUBLE_TAP_MS = 250;
 const SENSITIVITY = 0.0022;
-const AIM_DISTANCE = 600;
+export const AIM_DISTANCE = 600;
 
 const keys = new Set<string>();
 const lastTap: Record<string, number> = {};
