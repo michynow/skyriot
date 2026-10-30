@@ -35,7 +35,11 @@ const PhysicsDebug = import.meta.env.DEV ? lazy(() => import('./dev/PhysicsDebug
 const FX_QUEUE_MAX = 600;
 
 /** Start local prediction. Falls back to snapshot-only rendering if the shared sim can't be created. */
-async function startPrediction(map: NonNullable<typeof world.map>, ownId: ShipId, isCurrent: () => boolean) {
+async function startPrediction(
+  map: NonNullable<typeof world.map>,
+  ownId: ShipId,
+  isCurrent: () => boolean,
+) {
   try {
     const rapier = await import('@dimforge/rapier3d-compat');
     await rapier.init();
@@ -120,7 +124,8 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
     useHud.setState({ status: 'connecting', error: '', chat: [], killfeed: [], consoleLines: [] });
     const interp = createInterpolator();
     session.interp = interp;
-    let lastSnap: Parameters<NonNullable<typeof session.predictor>['onServerSnapshot']>[0] | null = null;
+    let lastSnap: Parameters<NonNullable<typeof session.predictor>['onServerSnapshot']>[0] | null =
+      null;
 
     const fail = (error: string) => current && useHud.setState({ status: 'error', error });
 
@@ -136,14 +141,16 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
         useHud.setState({ status: 'playing' });
         addChatLine(`Deployed to ${mapDef.name}. Enter = chat.`, 'sys');
         void startPrediction(mapDef, w.shipId, () => current).then(() => {
-          if (current && lastSnap && session.predictor) session.predictor.onServerSnapshot(lastSnap);
+          if (current && lastSnap && session.predictor)
+            session.predictor.onServerSnapshot(lastSnap);
         });
       },
       onSnapshot(s) {
         lastSnap = s;
         interp.push(s, conn?.rtt ?? 0);
         world.missiles.clear();
-        for (const mi of s.missiles) if (mi.guided) world.missiles.set(mi.id, { pos: mi.pos, vel: mi.vel });
+        for (const mi of s.missiles)
+          if (mi.guided) world.missiles.set(mi.id, { pos: mi.pos, vel: mi.vel });
         try {
           session.predictor?.onServerSnapshot(s);
         } catch (err) {
@@ -157,7 +164,8 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
           handleAudioEvent(ev);
           if (ev.type === 'teleport' && ev.id === world.ownId) session.predictor?.teleport();
         }
-        if (world.fxQueue.length > FX_QUEUE_MAX) world.fxQueue.splice(0, world.fxQueue.length - FX_QUEUE_MAX);
+        if (world.fxQueue.length > FX_QUEUE_MAX)
+          world.fxQueue.splice(0, world.fxQueue.length - FX_QUEUE_MAX);
       },
       onConsole: addConsoleLine,
       onClose: fail,
@@ -167,7 +175,9 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
         conn = c;
         session.conn = c;
       })
-      .catch((err) => fail(`Could not connect: ${err instanceof Error ? err.message : String(err)}`));
+      .catch((err) =>
+        fail(`Could not connect: ${err instanceof Error ? err.message : String(err)}`),
+      );
 
     return () => {
       current = false;
@@ -190,7 +200,11 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
     <>
       {status === 'playing' && map && (
         <>
-          <Canvas shadows="percentage" dpr={QUALITY_DPR[quality]} camera={{ fov: 70, near: 0.5, far: 8000 }}>
+          <Canvas
+            shadows="percentage"
+            dpr={QUALITY_DPR[quality]}
+            camera={{ fov: 70, near: 0.5, far: 8000 }}
+          >
             <MapScene map={map} />
             <Ships />
             <ProjectilesFx />
@@ -203,7 +217,7 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
               </Suspense>
             )}
           </Canvas>
-          <Hud />
+          <Hud onLeave={onExit} />
           {DevPanel && (
             <Suspense fallback={null}>
               <DevPanel />
@@ -212,10 +226,17 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
         </>
       )}
       {status !== 'playing' && (
-        <div className="status-screen">
-          <div>{status === 'error' ? 'CONNECTION LOST' : 'CONNECTING…'}</div>
-          {status === 'error' && <div style={{ fontSize: 16, letterSpacing: '.05em' }}>{error}</div>}
-          <button onClick={onExit}>BACK TO HANGAR</button>
+        <div className={`status-screen ${status}`}>
+          {status === 'connecting' && <div className="status-ring" />}
+          <h2>{status === 'error' ? 'CONNECTION LOST' : 'CONNECTING'}</h2>
+          <p>
+            {status === 'error'
+              ? error
+              : `Deploying to ${MAPS[options.mapId]?.name ?? options.mapId}…`}
+          </p>
+          <button className="ui-btn" onClick={onExit}>
+            BACK TO HANGAR
+          </button>
         </div>
       )}
     </>

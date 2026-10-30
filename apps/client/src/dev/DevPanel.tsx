@@ -141,7 +141,7 @@ export default function DevPanel() {
   return (
     <>
       <div data-ui>
-        <Leva collapsed titleBar={{ title: 'SKYRIOT DEV', position: { x: -50, y: 0 } }} />
+        <Leva collapsed titleBar={{ title: 'SKYRIOT DEV', position: { x: -50, y: 48 } }} />
       </div>
       <Controls />
       <Console />
