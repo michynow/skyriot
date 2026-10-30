@@ -12,11 +12,17 @@ import {
 } from '@skyriot/shared';
 import { world } from '../state/world';
 import { inputState } from '../input/input';
-import { isGrounded } from './hudStore';
+import { isFlying, isGrounded, ownShip } from './hudStore';
 import { project } from './view';
 import { Ammo } from './Ammo';
 
 const MARKERS = 40;
+/** Text labels (name + distance) at once; everything else is a bare marker. */
+const MAX_ENEMY_LABELS = 5;
+const MAX_ALLY_LABELS = 2;
+const LABEL_ENEMY_M = 450;
+const LABEL_ALLY_M = 180;
+const LABEL_CONE_COS = Math.cos((9 * Math.PI) / 180);
 const LADDER = 8;
 const NOSE_DISTANCE = 500;
 export const NATION_COLOR = { concord: '#f2c24b', vex: '#ff5a3c' } as const;
@@ -97,6 +103,8 @@ export function Reticles() {
     let lockProgress = 0;
     let lockFor: string | null = null;
     const labelCache: string[] = [];
+    const labelX: number[] = [];
+    const labelY: number[] = [];
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -104,17 +112,17 @@ export function Reticles() {
       last = now;
       const W = window.innerWidth;
       const H = window.innerHeight;
-      const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+      const own = ownShip();
       // The crosshair is fixed at screen centre (the Ship's nose); the aim point moves freely and the Ship follows.
       const cx = W / 2;
       const cy = H / 2;
       const aimPt = aimEl.current;
       if (aimPt) {
-        aimPt.style.display = own?.alive && !world.freeLook ? 'block' : 'none';
+        aimPt.style.display = own && isFlying(own) && !world.freeLook ? 'block' : 'none';
         aimPt.style.transform = `translate(${cx + (world.cursor.x * W) / 2}px,${cy - (world.cursor.y * H) / 2}px)`;
       }
-      if (!own || !own.alive) {
-        place(cursorEl.current, cx, cy, true);
+      if (!own || !isFlying(own)) {
+        place(cursorEl.current, cx, cy, false);
         place(noseEl.current, 0, 0, false);
         place(leadEl.current, 0, 0, false);
         place(leadLink.current, 0, 0, false);
@@ -222,7 +230,11 @@ export function Reticles() {
       );
       place(noseEl.current, p.x, p.y, false && noseOk);
 
-      // Name tags: name + distance only, red enemy / white ally.
+      // Ship markers, decluttered: text (name + distance) only for the few that matter — enemies close by or near
+      // the aim, allies very close — capped and never overlapping; the rest are bare dots fading with distance.
+      let enemyLabels = 0;
+      let allyLabels = 0;
+      let placed = 0;
       for (let i = 0; i < MARKERS; i++) {
         const el = markerEls.current[i] ?? null;
         const o = others[i];
@@ -233,11 +245,38 @@ export function Reticles() {
         const on = project(o.s.pos[0], o.s.pos[1] + 6, o.s.pos[2], p);
         place(el, p.x, p.y, on);
         if (!on) continue;
-        el.style.color = o.s.nation === own.nation ? ALLY : ENEMY;
-        const label = `${o.s.name} · ${Math.round(o.d / 10) * 10}m`;
+        const enemy = o.s.nation !== own.nation;
+        const cos =
+          ((o.s.pos[0] - own.pos[0]) * aim[0] +
+            (o.s.pos[1] - own.pos[1]) * aim[1] +
+            (o.s.pos[2] - own.pos[2]) * aim[2]) /
+          (o.d || 1);
+        let text = enemy
+          ? (o.d < LABEL_ENEMY_M || cos > LABEL_CONE_COS) && enemyLabels < MAX_ENEMY_LABELS
+          : o.d < LABEL_ALLY_M && allyLabels < MAX_ALLY_LABELS;
+        if (text) {
+          for (let j = 0; j < placed; j++) {
+            if (Math.abs(labelX[j]! - p.x) < 110 && Math.abs(labelY[j]! - p.y) < 22) {
+              text = false;
+              break;
+            }
+          }
+        }
+        if (text) {
+          labelX[placed] = p.x;
+          labelY[placed] = p.y;
+          placed++;
+          if (enemy) enemyLabels++;
+          else allyLabels++;
+        }
+        const far = o.d / radar;
+        el.style.opacity = String(enemy ? Math.max(0.4, 1.05 - far) : Math.max(0.25, 0.75 - far));
+        if (el.dataset.e !== (enemy ? '1' : '0')) el.dataset.e = enemy ? '1' : '0';
+        if (el.dataset.t !== (text ? '1' : '0')) el.dataset.t = text ? '1' : '0';
+        const label = text ? `${o.s.name} · ${Math.round(o.d / 10) * 10}m` : '';
         if (labelCache[i] !== label) {
           labelCache[i] = label;
-          el.textContent = label;
+          (el.lastElementChild as HTMLElement).textContent = label;
         }
       }
 
@@ -355,7 +394,10 @@ export function Reticles() {
           className="mk"
           ref={(el) => void (markerEls.current[i] = el)}
           style={{ display: 'none' }}
-        />
+        >
+          <i />
+          <span />
+        </div>
       ))}
       <div className="tgt" ref={targetEl} style={{ display: 'none' }}>
         <svg viewBox="-40 -40 80 80">
