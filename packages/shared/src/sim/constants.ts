@@ -3,13 +3,29 @@
 /** Time constant (s) of lateral/vertical velocity blending; roll impulse decays over ~3x this. */
 export const LATERAL_TAU_SEC = 0.1;
 export const BRAKE_DECEL_MUL = 1.6;
-export const BANK_MAX_RAD = 0.75;
-export const BANK_RATE_RAD = 5;
+/** Easing off the throttle (S / release) slows at this fraction of accel: only Brake bleeds speed fast. */
+export const THROTTLE_DECEL_MUL = 0.5;
+export const BANK_MAX_RAD = 1.05;
+export const BANK_RATE_RAD = 9;
 /** Bank (rad) per rad/s of yaw rate. */
-export const BANK_PER_YAW_RATE = 0.45;
-export const BANK_PER_STRAFE = 0.3;
+export const BANK_PER_YAW_RATE = 0.5;
+export const BANK_PER_STRAFE = 0.35;
 /** Terminal fall speed when fully stalled = gravity * this. */
 export const STALL_FALL_SECONDS = 2;
+// Stall (atmosphere, non-hover Frames): below env.stallSpeed the Ship stalls; it recovers above stallSpeed * this.
+export const STALL_RECOVER_MUL = 1.2;
+/** Turn rate multiplier while stalled. */
+export const STALL_TURN_MUL = 0.3;
+/** How hard a stall drags the aim toward straight down (0..1 blend). */
+export const STALL_NOSE_DROP = 0.75;
+/** While stalled, throttle changes speed at this fraction of accel... */
+export const STALL_THRUST_MUL = 0.3;
+/** ...and gravity along the nose adds -forward.y * gravity * this (m/s^2): dive to recover. */
+export const STALL_DIVE_GAIN = 2;
+/** The nose drop fades out below this height above ground. */
+export const STALL_GROUND_FADE_M = 40;
+/** Climbing/diving shifts the target speed by -forward.y * this (m/s): climbs bleed speed, dives build it. */
+export const CLIMB_SPEED_SHIFT = 45;
 /** Hover gap between the hull's lowest point and the ground. */
 export const HOVER_CLEARANCE = 2.6;
 export const HOVER_MAX_SPEED = 15;
@@ -67,9 +83,9 @@ export const WALL_MAX = 16;
 
 // Steering smoothing
 /** Desired turn rate = angle-to-aim * gain (capped at turnRate): eases out of turns. */
-export const TURN_GAIN = 4;
+export const TURN_GAIN = 5;
 /** Angular velocity blend time constant (s): eases into turns. */
-export const TURN_TAU_SEC = 0.12;
+export const TURN_TAU_SEC = 0.1;
 
 // Launch Decks
 export const DECK_HALF_THICKNESS = 1;
@@ -123,3 +139,14 @@ export const WEAVE_AMP_SPAN_M = 4;
 export const WEAVE_RAMP_SEC = 0.3;
 export const ROCKET_WOBBLE_AMP_M = 1.2;
 export const ROCKET_WOBBLE_PERIOD_SEC = 0.5;
+
+// Guided missile limits (what makes them beatable by flying).
+/** Seeker half-angle: the target leaving this cone off the missile's nose = lock lost, missile goes dumb. */
+export const SEEKER_CONE_RAD = 0.6;
+/** Guidance only while the motor burns; afterwards the missile flies on dumb until its range runs out. */
+export const MISSILE_MOTOR_SEC = 5;
+/**
+ * A target pulling at least this lateral acceleration (speed * turn rate, m/s^2) while the missile is in its
+ * endgame out-turns it. Wasp manages it at cruise, Halo needs throttle, Anvil/Bulwark only while boosting.
+ */
+export const BREAK_TURN_ACCEL = 260;

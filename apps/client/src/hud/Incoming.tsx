@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { world } from '../state/world';
-import { incoming } from './hudStore';
+import { incoming, isFlying, ownShip } from './hudStore';
 import { project } from './view';
 
 const ROLL_HINT_M = 90;
@@ -17,9 +16,9 @@ export function Incoming() {
     let raf = 0;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
-      const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+      const own = ownShip();
       let best: { d: number; t: number; x: number; y: number; z: number } | null = null;
-      if (own?.alive) {
+      if (own && isFlying(own)) {
         for (const [id, m] of incoming) {
           const age = (now - m.bornMs) / 1000;
           if (age > 12) {
@@ -33,7 +32,13 @@ export function Incoming() {
           const d = Math.max(0, total - m.speed * age);
           if (!best || d < best.d) {
             const k = d / total;
-            best = { d, t: d / Math.max(1, m.speed), x: own.pos[0] + ox * k, y: own.pos[1] + oy * k, z: own.pos[2] + oz * k };
+            best = {
+              d,
+              t: d / Math.max(1, m.speed),
+              x: own.pos[0] + ox * k,
+              y: own.pos[1] + oy * k,
+              z: own.pos[2] + oz * k,
+            };
           }
         }
       }
@@ -41,8 +46,14 @@ export function Incoming() {
       if (best && own && own.incomingDist >= 0) {
         best.d = own.incomingDist;
         best.t = own.incomingTti;
-      } else if (own?.alive && own.incomingDist >= 0 && !best) {
-        best = { d: own.incomingDist, t: own.incomingTti, x: own.pos[0], y: own.pos[1], z: own.pos[2] };
+      } else if (own && isFlying(own) && own.incomingDist >= 0 && !best) {
+        best = {
+          d: own.incomingDist,
+          t: own.incomingTti,
+          x: own.pos[0],
+          y: own.pos[1],
+          z: own.pos[2],
+        };
       }
       const el = box.current;
       if (!el) return;
@@ -66,7 +77,10 @@ export function Incoming() {
         dx = -dx;
         dy = -dy;
       }
-      const edge = Math.min((W / 2 - 60) / Math.abs(dx || 1e-6), (H / 2 - 60) / Math.abs(dy || 1e-6));
+      const edge = Math.min(
+        (W / 2 - 60) / Math.abs(dx || 1e-6),
+        (H / 2 - 60) / Math.abs(dy || 1e-6),
+      );
       const ax = W / 2 + dx * (ok && edge > 1 ? 1 : edge);
       const ay = H / 2 + dy * (ok && edge > 1 ? 1 : edge);
       const a = arrow.current;

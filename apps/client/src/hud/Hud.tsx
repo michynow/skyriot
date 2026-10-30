@@ -11,6 +11,9 @@ import { Incoming } from './Incoming';
 import { Radar } from './Radar';
 import { NATION_COLOR, Reticles } from './Reticles';
 import { EscMenu, openEscMenu } from '../ui/EscMenu';
+import { FlightTapes } from './FlightTapes';
+import { Launch } from './Launch';
+import { BattleBanner, BattleEnd, Objectives, StructureMarkers } from './Objectives';
 import './hud.css';
 
 const ARC = 0.75; // 270-degree gauges
@@ -93,8 +96,6 @@ function Status() {
       frame: h.frame,
       name: h.name,
       nation: h.nation,
-      speed: h.speed,
-      altitude: h.altitude,
       rollCd: h.rollCd,
       grounded: h.grounded,
     })),
@@ -108,16 +109,6 @@ function Status() {
         {s.frame ? FRAMES[s.frame].name.toUpperCase() : '—'} <small>{s.name}</small>
       </div>
       <div className="readouts">
-        <div className="ro">
-          <small>SPEED</small>
-          <b>{Math.round(s.speed)}</b>
-          <em>m/s</em>
-        </div>
-        <div className="ro">
-          <small>ALT</small>
-          <b>{Math.round(s.altitude)}</b>
-          <em>m</em>
-        </div>
         <div
           className={`roll ${s.rollCd <= 0 ? 'ready' : ''}`}
           title="Barrel roll: double-tap A / D"
@@ -335,7 +326,6 @@ function Warnings() {
     useShallow((x) => ({
       locked: x.locked,
       alive: x.alive,
-      respawnIn: x.respawnIn,
       sieged: x.sieged,
       grounded: x.grounded,
       evadedNonce: x.evadedNonce,
@@ -347,14 +337,16 @@ function Warnings() {
       docked: x.docked,
       resupply: x.resupply,
       resupplied: x.resupplied,
-      crashed: x.crashed,
+      launchPhase: x.launchPhase,
     })),
   );
+  // In the hangar / tunnel the Ship is hidden: no lock, bounds or dock warnings apply.
+  const flying = h.alive && (h.launchPhase === 'none' || h.launchPhase === 'catapult');
   const fullyStocked = h.resupplied || h.resupply >= 0.999;
   return (
     <>
-      {h.locked && h.alive && <div className="warn-lock">MISSILE LOCK</div>}
-      {h.outOfBounds && h.alive && <div className="oob">RETURN TO COMBAT AREA</div>}
+      {h.locked && flying && <div className="warn-lock">MISSILE LOCK</div>}
+      {h.outOfBounds && flying && <div className="oob">RETURN TO COMBAT AREA</div>}
       {h.evadedNonce > 0 && (
         <div key={h.evadedNonce} className="evaded">
           EVADED
@@ -375,7 +367,7 @@ function Warnings() {
       {h.hitNonce > 0 && (
         <div key={h.hitNonce} className={`hitmark ${h.hitDeflected ? 'defl' : ''}`} />
       )}
-      {h.docked && h.alive && (
+      {h.docked && flying && (
         <div className="dock">
           {fullyStocked ? (
             <b className="ready">PRESS R TO LAUNCH</b>
@@ -387,13 +379,6 @@ function Warnings() {
               </div>
             </>
           )}
-        </div>
-      )}
-      {!h.alive && (
-        <div className="respawn">
-          <h2>SHIP DESTROYED</h2>
-          {h.crashed && <p className="crash">Crashed into terrain</p>}
-          <p>Redeploying in {h.respawnIn.toFixed(1)}s</p>
         </div>
       )}
     </>
@@ -436,9 +421,15 @@ export function Hud({ onLeave }: { onLeave(): void }) {
       <IconDefs />
       <TopBar />
       <Reticles />
+      <StructureMarkers />
+      <FlightTapes />
       <Warnings />
       <Floaters />
       <Status />
+      <Objectives />
+      <BattleBanner />
+      <Launch />
+      <BattleEnd />
       <Gauge />
       <BuffBar />
       <SkillFx />

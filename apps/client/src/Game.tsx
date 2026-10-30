@@ -151,6 +151,9 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
         world.missiles.clear();
         for (const mi of s.missiles)
           if (mi.guided) world.missiles.set(mi.id, { pos: mi.pos, vel: mi.vel });
+        world.structures.clear();
+        for (const st of s.structures) world.structures.set(st.id, st);
+        world.match = s.match;
         try {
           session.predictor?.onServerSnapshot(s);
         } catch (err) {
