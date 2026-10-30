@@ -115,7 +115,7 @@ export function ChaseCamera() {
     st.qs.copy(st.q).multiply(st.qo);
 
     // Sized by the hull so the whole Ship fits in frame, sitting below the centre crosshair.
-    const dist = Math.max(def.halfLength, def.radius) * 3.2 * st.zoom;
+    const dist = Math.max(def.halfLength, def.radius) * 4.6 * st.zoom;
     const height = Math.max(dist * 0.2, def.radius * st.zoom);
     st.off.set(0, height, dist).applyQuaternion(st.qs);
     // Pitch so the screen-centre ray meets the Ship's flight line at AIM_DISTANCE: centred cursor = fly straight.
