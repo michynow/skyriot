@@ -2,9 +2,6 @@ import { Vector3, type Camera } from 'three';
 import {
   EMPTY_INPUT,
   FRAMES,
-  SIEGE,
-  SIEGE_AIR,
-  WEAPONS,
   type PilotInput,
   type ShipId,
   type ShipState,
@@ -15,8 +12,6 @@ import { useSettings } from '../ui/settings';
 /** Mutable input-side state shared with the HUD (read per frame, never React state). */
 export const inputState = {
   targetId: null as ShipId | null,
-  /** True while targetId came from Tab rather than auto-acquire. */
-  manualTarget: false,
   typing: false,
   /** Called when Enter requests the chat line. Set by the HUD. */
   onOpenChat: null as (() => void) | null,
@@ -99,64 +94,10 @@ export function cycleTarget(): void {
     .sort((a, b) => a.d - b.d);
   if (!enemies.length) {
     inputState.targetId = null;
-    inputState.manualTarget = false;
     return;
   }
   const i = enemies.findIndex((e) => e.id === inputState.targetId);
   inputState.targetId = enemies[(i + 1) % enemies.length]!.id;
-  inputState.manualTarget = true;
-}
-
-/** Lock cone and range of the Ship's Secondary as the sim applies them (Siege multipliers included). */
-function lockEnvelope(own: ShipState): { cone: number; range: number } | null {
-  const sec = WEAPONS[FRAMES[own.frame].secondary];
-  if (!sec || sec.lockConeRad <= 0) return null;
-  const grounded = own.grounded === true;
-  const rangeMul = own.sieged ? (grounded ? SIEGE : SIEGE_AIR).rangeMul : 1;
-  const coneMul = own.sieged && !grounded ? SIEGE_AIR.lockConeMul : 1;
-  return { cone: sec.lockConeRad * coneMul, range: sec.rangeM * rangeMul };
-}
-
-/**
- * Missiles only lock onto PilotInput.target, so without a Tab pick the Target is the enemy nearest the nose
- * inside the lock cone. A Tab pick holds until it leaves the cone while another enemy is inside it.
- */
-function acquireTarget(own: ShipState): void {
-  const env = lockEnvelope(own);
-  const [qx, qy, qz, qw] = own.rot;
-  const fx = -2 * (qx * qz + qw * qy);
-  const fy = -2 * (qy * qz - qw * qx);
-  const fz = -(1 - 2 * (qx * qx + qy * qy));
-  // cos of the angle off the nose, or -2 when outside range / unlockable (flares).
-  const noseCos = (s: ShipState, coneMul: number): number => {
-    if (!env || s.flareTicks > 0) return -2;
-    const dx = s.pos[0] - own.pos[0];
-    const dy = s.pos[1] - own.pos[1];
-    const dz = s.pos[2] - own.pos[2];
-    const d = Math.hypot(dx, dy, dz);
-    if (d > env.range || d < 1) return -2;
-    const c = (dx * fx + dy * fy + dz * fz) / d;
-    return c >= Math.cos(env.cone * coneMul) ? c : -2;
-  };
-  let best: ShipState | null = null;
-  let bestCos = -2;
-  for (const s of world.ships.values()) {
-    if (s.id === own.id || !s.alive || s.nation === own.nation) continue;
-    const c = noseCos(s, 1);
-    if (c > bestCos) {
-      bestCos = c;
-      best = s;
-    }
-  }
-  const current = inputState.targetId ? world.ships.get(inputState.targetId) : undefined;
-  const valid = !!current && current.alive && current.nation !== own.nation;
-  if (inputState.manualTarget) {
-    if (valid && (!best || noseCos(current, 1) > -2)) return;
-    inputState.manualTarget = false;
-  }
-  // Hold the auto Target inside a slightly wider cone so it doesn't flicker at the edge.
-  if (valid && noseCos(current, 1.25) > -2) return;
-  inputState.targetId = best?.id ?? null;
 }
 
 export function setTyping(on: boolean): void {
@@ -349,8 +290,9 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
   }
   if (!aim.every(Number.isFinite)) aim = [0, 0, -1];
   inputState.aim = aim;
-  if (own) acquireTarget(own);
-  else inputState.targetId = null;
+  // The Target is only ever picked with Tab and held until the next Tab; it drops when it dies or leaves view.
+  const target = inputState.targetId ? world.ships.get(inputState.targetId) : undefined;
+  if (!own || !target?.alive) inputState.targetId = null;
 
   const input: PilotInput = {
     ...EMPTY_INPUT,

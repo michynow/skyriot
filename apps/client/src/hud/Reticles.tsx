@@ -355,7 +355,6 @@ export function Reticles() {
       if (tgt) {
         tgt.dataset.locked = isLocked ? '1' : '0';
         tgt.dataset.assist = assist ? '1' : '0';
-        tgt.dataset.manual = inputState.manualTarget ? '1' : '0';
         // Brackets close in on the Target as the lock builds.
         tgt.style.setProperty('--k', String(1.5 - 0.5 * lockProgress));
       }

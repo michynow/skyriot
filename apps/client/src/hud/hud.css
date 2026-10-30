@@ -177,7 +177,6 @@
 .tgt-br { fill: none; stroke: var(--tc); stroke-width: 3; stroke-linecap: square; transform: scale(var(--k)); transition: transform .08s linear, stroke .15s; filter: drop-shadow(0 0 3px #000); }
 .tgt-ring { fill: none; stroke: var(--tc); stroke-opacity: .55; stroke-width: 2; transition: stroke-dashoffset .1s linear; }
 .tgt-diamond { display: none; fill: none; stroke: #7fe7ff; stroke-width: 2; filter: drop-shadow(0 0 3px #000); }
-.tgt[data-manual='1'] .tgt-diamond { display: block; }
 .tgt[data-assist='1'] { --tc: #fff1a8; }
 .tgt[data-locked='1'] { --tc: #ff4d4d; }
 .tgt[data-locked='1'] .tgt-br { animation: lockpulse .45s infinite alternate; }
