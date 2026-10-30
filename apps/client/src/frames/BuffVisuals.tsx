@@ -31,11 +31,11 @@ function auraMat(col: [number, number, number], hex: boolean, strength: number) 
   });
 }
 const AURA = {
-  rally: auraMat([0.3, 2.2, 0.7], false, 0.9),
-  overcharge: auraMat([0.4, 0.9, 3.0], false, 0.9),
-  fortify: auraMat([0.9, 1.7, 2.6], true, 0.55),
-  iron: auraMat([1.6, 1.8, 2.2], true, 0.6),
-  aegis: auraMat([0.4, 1.4, 3.2], true, 0.6),
+  rally: auraMat([0.3, 2.2, 0.7], false, 0.35),
+  overcharge: auraMat([0.4, 0.9, 3.0], false, 0.35),
+  fortify: auraMat([0.9, 1.7, 2.6], true, 0.25),
+  iron: auraMat([1.6, 1.8, 2.2], true, 0.25),
+  aegis: auraMat([0.4, 1.4, 3.2], true, 0.3),
 };
 const odMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 0.7, 0.15), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false });
 const flameGeo = new THREE.ConeGeometry(1, 1, 10, 1, true).translate(0, 0.5, 0).rotateX(Math.PI / 2);
@@ -113,11 +113,11 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       m.visible = on;
       if (on) m.scale.set(rad * sc, rad * sc * 0.72, len * sc * 1.15);
     };
-    set('rally', rally, 1.5);
-    set('overcharge', charge, 1.62);
-    set('fortify', fort, 1.35);
-    set('iron', iron, 1.22);
-    set('aegis', aegis, 2.4);
+    set('rally', rally, 1.15);
+    set('overcharge', charge, 1.22);
+    set('fortify', fort, 1.08);
+    set('iron', iron, 1.04);
+    set('aegis', aegis, 1.6);
 
     // Overdrive: extra red-orange flame sheath on every engine
     s.od += ((overdrive ? 1 : 0) - s.od) * (1 - Math.exp(-6 * dt));
