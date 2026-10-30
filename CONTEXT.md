@@ -73,8 +73,11 @@ A Ship resting on a Launch Deck, stationary and resupplying until it launches.
 **Target**:
 The single enemy Ship a Pilot has selected; missiles can only lock onto it.
 
+**Grounded**:
+A Bulwark that has landed and drives on terrain (or a hull in space).
+
 **Siege Mode**:
-Bulwark toggle that roots the Ship for extra damage and range.
+Grounded-only Bulwark toggle that roots the Ship, switches to first-person gunner view and extends damage, range and lock.
 
 ## Progression & economy
 

@@ -44,7 +44,7 @@ Every pilot owns all four Frames and swaps in the hangar. Each Frame has its own
 | **Wasp** | Agile fighter | Fastest turn rate & speed, lowest HP | Highest Deflect stacking, burst evasion skills |
 | **Anvil** | Heavy bomber | Slow turns, high HP/armor | Siege barrages, carpet bombing, ground strike |
 | **Halo** | Support | Medium | Heals, shields, buffs, debuff fields, resurrection beacon |
-| **Bulwark** | Armored hover-gunship | Hovers near ground/hulls, slow | **Siege mode** (rooted, +damage/+range), artillery, area denial |
+| **Bulwark** | Armored hover-gunship | Hovers, **lands and drives on terrain** (hull in space), slow | **Siege mode** (grounded only, rooted, first-person gunner view, Target lock for mortar, +damage/+range), artillery, area denial |
 
 Skill kits are our own designs covering these roles (no 1:1 renames of any existing game's skills). Each Frame: ~12 skills unlocked across levels, player slots up to 10 on the hotbar alongside consumables.
 
