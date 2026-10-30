@@ -21,6 +21,7 @@ export function enemyOf(nation: NationId): NationId {
 export function createStructures(ctx: SimCtx): void {
   for (const nation of NATIONS) {
     const base = ctx.map.bases[nation];
+    ctx.coreIndex[nation] = ctx.structures.length;
     addStructure(ctx, nation, 'core', `${nation}-core`, base.core);
     base.shieldStations.forEach((p, i) =>
       addStructure(ctx, nation, 'shieldStation', `${nation}-station-${i}`, p),
@@ -67,7 +68,7 @@ function addStructure(
 }
 
 function coreOf(ctx: SimCtx, nation: NationId): StructureRec {
-  return ctx.structures.find((st) => st.state.kind === 'core' && st.state.nation === nation)!;
+  return ctx.structures[ctx.coreIndex[nation]]!;
 }
 
 function refreshShields(ctx: SimCtx): void {
@@ -252,6 +253,7 @@ export function stepBattle(ctx: SimCtx): boolean {
     ctx.match.shielded[nation] = ctx.map.bases[nation].shieldStations.length > 0;
     ctx.match.queues[nation].length = 0;
     ctx.tunnelFreeTick[nation].fill(0);
+    ctx.formationSlot[nation] = 0;
   }
   m.phase = 'battle';
   m.winner = null;

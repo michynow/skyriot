@@ -1,4 +1,5 @@
-import { LAUNCH } from '../content/bases';
+import { FORMATION, LAUNCH } from '../content/bases';
+import { sampleHeight } from '../terrain/heightfield';
 import { TICK_DT, TICK_HZ, type PilotInput, type Quat, type Vec3 } from '../types';
 import type { ShipRec, SimCtx } from './ctx';
 import { syncBody } from './flight';
@@ -20,8 +21,43 @@ export function enterHangar(ctx: SimCtx, rec: ShipRec): void {
   s.pos[2] = base.core[2];
   hold(ctx, rec, base.facing);
   const queue = ctx.match.queues[s.nation];
-  if (!queue.includes(s.id)) queue.push(s.id);
+  if (!queue.includes(s.id)) {
+    // Humans go out before every Bot (FIFO among humans); Bots join the back.
+    let at = queue.length;
+    if (!s.isBot) {
+      at = queue.findIndex((id) => ctx.ships.get(id)?.state.isBot !== false);
+      if (at < 0) at = queue.length;
+    }
+    queue.splice(at, 0, s.id);
+  }
   s.queuePos = queue.indexOf(s.id);
+}
+
+/** Skip the queue: start flying at cruise speed in the next formation slot ahead of the Base. */
+export function deployInFormation(ctx: SimCtx, rec: ShipRec): void {
+  const s = rec.state;
+  leaveQueue(ctx, rec);
+  const base = ctx.map.bases[s.nation];
+  const slot = ctx.formationSlot[s.nation]++;
+  const row = Math.floor(slot / FORMATION.perRow);
+  const column = (slot % FORMATION.perRow) - (FORMATION.perRow - 1) / 2;
+  const ahead = FORMATION.aheadM + row * FORMATION.rowSpacingM;
+  const side = column * FORMATION.columnSpacingM;
+  const f = base.facing;
+  const x = base.core[0] + f[0] * ahead + f[2] * side;
+  const z = base.core[2] + f[2] * ahead - f[0] * side;
+  s.pos[0] = x;
+  s.pos[1] = Math.max(
+    base.core[1] + FORMATION.altitudeM,
+    sampleHeight(ctx.hf, x, z) + FORMATION.minClearanceM,
+  );
+  s.pos[2] = z;
+  s.launchPhase = 'none';
+  s.tunnel = -1;
+  s.launchTicks = 0;
+  hold(ctx, rec, f);
+  s.speed = ctx.frames[s.frame].cruiseSpeed;
+  for (let i = 0; i < 3; i++) s.vel[i] = f[i]! * s.speed;
 }
 
 /** Drop a Ship from its Launch Queue (left the Map Instance, teleported). */
