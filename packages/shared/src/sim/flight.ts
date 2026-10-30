@@ -128,7 +128,13 @@ function ownDeck(ctx: SimCtx, s: ShipState, reach: number, radiusMul: number) {
 }
 
 /** Barrel Roll lateral velocity: a smooth half-sine bump whose integral is the roll displacement. */
-function rollVelocity(fd: { rollImpulse: number }, s: ShipState, fx: number, fz: number, out: number[]): void {
+function rollVelocity(
+  fd: { rollImpulse: number },
+  s: ShipState,
+  fx: number,
+  fz: number,
+  out: number[],
+): void {
   out[0] = out[1] = out[2] = 0;
   if (s.rollPhase < 0) return;
   const displacement = fd.rollImpulse * ROLL_DISPLACEMENT_PER_IMPULSE;
@@ -257,7 +263,7 @@ export function stepFlight(
     ay = _f0[1]!;
     az = _f0[2]!;
   }
-  const maxRate = fd.turnRate * (sieged ? siegeMods(s).turnRateMul : 1);
+  const maxRate = fd.turnRate * rec.mods.turnRateMul * (sieged ? siegeMods(s).turnRateMul : 1);
   const cosA = clamp(_f0[0]! * ax + _f0[1]! * ay + _f0[2]! * az, -1, 1);
   const angle = Math.acos(cosA);
   let cx = _f0[1]! * az - _f0[2]! * ay;
@@ -435,11 +441,12 @@ export function stepFlight(
         input.throttle >= 0
           ? input.throttle * fd.cruiseSpeed
           : input.throttle * fd.cruiseSpeed * GROUND_REVERSE_MUL;
+      target *= rec.mods.speedMul;
     }
     const delta = target - s.speed;
     const rate2 = (Math.abs(target) < Math.abs(s.speed) ? BRAKE_DECEL_MUL : 1) * accel;
     s.speed += clamp(delta, -rate2, rate2);
-    s.fuel = clamp(s.fuel + fd.fuelRegenPerSec * dt, 0, 1);
+    s.fuel = clamp(s.fuel + fd.fuelRegenPerSec * rec.mods.fuelRegenMul * dt, 0, 1);
     let tx = 0,
       tz = 0;
     if (steep) {
@@ -496,8 +503,13 @@ export function stepFlight(
       target = fd.boostSpeed;
       boosting = true;
     }
+    target *= rec.mods.speedMul;
   }
-  s.fuel = clamp(s.fuel + (boosting ? -fd.fuelBurnPerSec : fd.fuelRegenPerSec) * dt, 0, 1);
+  s.fuel = clamp(
+    s.fuel + (boosting ? -fd.fuelBurnPerSec : fd.fuelRegenPerSec * rec.mods.fuelRegenMul) * dt,
+    0,
+    1,
+  );
   const delta = target - s.speed;
   const rate2 = (delta < 0 ? BRAKE_DECEL_MUL : 1) * accel;
   s.speed += clamp(delta, -rate2, rate2);

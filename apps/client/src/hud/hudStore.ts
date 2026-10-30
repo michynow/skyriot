@@ -35,6 +35,12 @@ export interface TakenNumber {
   text: string;
   x: number;
 }
+export interface BuffView {
+  skill: SkillId;
+  ally: boolean;
+  left: number;
+  total: number;
+}
 export interface ChatLine {
   id: number;
   text: string;
@@ -70,6 +76,9 @@ export interface HudState {
   weaponId1: string;
   weaponId2: string;
   evadedNonce: number;
+  buffs: BuffView[];
+  toggles: Record<string, string>;
+  skillFx: { nonce: number; slot: number; skill: SkillId } | null;
   docked: boolean;
   /** 0..1 resupply fill (average of both ammo counters) while docked. */
   resupply: number;
@@ -121,6 +130,9 @@ export const useHud = create<HudState>(() => ({
   weaponId1: '',
   weaponId2: '',
   evadedNonce: 0,
+  buffs: [],
+  toggles: {},
+  skillFx: null,
   docked: false,
   resupply: 0,
   resupplied: false,
@@ -188,6 +200,10 @@ export function handleHudEvent(ev: SimEvent): void {
   if (ev.type === 'missileEvaded') {
     incoming.delete(ev.id);
     if (ev.victim === ownId) useHud.setState((st) => ({ evadedNonce: st.evadedNonce + 1 }));
+    return;
+  }
+  if (ev.type === 'skillUsed' && ev.id === ownId) {
+    useHud.setState((st) => ({ skillFx: { nonce: (st.skillFx?.nonce ?? 0) + 1, slot: ev.slot, skill: ev.skill } }));
     return;
   }
   if (ev.type === 'hit') incoming.delete(ev.projectile);
@@ -286,6 +302,13 @@ export function startHudFeed(): () => void {
         weaponId2: def.secondary,
         docked: own.docked,
         resupply: Math.min(1, (own.ammo1 / def.ammo1Max + own.ammo2 / def.ammo2Max) / 2),
+        buffs: own.buffs.map((b) => ({
+          skill: b.skill,
+          ally: b.source !== own.id,
+          left: b.ticksLeft / TICK_HZ,
+          total: Math.max(1, SKILLS[b.skill]?.durationSec ?? 1),
+        })),
+        toggles: own.toggles,
         hotbar,
         cooldownFrac: cd.map((c, i) => Math.min(1, c / total[i]!)),
         cooldownSec: cd.map((c) => c / TICK_HZ),
@@ -296,3 +319,6 @@ export function startHudFeed(): () => void {
   return () => clearInterval(timer);
 }
 
+
+// Dev-only handle for poking the HUD from the console (e.g. __hud.setState({ skillFx: ... })).
+if (import.meta.env.DEV) (window as unknown as { __hud: typeof useHud }).__hud = useHud;

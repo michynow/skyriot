@@ -38,13 +38,14 @@ export function IconDefs() {
         {rad('bg-red', [[0, '#8a2424'], [1, '#2a0a0e']])}
         {rad('bg-blue', [[0, '#2a5fa6'], [1, '#09162e']])}
         {rad('bg-green', [[0, '#26894e'], [1, '#082a18']])}
+        {rad('bg-violet', [[0, '#6a3aa6'], [1, '#1a0a30']])}
         {rad('bg-gold', [[0, '#9a7620'], [1, '#2a1c06']])}
       </defs>
     </svg>
   );
 }
 
-type Category = 'red' | 'blue' | 'green' | 'gold';
+type Category = 'red' | 'blue' | 'green' | 'gold' | 'violet';
 const star = (cx: number, cy: number, r1: number, r2: number, n: number) =>
   Array.from({ length: n * 2 }, (_, i) => {
     const a = (i * Math.PI) / n - Math.PI / 2;
@@ -238,8 +239,162 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
   },
 };
 
-const BG: Record<Category, string> = { red: 'bg-red', blue: 'bg-blue', green: 'bg-green', gold: 'bg-gold' };
-const RIM: Record<Category, string> = { red: '#ff7a6a', blue: '#6ab8ff', green: '#6aff9a', gold: '#ffd25a' };
+
+const rocket = (angle: number): ReactElement => (
+  <g key={angle} transform={`rotate(${angle} 24 44)`}>
+    <path d="M21 44c0 6 6 6 6 0l-3-6z" fill="url(#g-fire)" />
+    <path d="M21 25h6v17h-6z" fill="url(#g-steel)" stroke="#222a36" strokeWidth=".7" />
+    <path d="M21 25l3-8 3 8z" fill="url(#g-red)" />
+    <path d="M21 38l-3 4v-5zM27 38l3 4v-5z" fill="url(#g-dark)" />
+  </g>
+);
+const ship = (x: number, y: number, k: number, o: number, fill = 'url(#g-cyan)'): ReactElement => (
+  <path
+    key={`${x}${y}`}
+    transform={`translate(${x} ${y}) scale(${k})`}
+    opacity={o}
+    d="M0-12L4-2 13 5v3L4 6 3 12 0 10-3 12-4 6-13 8V5L-4-2z"
+    fill={fill}
+    stroke="#e6ffff"
+    strokeWidth="1"
+    strokeLinejoin="round"
+  />
+);
+const bracket = (r: number, c: number): ReactElement => (
+  <path key={r} transform={`rotate(${r} 24 24) translate(${c} ${c})`} d="M-2 8V0h8" fill="none" stroke="url(#g-red)" strokeWidth="3.2" strokeLinecap="round" />
+);
+
+Object.assign(SKILL, {
+  overdrive: {
+    cat: 'violet',
+    art: (
+      <>
+        <path d="M3 13h13M1 24h9M3 35h13" stroke="url(#g-fire)" strokeWidth="2.6" strokeLinecap="round" />
+        <circle cx="29" cy="24" r="16" fill="url(#g-dark)" stroke="url(#g-steel)" strokeWidth="2" />
+        <circle cx="29" cy="24" r="11.5" fill="url(#g-red)" />
+        <circle cx="29" cy="24" r="7.5" fill="url(#g-fire)" />
+        <circle cx="29" cy="24" r="3.5" fill="#fff" />
+        <path d="M29 9v5M29 34v5M14 24h5M39 24h5M18 13l3 4M40 35l-3-4M40 13l-3 4M18 35l3-4" stroke="#ffd070" strokeWidth="1.8" strokeLinecap="round" />
+      </>
+    ),
+  },
+  'phantom-weave': { cat: 'violet', art: <>{[ship(10, 31, 0.8, 0.28), ship(38, 31, 0.8, 0.28), ship(24, 25, 1.25, 0.9)]}<path d="M24 5v6" stroke="#e6ffff" strokeWidth="2" strokeLinecap="round" /></> },
+  'hunter-sight': {
+    cat: 'violet',
+    art: (
+      <>
+        <path d="M2 24C10 10 38 10 46 24 38 38 10 38 2 24z" fill="#1a1408" stroke="url(#g-gold)" strokeWidth="3" strokeLinejoin="round" />
+        <circle cx="24" cy="24" r="9.5" fill="url(#g-gold)" />
+        <circle cx="24" cy="24" r="4.5" fill="#1a1408" />
+        <path d="M24 10v7M24 31v7M10 24h7M31 24h7" stroke="#fff6c0" strokeWidth="2" strokeLinecap="round" />
+        <circle cx="21.5" cy="21.5" r="1.6" fill="#fff" />
+      </>
+    ),
+  },
+  'air-barrage-mode': { cat: 'red', art: <>{[rocket(-32), rocket(0), rocket(32)]}</> },
+  'ground-strike-mode': {
+    cat: 'red',
+    art: (
+      <>
+        <ellipse cx="24" cy="41" rx="20" ry="4.5" fill="url(#g-fire)" opacity=".8" />
+        <path d="M6 44c4-8 7-3 10-10 3 6 6 2 8-5 2 7 6 4 9 10 2-4 5-4 9-3v8z" fill="url(#g-fire)" />
+        <path d="M14 44c3-5 5-2 7-6 2 3 4 2 6 6z" fill="#fff6b0" />
+        <g transform="translate(24 18) scale(1.9)">
+          <path d="M-3-6C-6-12 0-18 3-6z" fill="url(#g-fire)" />
+          <path d="M-4-4h8v9c0 3-2 6-4 6s-4-3-4-6z" fill="url(#g-steel)" stroke="#fff8" strokeWidth=".5" />
+          <path d="M-4 6c0-1 8-1 8 0 0 3-2 5-4 5s-4-2-4-5z" fill="url(#g-red)" />
+          <path d="M-4-4l-3-2v5zM4-4l3-2v5z" fill="url(#g-dark)" />
+        </g>
+      </>
+    ),
+  },
+  'bulk-plating': {
+    cat: 'violet',
+    art: (
+      <>
+        {[30, 21, 12].map((y, i) => (
+          <g key={y}>
+            <path d={`M${8 - i * 0}  ${y + 8}l3-8h26l3 8z`} fill="url(#g-steel)" stroke="#222a36" strokeWidth="1.2" strokeLinejoin="round" />
+            <path d={`M12 ${y + 2}h24`} stroke="#fff" strokeOpacity=".7" strokeWidth="1.6" />
+            <circle cx="14" cy={y + 5} r="1.4" fill="#222a36" />
+            <circle cx="34" cy={y + 5} r="1.4" fill="#222a36" />
+          </g>
+        ))}
+        <path d="M24 3l4 5h-8z" fill="url(#g-gold)" />
+      </>
+    ),
+  },
+  'rally-field': {
+    cat: 'violet',
+    art: (
+      <>
+        <circle cx="24" cy="40" r="14" fill="none" stroke="url(#g-green)" strokeWidth="2" opacity=".5" />
+        <circle cx="24" cy="40" r="8" fill="none" stroke="url(#g-green)" strokeWidth="2.4" opacity=".85" />
+        <path d="M14 42V6" stroke="url(#g-steel)" strokeWidth="3" strokeLinecap="round" />
+        <path d="M15 7c8-4 12 4 20 0v16c-8 4-12-4-20 0z" fill="url(#g-green)" stroke="#e0ffd8" strokeWidth="1.2" strokeLinejoin="round" />
+        <polygon points={star(25, 15, 4.2, 1.8, 5)} fill="#fff" />
+        <circle cx="14" cy="5" r="2.2" fill="url(#g-yellow)" />
+      </>
+    ),
+  },
+  overcharge: {
+    cat: 'violet',
+    art: (
+      <>
+        <path d="M24 3l-5 8h4l-4 7M36 8l-6 7h4l-3 6" stroke="url(#g-yellow)" strokeWidth="2.2" fill="none" strokeLinejoin="round" strokeLinecap="round" />
+        <rect x="12" y="14" width="24" height="26" rx="5" fill="url(#g-blue)" stroke="#e6f6ff" strokeWidth="1.3" />
+        <path d="M12 22h24M12 30h24" stroke="#0a2a66" strokeWidth="2" />
+        <rect x="17" y="9" width="5" height="6" rx="1" fill="url(#g-steel)" />
+        <rect x="27" y="9" width="5" height="6" rx="1" fill="url(#g-steel)" />
+        <path d="M26 18l-7 9h5l-3 10 10-13h-6z" fill="url(#g-yellow)" stroke="#fff" strokeWidth=".8" strokeLinejoin="round" />
+        <path d="M16 17v21" stroke="#fff" strokeWidth="2" strokeLinecap="round" opacity=".5" />
+      </>
+    ),
+  },
+  purge: {
+    cat: 'green',
+    art: (
+      <>
+        {[bracket(0, 6), bracket(90, 6), bracket(180, 6), bracket(270, 6)]}
+        <polygon points={star(24, 24, 15, 5, 8)} fill="#fff" opacity=".95" />
+        <circle cx="24" cy="24" r="6" fill="url(#g-cyan)" />
+        <path d="M5 5l5 3M43 5l-5 3M5 43l5-3M43 43l-5-3" stroke="#ff9a8a" strokeWidth="2" strokeLinecap="round" />
+      </>
+    ),
+  },
+  fortify: {
+    cat: 'violet',
+    art: (
+      <>
+        <path d="M24 3l18 6v14c0 11-8 18-18 22C14 41 6 34 6 23V9z" fill="url(#g-steel)" stroke="#fff" strokeWidth="1.2" />
+        <path d="M13 18h22v18H13z" fill="url(#g-rust)" stroke="#222a36" strokeWidth="1.2" />
+        <path d="M13 18v-5h4v3h4v-3h6v3h4v-3h4v5z" fill="url(#g-rust)" stroke="#222a36" strokeWidth="1.2" strokeLinejoin="round" />
+        <path d="M20 36V28a4 4 0 0 1 8 0v8z" fill="#1a1008" />
+        <path d="M13 24h22" stroke="#fff" strokeOpacity=".4" />
+        <path d="M10 8l10 28" stroke="#fff" strokeWidth="2" opacity=".25" />
+      </>
+    ),
+  },
+  'barrage-calibration': {
+    cat: 'violet',
+    art: (
+      <>
+        <path d="M3 44h22l-2-5H5z" fill="url(#g-dark)" />
+        <path d="M6 40l9-18 8 4-5 14z" fill="url(#g-steel)" stroke="#222a36" strokeWidth="1" />
+        <path d="M14 21l9-7" stroke="url(#g-dark)" strokeWidth="7" strokeLinecap="round" />
+        <circle cx="34" cy="31" r="12" fill="url(#g-dark)" stroke="url(#g-gold)" strokeWidth="2.4" />
+        <circle cx="34" cy="31" r="9" fill="#0d1520" />
+        <path d="M34 22.5v3M34 36.5v3M25.5 31h3M39.5 31h3M28 25l2 2M40 25l-2 2" stroke="#9ae" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M34 31l5-6" stroke="url(#g-yellow)" strokeWidth="2.4" strokeLinecap="round" />
+        <circle cx="34" cy="31" r="1.8" fill="#fff" />
+        <polygon points={star(22, 11, 5, 2, 6)} fill="url(#g-fire)" />
+      </>
+    ),
+  },
+} satisfies Record<string, { cat: Category; art: ReactNode }>);
+
+const BG: Record<Category, string> = { violet: 'bg-violet', red: 'bg-red', blue: 'bg-blue', green: 'bg-green', gold: 'bg-gold' };
+const RIM: Record<Category, string> = { violet: '#c28aff', red: '#ff7a6a', blue: '#6ab8ff', green: '#6aff9a', gold: '#ffd25a' };
 
 export function SkillIcon({ id }: { id: string }) {
   const def = SKILL[id];
@@ -333,7 +488,7 @@ const WEAPON: Record<string, ReactNode> = {
 export function WeaponIcon({ id }: { id: string }) {
   return (
     <svg viewBox="0 0 48 48" className="wpn-icon" aria-hidden>
-      {WEAPON[id] ?? <circle cx="24" cy="24" r="8" fill="#d8f4ff" />}
+      {WEAPON[id] ?? SKILL[id]?.art ?? <circle cx="24" cy="24" r="8" fill="#d8f4ff" />}
     </svg>
   );
 }

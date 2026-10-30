@@ -12,6 +12,21 @@ import {
 import type { Projectile, ShipRec, SimCtx } from './ctx';
 import {
   LAG_HISTORY_TICKS,
+  AIR_BARRAGE_COUNT,
+  AIR_BARRAGE_DAMAGE_MUL,
+  AIR_BARRAGE_SPREAD_RAD,
+  BOMB_DROP_SPEED,
+  BOMB_GRAVITY,
+  GROUND_STRIKE_GROUND_MUL,
+  GROUND_STRIKE_SPLASH_MUL,
+  NAV_MAX_LEAD_SEC,
+  ROCKET_WOBBLE_AMP_M,
+  ROCKET_WOBBLE_PERIOD_SEC,
+  WEAVE_AMP_MIN_M,
+  WEAVE_AMP_SPAN_M,
+  WEAVE_PERIOD_MIN_SEC,
+  WEAVE_PERIOD_SPAN_SEC,
+  WEAVE_RAMP_SEC,
   MORTAR_GUIDE_TURN,
   MORTAR_LOCK_CONE_RAD,
   MORTAR_LOCK_SEC,
@@ -150,7 +165,7 @@ export function spawnProjectile(
   dy: number,
   dz: number,
   rewind: number,
-): void {
+): Projectile {
   const p: Projectile = ctx.pool.pop() ?? ({} as Projectile);
   p.id = ctx.nextProjectileId++;
   p.owner = owner.state.id;
@@ -173,6 +188,9 @@ export function spawnProjectile(
   p.spawnTick = ctx.tick;
   p.rewind = rewind;
   p.losTime = 0;
+  p.gravity = 0;
+  p.groundMul = 1;
+  p.weaveAmp = 0;
   ctx.projectiles.push(p);
   ctx.events.push({
     type: 'projectileSpawned',
@@ -186,6 +204,7 @@ export function spawnProjectile(
     target,
     tick: ctx.tick,
   });
+  return p;
 }
 
 /** Missiles (and the siege mortar) lock only onto the selected target, if it is an enemy in cone and range. */
@@ -193,11 +212,11 @@ function updateLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, sec: WeaponDef
   const s = rec.state;
   let cone = sec.lockConeRad;
   let range = sec.rangeM;
-  let lockSec = sec.lockTimeSec;
+  let lockSec = sec.lockTimeSec * rec.mods.lockTimeMul;
   if (cone <= 0) {
     if (sec.kind === 'shell' && s.sieged) {
       cone = MORTAR_LOCK_CONE_RAD;
-      lockSec = MORTAR_LOCK_SEC;
+      lockSec = MORTAR_LOCK_SEC * rec.mods.lockTimeMul;
     } else {
       s.lockTarget = null;
       s.canLock = false;
@@ -286,7 +305,7 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
     if (!fire[i] || rec.fireCd[i]! > 0 || ammo <= 0) continue;
     if (i === 0) s.ammo1--;
     else s.ammo2--;
-    rec.fireCd[i] = rec.fireCd[i]! + w.fireIntervalSec;
+    rec.fireCd[i] = rec.fireCd[i]! + w.fireIntervalSec / (i === 0 ? rec.mods.fireRateMul : 1);
     forwardOf(s.rot, _f);
     rightOf(s.rot, _r);
     upOf(s.rot, _u);
@@ -295,6 +314,69 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
     const ox = s.pos[0] + _f[0]! * nose,
       oy = s.pos[1] + _f[1]! * nose,
       oz = s.pos[2] + _f[2]! * nose;
+    const mode = i === 1 ? s.toggles.bombing : undefined;
+    if (mode === 'air-barrage-mode') {
+      // Forward salvo: the first rocket's ammo is already paid; each extra rocket costs 1.
+      const extra = Math.min(AIR_BARRAGE_COUNT - 1, s.ammo2);
+      s.ammo2 -= extra;
+      const count = 1 + extra;
+      for (let k = 0; k < count; k++) {
+        const off = (k - (count - 1) / 2) * AIR_BARRAGE_SPREAD_RAD;
+        const adx = _f[0]! + _r[0]! * off,
+          ady = _f[1]! + _r[1]! * off,
+          adz = _f[2]! + _r[2]! * off;
+        const al = Math.hypot(adx, ady, adz);
+        spawnProjectile(
+          ctx,
+          rec,
+          w.kind,
+          w.id,
+          w.damage * AIR_BARRAGE_DAMAGE_MUL * rec.mods.damageMul * (mods ? mods.damageMul : 1),
+          w.splashRadius * rec.mods.splashMul,
+          w.speed,
+          w.rangeM * (mods ? mods.rangeMul : 1),
+          0,
+          null,
+          ox,
+          oy,
+          oz,
+          adx / al,
+          ady / al,
+          adz / al,
+          rewind,
+        );
+      }
+      continue;
+    }
+    if (mode === 'ground-strike-mode') {
+      // Heavy bomb dropped straight down, inheriting the Ship's velocity, then falling under gravity.
+      const bvx = s.vel[0],
+        bvy = s.vel[1] - BOMB_DROP_SPEED,
+        bvz = s.vel[2];
+      const bs = Math.hypot(bvx, bvy, bvz) || 1;
+      const bomb = spawnProjectile(
+        ctx,
+        rec,
+        w.kind,
+        w.id,
+        w.damage * rec.mods.damageMul * (mods ? mods.damageMul : 1),
+        w.splashRadius * GROUND_STRIKE_SPLASH_MUL * rec.mods.splashMul,
+        bs,
+        w.rangeM,
+        0,
+        null,
+        s.pos[0],
+        s.pos[1] - fd.radius - 1,
+        s.pos[2],
+        bvx / bs,
+        bvy / bs,
+        bvz / bs,
+        rewind,
+      );
+      bomb.gravity = BOMB_GRAVITY;
+      bomb.groundMul = GROUND_STRIKE_GROUND_MUL;
+      continue;
+    }
     // Base direction: the nose, or (Primary aim assist) the Target's lead point.
     let bx = _f[0]!,
       by = _f[1]!,
@@ -365,8 +447,8 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
       rec,
       w.kind,
       w.id,
-      w.damage * (mods ? mods.damageMul : 1),
-      w.splashRadius,
+      w.damage * rec.mods.damageMul * (mods ? mods.damageMul : 1),
+      w.splashRadius * rec.mods.splashMul,
       w.speed,
       w.rangeM * (mods ? mods.rangeMul : 1),
       homing,
@@ -395,6 +477,50 @@ function recycle(ctx: SimCtx, index: number): void {
   ctx.pool.push(p);
 }
 
+function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+/** Deterministic hash of a projectile id to [0,1). */
+function hash01(id: number, k: number): number {
+  return ((Math.imul(id, 0x9e3779b1) ^ Math.imul(k + 1, 0x85ebca6b)) >>> 0) / 4294967296;
+}
+
+/**
+ * Corkscrew offset around the flight line: a circle of radius `amp` in the plane perpendicular to the
+ * heading. Only the change in offset is applied each tick, so the path is the line plus the circle.
+ */
+function applyWeave(p: Projectile, age: number, amp: number, period: number, dt: number): void {
+  let e1x = -p.dz,
+    e1z = p.dx;
+  let l = Math.hypot(e1x, e1z);
+  if (l < 1e-4) {
+    e1x = 1;
+    e1z = 0;
+    l = 1;
+  }
+  e1x /= l;
+  e1z /= l;
+  // e2 = d x e1
+  const e2x = p.dy * e1z,
+    e2y = p.dz * e1x - p.dx * e1z,
+    e2z = -p.dy * e1x;
+  const phi = hash01(p.id, 3) * Math.PI * 2;
+  const th = phi + (Math.PI * 2 * age * dt) / period;
+  const thPrev = phi + (Math.PI * 2 * (age - 1) * dt) / period;
+  const c = Math.cos(th) * amp - Math.cos(thPrev) * p.weaveAmp;
+  const s = Math.sin(th) * amp - Math.sin(thPrev) * p.weaveAmp;
+  p.x += e1x * c + e2x * s;
+  p.y += e2y * s;
+  p.z += e1z * c + e2z * s;
+  p.weaveAmp = amp;
+}
+
+/** Ground-strike bonus applies to Grounded or Docked victims. */
+function victimMul(p: Projectile, victim: ShipRec): number {
+  return victim.state.grounded || victim.state.docked ? p.groundMul : 1;
+}
+
 function explode(
   ctx: SimCtx,
   p: Projectile,
@@ -403,7 +529,7 @@ function explode(
   z: number,
   direct: ShipRec | null,
 ): void {
-  if (direct) hitShip(ctx, direct, p.damage, p.owner, p.id, x, y, z);
+  if (direct) hitShip(ctx, direct, p.damage * victimMul(p, direct), p.owner, p.id, x, y, z);
   if (p.splash <= 0) return;
   for (const o of ctx.recList) {
     const os = o.state;
@@ -411,7 +537,7 @@ function explode(
     const d = Math.hypot(os.pos[0] - x, os.pos[1] - y, os.pos[2] - z) - ctx.frames[os.frame].radius;
     if (d >= p.splash) continue;
     const fall = Math.max(1 - Math.max(d, 0) / p.splash, SPLASH_MIN_FRACTION);
-    hitShip(ctx, o, p.damage * fall, p.owner, p.id, x, y, z);
+    hitShip(ctx, o, p.damage * fall * victimMul(p, o), p.owner, p.id, x, y, z);
   }
 }
 
@@ -427,6 +553,22 @@ export function stepProjectiles(ctx: SimCtx): void {
     const p = ctx.projectiles[i]!;
     const age = ctx.tick - p.spawnTick;
 
+    let weaveAmp = -1; // < 0: no weave this tick
+    let weavePeriod = 1;
+    if (p.kind === 'rocket' && p.gravity === 0) {
+      weaveAmp = ROCKET_WOBBLE_AMP_M;
+      weavePeriod = ROCKET_WOBBLE_PERIOD_SEC;
+    }
+    if (p.gravity > 0) {
+      // Bombs fall: add gravity to the velocity vector.
+      const gvy = p.dy * p.speed - p.gravity * dt;
+      const gvx = p.dx * p.speed,
+        gvz = p.dz * p.speed;
+      p.speed = Math.hypot(gvx, gvy, gvz) || 1;
+      p.dx = gvx / p.speed;
+      p.dy = gvy / p.speed;
+      p.dz = gvz / p.speed;
+    }
     if (p.homing > 0 && p.target) {
       const t = ctx.ships.get(p.target);
       if (!t || !t.state.alive) {
@@ -469,13 +611,37 @@ export function stepProjectiles(ctx: SimCtx): void {
           const turn =
             p.homing *
             (missile && tl < MISSILE_EVADE.endgameDistM ? MISSILE_EVADE.endgameTurnMul : 1);
-          const cosA = Math.min(Math.max(p.dx * tx + p.dy * ty + p.dz * tz, -1), 1);
+          // Missiles steer at the target's intercept point (lead pursuit), not at its current position.
+          let sx = tx,
+            sy = ty,
+            sz = tz;
+          if (missile) {
+            const tt = Math.min(
+              interceptTime(tx * tl, ty * tl, tz * tl, ts.vel[0], ts.vel[1], ts.vel[2], p.speed),
+              NAV_MAX_LEAD_SEC,
+            );
+            sx = tx * tl + ts.vel[0] * tt;
+            sy = ty * tl + ts.vel[1] * tt;
+            sz = tz * tl + ts.vel[2] * tt;
+            const sl = Math.hypot(sx, sy, sz) || 1;
+            sx /= sl;
+            sy /= sl;
+            sz /= sl;
+            // Corkscrew weave amplitude: ramps in after launch, fades out through the endgame.
+            const ramp = Math.min((age * dt) / WEAVE_RAMP_SEC, 1);
+            const fade = clamp01(
+              (tl - MISSILE_EVADE.endgameDistM * 0.5) / (MISSILE_EVADE.endgameDistM * 0.5),
+            );
+            weaveAmp = (WEAVE_AMP_MIN_M + WEAVE_AMP_SPAN_M * hash01(p.id, 2)) * ramp * fade;
+            weavePeriod = WEAVE_PERIOD_MIN_SEC + WEAVE_PERIOD_SPAN_SEC * hash01(p.id, 1);
+          }
+          const cosA = Math.min(Math.max(p.dx * sx + p.dy * sy + p.dz * sz, -1), 1);
           const angle = Math.acos(cosA);
           const maxTurn = turn * dt;
           const frac = angle <= maxTurn ? 1 : maxTurn / angle;
-          let nx = p.dx + (tx - p.dx) * frac,
-            ny = p.dy + (ty - p.dy) * frac,
-            nz = p.dz + (tz - p.dz) * frac;
+          let nx = p.dx + (sx - p.dx) * frac,
+            ny = p.dy + (sy - p.dy) * frac,
+            nz = p.dz + (sz - p.dz) * frac;
           const nl = Math.hypot(nx, ny, nz) || 1;
           p.dx = nx / nl;
           p.dy = ny / nl;
@@ -552,6 +718,8 @@ export function stepProjectiles(ctx: SimCtx): void {
     p.x = x1;
     p.y = y1;
     p.z = z1;
+    if (weaveAmp >= 0) applyWeave(p, age, weaveAmp, weavePeriod, dt);
+    else p.weaveAmp = 0;
     p.travelled += step;
     if (p.travelled >= p.range - 1e-6) {
       ctx.events.push({ type: 'projectileExpired', id: p.id, pos: [p.x, p.y, p.z] });

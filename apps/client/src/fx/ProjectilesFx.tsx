@@ -7,6 +7,8 @@ import { MODEL_SCALE, getModel } from '../frames/models';
 import { camSnap } from '../scene/ChaseCamera';
 import { rollAngle, rollDirs } from '../frames/roll';
 import { world } from '../state/world';
+import { skillActivation, updateBeams } from './skillFx';
+import { ShellSet } from './shells';
 import { ParticlePool, SpriteBatch } from './sprites';
 
 // ---- tuning -------------------------------------------------------------------------------
@@ -26,7 +28,6 @@ const KIND_ID: Record<ProjectileKind, number> = { tracer: 0, missile: 1, rocket:
 const rnd = Math.random;
 const rr = (a: number, b: number) => a + (b - a) * rnd();
 
-interface Bubble { victim: ShipId; t: number; r: number; g: number; b: number }
 interface Trail { x: number; y: number; z: number; has: boolean }
 
 // ---- projectile pool (struct of arrays) -------------------------------------------------
@@ -57,7 +58,7 @@ class Projectiles {
     this.target[i] = e.target;
     this.evaded[i] = 0;
     f[o + 13] = 0; f[o + 14] = rnd() * 6.28; f[o + 15] = 0;
-    this.style[i] = e.weapon === 'seeker-pod' ? 1 : e.kind === 'rocket' || e.kind === 'shell' ? 2 : 0;
+    this.style[i] = e.weapon === 'seeker-pod' ? 1 : e.kind === 'rocket' && e.dir[1] < -0.6 ? 3 : e.kind === 'rocket' || e.kind === 'shell' ? 2 : 0;
   }
   find(id: number) {
     for (let i = 0; i < this.n; i++) if (this.id[i] === id) return i;
@@ -82,7 +83,7 @@ export function ProjectilesFx() {
   (window as unknown as { __fx: unknown }).__fx = fx;
 
   useEffect(() => {
-    const objs = [fx.additive.mesh, fx.smoke.mesh, fx.streaks.mesh, fx.rings.mesh, fx.ringsFlat.mesh, fx.boomLight, fx.bodies, fx.debris, fx.bubbles];
+    const objs = [fx.additive.mesh, fx.smoke.mesh, fx.streaks.mesh, fx.rings.mesh, fx.ringsFlat.mesh, fx.boomLight, fx.bodies, fx.debris, fx.sph.mesh, fx.hex.mesh];
     objs.forEach((o) => scene.add(o));
     return () => objs.forEach((o) => scene.remove(o));
   }, [scene, fx]);
@@ -94,7 +95,9 @@ export function ProjectilesFx() {
     handleEvents(fx, dt);
     updateProjectiles(fx, dt);
     updateDebris(fx, dt);
-    updateBubbles(fx, dt);
+    updateBeams(fx, dt);
+    fx.sph.update(dt);
+    fx.hex.update(dt);
     updateShipFx(fx, dt, camera.position);
     fx.glow.update(dt, fx.additive);
     fx.puffs.update(dt, fx.smoke);
@@ -111,7 +114,7 @@ export function ProjectilesFx() {
   return null;
 }
 
-type Fx = ReturnType<typeof makeFx>;
+export type Fx = ReturnType<typeof makeFx>;
 
 function makeFx() {
     const additive = new SpriteBatch(26000, true); // glow, sparks, fire, trails
@@ -144,32 +147,11 @@ function makeFx() {
     debris.count = 0; debris.frustumCulled = false; debris.castShadow = true;
     debris.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_DEBRIS * 3), 3);
 
-    // shield bubbles
-    const bubbleMat = new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.FrontSide,
-      vertexShader: /* glsl */ `
-        varying vec3 vC; varying float vF;
-        void main(){
-          vec4 wp = modelMatrix * instanceMatrix * vec4(position, 1.0);
-          vec4 mv = viewMatrix * wp;
-          vec3 n = normalize(mat3(viewMatrix) * mat3(instanceMatrix) * normal);
-          vF = pow(1.0 - abs(dot(n, normalize(-mv.xyz))), 2.2);
-          vC = instanceColor;
-          gl_Position = projectionMatrix * mv;
-        }`,
-      fragmentShader: /* glsl */ `
-        varying vec3 vC; varying float vF;
-        void main(){ gl_FragColor = vec4(vC * (vF * 1.6 + 0.1), 1.0);
-          #include <tonemapping_fragment>
-          #include <colorspace_fragment>
-        }`,
-    });
-    const bubbles = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 20, 14), bubbleMat, MAX_BUBBLES);
-    bubbles.count = 0; bubbles.frustumCulled = false; bubbles.renderOrder = 15;
-    bubbles.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_BUBBLES * 3), 3);
-
+    const o = new THREE.Object3D();
+    const sph = new ShellSet(MAX_BUBBLES, false, o);
+    const hex = new ShellSet(16, true, o);
     return {
-      additive, smoke, streaks, glow, puffs, rings, ringsFlat, ringP, ringFlatP, boomLight, bodies, debris, bubbles,
+      additive, smoke, streaks, glow, puffs, rings, ringsFlat, ringP, ringFlatP, boomLight, bodies, debris, sph, hex,
       proj: new Projectiles(),
       // debris state
       dN: 0,
@@ -179,12 +161,10 @@ function makeFx() {
       ds: new Float32Array(MAX_DEBRIS * 3),
       dl: new Float32Array(MAX_DEBRIS * 3), // life, maxLife, smoke timer
       dsc: new Float32Array(MAX_DEBRIS * 3),
-      bub: Array.from({ length: MAX_BUBBLES }, (): Bubble => ({ victim: '', t: 0, r: 0, g: 0, b: 0 })),
-      bN: 0,
       rolls: Array.from({ length: MAX_ROLLS }, () => ({ id: '', t: 0, dir: 1 })),
       rN: 0,
       trails: new Map<ShipId, Trail[]>(),
-      o: new THREE.Object3D(),
+      o,
       q: new THREE.Quaternion(),
       v: new THREE.Vector3(),
       v2: new THREE.Vector3(),
@@ -192,6 +172,8 @@ function makeFx() {
       c: new THREE.Color(),
       time: 0,
       camPos: new THREE.Vector3(),
+      beams: Array.from({ length: 48 }, () => ({ src: '', dst: '', t: 0, T: 1, r: 0, g: 0, b: 0 })),
+      bn: 0,
       cu: new THREE.Vector3(),
       cw: new THREE.Vector3(),
       boomT: new Map<ShipId, number>(),
@@ -243,19 +225,19 @@ function handleEvents(fx: Fx, _dt: number) {
         const i = fx.proj.find(e.id);
         if (i >= 0) {
           const k = fx.proj.kind[i]!;
-          const splash = fx.proj.f[i * PS + 11]!;
+          const splash = fx.proj.f[i * PS + 11]!, st = fx.proj.style[i]!;
           fx.proj.remove(i);
-          if (k === 1 || k === 2 || k === 3) explosion(fx, e.pos, Math.max(0.5, splash / 8) * (k > 1 ? 1.7 : 1), false, undefined, k > 1);
+          if (k === 1 || k === 2 || k === 3) explosion(fx, e.pos, Math.max(0.5, splash / 8) * (st === 3 ? 2.6 : k > 1 ? 1.7 : 1), false, undefined, k > 1);
         }
         break;
       }
       case 'hit': {
         const i = fx.proj.find(e.projectile);
-        let splash = 0, k = 0;
-        if (i >= 0) { splash = fx.proj.f[i * PS + 11]!; k = fx.proj.kind[i]!; fx.proj.remove(i); }
+        let splash = 0, k = 0, st = 0;
+        if (i >= 0) { splash = fx.proj.f[i * PS + 11]!; k = fx.proj.kind[i]!; st = fx.proj.style[i]!; fx.proj.remove(i); }
         const victim = world.ships.get(e.victim);
         sparks(fx, e.pos, e.deflected ? 12 : 8, e.deflected);
-        if (k === 1 || k === 2 || k === 3) explosion(fx, e.pos, Math.max(0.5, splash / 8) * (k > 1 ? 1.7 : 1), false, undefined, k > 1);
+        if (k === 1 || k === 2 || k === 3) explosion(fx, e.pos, Math.max(0.5, splash / 8) * (st === 3 ? 2.6 : k > 1 ? 1.7 : 1), false, undefined, k > 1);
         if (victim && (e.deflected || victim.shield > 0)) {
           const col = e.deflected ? ([1.6, 1.8, 2.4] as RGB) : ACCENT[victim.nation];
           bubble(fx, e.victim, col, e.deflected ? 0.6 : 1);
@@ -321,6 +303,8 @@ function handleEvents(fx: Fx, _dt: number) {
         if (e.id === world.ownId) camSnap.pending = true;
         break;
       case 'skillUsed':
+        skillActivation(fx, e);
+        break;
       case 'docked':
         break;
     }
@@ -431,12 +415,7 @@ function spawnDebris(fx: Fx, p: [number, number, number], col: RGB, speed: numbe
 }
 
 function bubble(fx: Fx, victim: ShipId, col: RGB, power: number) {
-  // reuse a slot already on this victim, else append (drop oldest if full)
-  let i = -1;
-  for (let k = 0; k < fx.bN; k++) if (fx.bub[k]!.victim === victim) { i = k; break; }
-  if (i < 0) i = fx.bN < MAX_BUBBLES ? fx.bN++ : 0;
-  const b = fx.bub[i]!;
-  b.victim = victim; b.t = 0.45 * power + 0.1; b.r = col[0] * power; b.g = col[1] * power; b.b = col[2] * power;
+  fx.sph.follow(victim, col, power, 0.45 * power + 0.1);
 }
 
 // ---- per-frame sims ---------------------------------------------------------------------
@@ -480,7 +459,7 @@ function updateProjectiles(fx: Fx, dt: number) {
       dead = true;
       const pos: [number, number, number] = [f[o]!, f[o + 1]!, f[o + 2]!];
       if (k === 0) sparks(fx, pos, 4, false);
-      else if (k !== 4) { explosion(fx, pos, Math.max(0.6, f[o + 11]! / 8) * (style === 2 ? 1.7 : 1), false, undefined, style === 2); dust(fx, pos, 0.8); }
+      else if (k !== 4) { explosion(fx, pos, Math.max(0.6, f[o + 11]! / 8) * (style === 3 ? 2.6 : style === 2 ? 1.7 : 1), false, undefined, style >= 2); dust(fx, pos, style === 3 ? 2 : 0.8); }
     }
     if (dead) { P.remove(i); continue; }
 
@@ -533,10 +512,20 @@ function updateProjectiles(fx: Fx, dt: number) {
     x += ux * sa + wx * ca; y += uy * sa + wy * ca; z += uz * sa + wz * ca;
     const dropping = (k === 1 || k === 2) && age < 0.15;
     if (dropping) y -= age * 14;
-    const big = k === 2 ? 1.7 : k === 3 ? 1.35 : 1;
+    const big = style === 3 ? 2.4 : k === 2 ? 1.7 : k === 3 ? 1.35 : 1;
     const mine = k === 1 && !!P.target[i] && P.target[i] === world.ownId;
 
-    if (!dropping) {
+    if (style === 3) {
+      // heavy ground-strike bomb: falling whistle trail (long thin streak + shed ring puffs), no flame
+      const sc = 14 / sp;
+      fx.streaks.push(x, y, z, 0.22, 2.6, 2.6, 2.8, 0.7, vx * sc, vy * sc, vz * sc);
+      fx.streaks.push(x, y, z, 0.7, 1.6, 1.1, 0.6, 0.35, vx * sc * 2.5, vy * sc * 2.5, vz * sc * 2.5);
+      f[o + 10]! += dt;
+      while (f[o + 10]! > 0.016) {
+        f[o + 10]! -= 0.016;
+        fx.puffs.emit(x - dx * (2 + f[o + 10]! * sp), y - dy * (2 + f[o + 10]! * sp), z - dz * (2 + f[o + 10]! * sp), rr(-2, 2), rr(-1, 1), rr(-2, 2), rr(1.2, 2), 0.9, 4, 0.85, 0.85, 0.9, 0.25, 0.6, 0, 0.45, 0.45, 0.48);
+      }
+    } else if (!dropping) {
       if (age - dt < 0.15 && (k === 1 || k === 2)) {
         // ignition: flash + smoke puff
         fx.glow.emit(x, y, z, 0, 0, 0, 0.18, 7 * big, 1, 3, 2.2, 1.2, 1);
@@ -661,33 +650,6 @@ function updateDebris(fx: Fx, dt: number) {
   if (fx.debris.instanceColor) fx.debris.instanceColor.needsUpdate = true;
 }
 
-function updateBubbles(fx: Fx, dt: number) {
-  const O = fx.o, ca = fx.bubbles.instanceColor!;
-  for (let i = 0; i < fx.bN; ) {
-    const b = fx.bub[i]!;
-    const s = world.ships.get(b.victim);
-    b.t -= dt;
-    if (b.t <= 0 || !s || !s.alive) {
-      const last = fx.bub[--fx.bN]!;
-      if (last !== b) { const tmp = fx.bub[i]!; fx.bub[i] = last; fx.bub[fx.bN] = tmp; }
-      continue;
-    }
-    const rad = FRAMES[s.frame].radius * 1.55;
-    O.position.set(s.pos[0], s.pos[1], s.pos[2]);
-    O.quaternion.set(s.rot[0], s.rot[1], s.rot[2], s.rot[3]);
-    O.scale.set(rad, rad * 0.7, rad * 1.5);
-    O.updateMatrix();
-    fx.bubbles.setMatrixAt(i, O.matrix);
-    const k = Math.min(1, b.t / 0.3);
-    ca.setXYZ(i, b.r * k, b.g * k, b.b * k);
-    i++;
-  }
-  O.quaternion.identity(); O.scale.set(1, 1, 1);
-  fx.bubbles.count = fx.bN;
-  fx.bubbles.instanceMatrix.needsUpdate = true;
-  ca.needsUpdate = true;
-}
-
 /** Engine trails, barrel-roll swooshes, damage smoke. */
 function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
   const v = fx.v, q = fx.q;
@@ -729,6 +691,18 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
         }
       }
       t.x = x; t.y = y; t.z = z; t.has = true;
+    }
+    for (const bf of s.buffs) {
+      if (bf.skill === 'overdrive' && rnd() < dt * 50) {
+        // heat haze + ember shed behind the engines
+        const hl = FRAMES[s.frame].halfLength;
+        v.set((rnd() - 0.5) * FRAMES[s.frame].radius, 0, hl * 1.1).applyQuaternion(q);
+        fx.puffs.emit(s.pos[0] + v.x, s.pos[1] + v.y, s.pos[2] + v.z, rr(-1, 1), rr(1, 3), rr(-1, 1), 1.0, 2, 7, 1.0, 0.7, 0.45, 0.06, 0.6, -0.8);
+        if (rnd() < 0.4) fx.glow.emit(s.pos[0] + v.x, s.pos[1] + v.y, s.pos[2] + v.z, rr(-3, 3), rr(-1, 3), rr(-3, 3), 0.6, 0.5, 0.1, 3, 0.9, 0.2, 1, 1, 5);
+      } else if (bf.skill === 'phantom-weave' && rnd() < dt * 25) {
+        v.set((rnd() - 0.5) * FRAMES[s.frame].radius * 2, (rnd() - 0.5), (rnd() - 0.5) * FRAMES[s.frame].halfLength).applyQuaternion(q);
+        fx.glow.emit(s.pos[0] + v.x, s.pos[1] + v.y, s.pos[2] + v.z, 0, 0, 0, 0.5, 0.8, 0.1, 0.4, 2, 3, 0.8);
+      }
     }
     if ((s as { grounded?: boolean }).grounded && Math.hypot(s.vel[0], s.vel[2]) > 3 && rnd() < dt * 50) {
       const r = FRAMES[s.frame].radius;

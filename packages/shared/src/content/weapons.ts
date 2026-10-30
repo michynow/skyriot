@@ -117,7 +117,7 @@ export const SKILLS: Record<string, SkillDef> = {
   'barrage-calibration': b(
     'barrage-calibration',
     'Barrage Calibration',
-    'Mortar/Secondary +25% damage, +30% splash.',
+    'All weapons +25% damage, +30% splash.',
     ['bulwark'],
     200,
     90,
@@ -143,13 +143,14 @@ export const SKILLS: Record<string, SkillDef> = {
     10,
     1.5,
   ),
-  'ghost-skin': s(
+  'ghost-skin': b(
     'ghost-skin',
     'Ghost Skin',
     '+20% Deflect (ignores cap) for a few seconds.',
     ['wasp'],
-    30,
     5,
+    5,
+    { deflectAdd: 0.2 },
   ),
   'carpet-drop': s(
     'carpet-drop',
@@ -159,7 +160,9 @@ export const SKILLS: Record<string, SkillDef> = {
     25,
     2,
   ),
-  'iron-hide': s('iron-hide', 'Iron Hide', 'Take 40% less damage.', ['anvil'], 35, 6),
+  'iron-hide': b('iron-hide', 'Iron Hide', 'Take 40% less damage.', ['anvil'], 6, 6, {
+    damageTakenMul: 0.6,
+  }),
   'mend-beam': s(
     'mend-beam',
     'Mend Beam',

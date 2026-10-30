@@ -309,6 +309,130 @@ function purity() {
 const pure = purity();
 console.log('grounded strafe drift', pure.drift.toFixed(2), 'docked upY', pure.upY.toFixed(4));
 
+// 2d. Frame core kits: buff expiry, maxHp revert, auras, toggles, Purge.
+function buffTests() {
+  const sim2 = fresh(true);
+  sim2.addShip('w', spawn('wasp'), [0, 600, 0]);
+  const w = sim2.getShip('w')!;
+  const idle = (n: number, extra: Record<string, Partial<PilotInput>> = {}) => {
+    for (let k = 0; k < n; k++) {
+      sim2.step(
+        new Map(Object.entries(extra).map(([id, p]) => [id, mk(k, { aim: [0, 0, -1], ...p })])),
+      );
+    }
+  };
+  const ghostSlot = FRAMES.wasp.hotbar.indexOf('ghost-skin');
+  idle(1, { w: { hotbar: ghostSlot } });
+  const ghostOn = w.buffs.some((b) => b.skill === 'ghost-skin');
+  idle(149, { w: {} });
+  const stillOn = w.buffs.length === 1;
+  idle(3, { w: {} });
+  const expired = w.buffs.length === 0;
+  const cooldownDone = w.cooldowns[ghostSlot] === 0;
+  // Anvil: bulk-plating raises max HP, scales HP, and reverts on expiry.
+  sim2.addShip('a', spawn('anvil'), [300, 600, 0]);
+  const a = sim2.getShip('a')!;
+  a.hp = a.maxHp / 2;
+  const base = a.maxHp;
+  const bulkSlot = FRAMES.anvil.hotbar.indexOf('bulk-plating');
+  idle(1, { a: { hotbar: bulkSlot } });
+  idle(1, { a: {} });
+  const raised = Math.abs(a.maxHp - base * 1.25) < 1e-6 && Math.abs(a.hp - a.maxHp / 2) < 1;
+  idle(3600, { a: {} });
+  const reverted =
+    a.buffs.length === 0 && Math.abs(a.maxHp - base) < 1e-6 && Math.abs(a.hp - base / 2) < 1;
+  // Toggles + Air Barrage ammo.
+  const defaultMode = a.toggles.bombing === 'air-barrage-mode';
+  const before = a.ammo2;
+  let spawnedRockets = 0;
+  const ev = sim2.step(new Map([['a', mk(1, { aim: [0, 0, -1], fire2: true })]]));
+  for (const e of ev) if (e.type === 'projectileSpawned' && e.owner === 'a') spawnedRockets++;
+  const barrage = spawnedRockets === 3 && before - a.ammo2 === 3;
+  idle(120, { a: {} });
+  const gsSlot = FRAMES.anvil.hotbar.indexOf('ground-strike-mode');
+  idle(1, { a: { hotbar: gsSlot } });
+  const switched = a.toggles.bombing === 'ground-strike-mode' && a.cooldowns[gsSlot]! > 0;
+  idle(70, { a: {} });
+  let bombDown = false;
+  for (const e of sim2.step(new Map([['a', mk(2, { aim: [0, 0, -1], fire2: true })]]))) {
+    if (e.type === 'projectileSpawned' && e.owner === 'a' && e.dir[1] < -0.1) bombDown = true;
+  }
+  sim2.dispose();
+  // Halo aura (Rally Field) reaches a nearby ally with the caster as source.
+  const sim3 = fresh(true);
+  sim3.addShip('h', spawn('halo', 'concord'), [0, 600, 0]);
+  sim3.addShip('f', spawn('wasp', 'concord'), [60, 600, 0]);
+  sim3.addShip('far', spawn('wasp', 'concord'), [900, 600, 0]);
+  const rally = FRAMES.halo.hotbar.indexOf('rally-field');
+  const evs = sim3.step(new Map([['h', mk(1, { hotbar: rally })]]));
+  const used = evs.find((e) => e.type === 'skillUsed' && e.skill === 'rally-field');
+  const aura =
+    sim3.getShip('f')!.buffs[0]?.source === 'h' &&
+    sim3.getShip('far')!.buffs.length === 0 &&
+    used?.type === 'skillUsed' &&
+    !!used.targets?.includes('f');
+  sim3.dispose();
+  return {
+    ghostOn,
+    stillOn,
+    expired,
+    cooldownDone,
+    raised,
+    reverted,
+    defaultMode,
+    barrage,
+    switched,
+    bombDown,
+    aura,
+  };
+}
+const buffRes = buffTests();
+console.log('buffs', buffRes);
+
+// Purge breaks missile guidance on the Halo.
+function purgeTrial(k: number): boolean {
+  const sim2 = fresh(true);
+  sim2.addShip('tgt', spawn('halo', 'vex'), [0, 500, 0]);
+  sim2.addShip('sh', spawn('wasp', 'concord'), [((k * 37) % 21) * 4 - 40, 500, 420]);
+  const tgt = sim2.getShip('tgt')!;
+  const shooter = sim2.getShip('sh')!;
+  const slot = FRAMES.halo.hotbar.indexOf('purge');
+  let missileId = -1;
+  let purged = false;
+  for (let i = 0; i < 360 && !purged; i++) {
+    const ev = sim2.step(
+      new Map([
+        [
+          'tgt',
+          mk(i, {
+            aim: [0, 0, -1],
+            hotbar: tgt.incomingDist > 0 && tgt.incomingDist < 200 ? slot : -1,
+          }),
+        ],
+        [
+          'sh',
+          mk(i, {
+            aim: [0, 0, -1],
+            target: 'tgt',
+            fire2: shooter.lockTarget !== null,
+            throttle: -0.2,
+          }),
+        ],
+      ]),
+    );
+    for (const e of ev) {
+      if (e.type === 'projectileSpawned' && e.kind === 'missile' && e.target && missileId < 0)
+        missileId = e.id;
+      if (e.type === 'missileEvaded' && e.id === missileId && e.reason === 'purge') purged = true;
+    }
+  }
+  sim2.dispose();
+  return purged;
+}
+let purges = 0;
+for (let k = 0; k < 10; k++) if (purgeTrial(k)) purges++;
+console.log('purge breaks guidance', purges, '/ 10');
+
 // 3. Prediction equality: stepLocal vs server step, identical inputs, bit-compare.
 function prediction(
   god: boolean,
@@ -354,6 +478,10 @@ const sweep = (i: number): Partial<PilotInput> => ({
 const eq = {
   flightRollBoostDash: prediction(false, 'wasp', [0, 600, 0], sweep),
   edgeOverride: prediction(false, 'wasp', [1500, 500, 0], () => ({ aim: [1, 0, 0] })),
+  buffMovement: prediction(false, 'wasp', [0, 600, 0], (i) => ({
+    ...sweep(i),
+    hotbar: i === 3 ? 1 : i === 10 ? 2 : sweep(i).hotbar,
+  })),
   dockedLaunch: prediction(false, 'wasp', undefined, (i) => ({
     launch: i === 40,
     aim: [1, 0, -1],
@@ -392,6 +520,8 @@ check(
   'no-shield crash rule',
 );
 check(bw.ok, 'bulwark ground mode');
+check(Object.values(buffRes).every(Boolean), 'buff/toggle/aura checks: ' + JSON.stringify(buffRes));
+check(purges >= 9, 'purge should break guidance');
 check(
   edge.maxReach < edge.hard - 5 && edge.warned && edge.returned,
   'soft boundary should turn the ship back before the hard clamp',

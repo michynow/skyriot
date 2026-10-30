@@ -163,7 +163,7 @@ export type SimEvent =
     }
   | { type: 'shipDestroyed'; victim: ShipId; killer: ShipId | null; pos: Vec3 }
   | { type: 'shipRespawned'; id: ShipId; pos: Vec3 }
-  | { type: 'skillUsed'; id: ShipId; skill: SkillId; slot: number }
+  | { type: 'skillUsed'; id: ShipId; skill: SkillId; slot: number; targets?: ShipId[] }
   | { type: 'barrelRoll'; id: ShipId; dir: -1 | 1 }
   | {
       type: 'terrainImpact';
@@ -173,7 +173,7 @@ export type SimEvent =
       /** true = shield absorbed it and the Ship bounced; false = no shield, Ship destroyed. */
       bounced: boolean;
     }
-  | { type: 'missileEvaded'; id: number; victim: ShipId; reason: 'roll' | 'terrain' | 'flare' }
+  | { type: 'missileEvaded'; id: number; victim: ShipId; reason: 'roll' | 'terrain' | 'flare' | 'purge' }
   | { type: 'teleport'; id: ShipId; pos: Vec3 }
   | { type: 'docked'; id: ShipId }
   | { type: 'resupplied'; id: ShipId }

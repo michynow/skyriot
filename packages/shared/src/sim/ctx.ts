@@ -18,7 +18,23 @@ import type {
 } from '../types';
 import type { SimTuning } from './index';
 
+/** Resolved buff modifiers (derived from ShipState.buffs once per tick). */
+export interface BuffMods {
+  fireRateMul: number;
+  speedMul: number;
+  turnRateMul: number;
+  deflectAdd: number;
+  damageMul: number;
+  damageTakenMul: number;
+  maxHpMul: number;
+  shieldRegenMul: number;
+  fuelRegenMul: number;
+  lockTimeMul: number;
+  splashMul: number;
+}
+
 export interface ShipRec {
+  mods: BuffMods;
   state: ShipState;
   body: RigidBody;
   collider: Collider;
@@ -57,6 +73,12 @@ export interface Projectile {
   rewind: number;
   /** Seconds the terrain has blocked line of sight to the target (missiles). */
   losTime: number;
+  /** Downward acceleration (bombs); 0 for straight-flying projectiles. */
+  gravity: number;
+  /** Damage multiplier vs Grounded/Docked victims (ground-strike bombs). */
+  groundMul: number;
+  /** Current weave offset amplitude (m) already applied to the position. */
+  weaveAmp: number;
 }
 
 export interface Wall {

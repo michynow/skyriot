@@ -102,3 +102,24 @@ export const MORTAR_GUIDE_TURN = 0.9;
 // Barrel Roll: displacement = rollImpulse * factor over ROLL_DURATION_SEC (half-sine velocity curve).
 export const ROLL_DURATION_SEC = 0.35;
 export const ROLL_DISPLACEMENT_PER_IMPULSE = 0.25;
+
+// Frame core kits
+export const AIR_BARRAGE_COUNT = 3;
+export const AIR_BARRAGE_SPREAD_RAD = 0.035;
+/** Each of the salvo's rockets deals this fraction of the Secondary's damage. */
+export const AIR_BARRAGE_DAMAGE_MUL = 0.45;
+export const GROUND_STRIKE_GROUND_MUL = 1.4;
+export const GROUND_STRIKE_SPLASH_MUL = 1.3;
+export const BOMB_DROP_SPEED = 20;
+export const BOMB_GRAVITY = 30;
+export const PURGE_RADIUS = 120;
+
+// Guided missile manoeuvring: lead pursuit plus a deterministic corkscrew weave (seeded by projectile id).
+export const NAV_MAX_LEAD_SEC = 5;
+export const WEAVE_PERIOD_MIN_SEC = 0.6;
+export const WEAVE_PERIOD_SPAN_SEC = 0.3;
+export const WEAVE_AMP_MIN_M = 6;
+export const WEAVE_AMP_SPAN_M = 4;
+export const WEAVE_RAMP_SEC = 0.3;
+export const ROCKET_WOBBLE_AMP_M = 1.2;
+export const ROCKET_WOBBLE_PERIOD_SEC = 0.5;

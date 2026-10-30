@@ -31,6 +31,7 @@ import { stepProjectiles, stepWeapons, pushHistory } from './combat';
 import { deriveLateral, stepFlight, syncBody } from './flight';
 import { forwardOf } from './math';
 import { tickTimers, useHotbar } from './skills';
+import { createMods, initToggles, resolveMods } from './buffs';
 
 const IDLE_INPUT: PilotInput = { seq: 0, viewTick: 0, ...EMPTY_INPUT };
 const HALF_SQRT = Math.SQRT1_2;
@@ -148,6 +149,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.sieged = false;
     s.lockTarget = null;
     s.cooldowns.fill(0);
+    s.buffs.length = 0;
+    initToggles(s, fd.hotbar);
     rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;
     s.ammo1 = fd.ammo1Max;
     s.ammo2 = fd.ammo2Max;
@@ -238,6 +241,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       sieged: false,
       cooldowns: new Array<number>(fd.hotbar.length).fill(0),
       lockTarget: null,
+      buffs: [],
+      toggles: {},
       ammo1: fd.ammo1Max,
       ammo2: fd.ammo2Max,
       docked: false,
@@ -270,6 +275,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       body,
     );
     return {
+      mods: createMods(),
       state,
       body,
       collider,
@@ -338,6 +344,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
         }
         // Frozen = a human whose input hasn't arrived; skipping keeps seq-for-seq lockstep with prediction.
         if (frozen?.has(s.id)) continue;
+        resolveMods(ctx, rec);
         stepFlight(ctx, rec, input, ctx.authoritative);
         if (!ctx.authoritative) continue;
         if (s.alive) {
@@ -346,7 +353,10 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
           stepWeapons(ctx, rec, input);
           if (rec.shieldDelay > 0) rec.shieldDelay -= ctx.dt;
           else
-            s.shield = Math.min(s.maxShield, s.shield + frames[s.frame].shieldRegenPerSec * ctx.dt);
+            s.shield = Math.min(
+              s.maxShield,
+              s.shield + frames[s.frame].shieldRegenPerSec * rec.mods.shieldRegenMul * ctx.dt,
+            );
         }
       }
       ctx.tick++;
@@ -364,9 +374,11 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
         addShip(id, state, state.pos);
         rec = ctx.ships.get(id)!;
       }
-      const { pos, rot, vel, cooldowns, angVel, ...scalars } = state;
+      const { pos, rot, vel, cooldowns, angVel, buffs, toggles, ...scalars } = state;
       // `state` may alias the live state (callers spread it), so copy arrays before touching them.
       const cooldownsCopy = cooldowns.slice();
+      const buffsCopy = buffs.map((b) => ({ ...b }));
+      const togglesCopy = { ...toggles };
       const s = rec.state;
       Object.assign(s, scalars);
       for (let i = 0; i < 3; i++) {
@@ -377,6 +389,10 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       for (let i = 0; i < 4; i++) s.rot[i] = rot[i]!;
       s.cooldowns.length = 0;
       for (const c of cooldownsCopy) s.cooldowns.push(c);
+      s.buffs.length = 0;
+      for (const b of buffsCopy) s.buffs.push(b);
+      for (const k of Object.keys(s.toggles)) delete s.toggles[k];
+      Object.assign(s.toggles, togglesCopy);
       deriveLateral(rec, frames[s.frame]);
       syncBody(ctx, rec);
     },
@@ -413,6 +429,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       ctx.events = discard;
       refreshFrames();
       // Same order as step(): flight, timers, then Skills.
+      resolveMods(ctx, rec);
       stepFlight(ctx, rec, input, false);
       tickTimers(rec);
       useHotbar(ctx, rec, input.hotbar, true);

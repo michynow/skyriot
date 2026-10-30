@@ -1,12 +1,7 @@
 import { RESPAWN_SEC } from '../content/frames';
 import { TICK_HZ, type ShipId } from '../types';
 import type { SimCtx, ShipRec } from './ctx';
-import {
-  DEFLECT_CAP,
-  DEFLECT_DAMAGE_MUL,
-  GHOST_DEFLECT_BONUS,
-  IRON_HIDE_DAMAGE_MUL,
-} from './constants';
+import { DEFLECT_CAP, DEFLECT_DAMAGE_MUL } from './constants';
 
 /** Shield first, then HP. Handles god, roll invulnerability and death. Returns damage actually dealt. */
 export function damageShip(
@@ -30,6 +25,7 @@ export function damageShip(
     s.vel[0] = s.vel[1] = s.vel[2] = 0;
     rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;
     s.lockTarget = null;
+    s.buffs.length = 0;
     s.respawnAtTick = ctx.tick + Math.ceil(RESPAWN_SEC * TICK_HZ);
     ctx.events.push({
       type: 'shipDestroyed',
@@ -54,13 +50,11 @@ export function hitShip(
 ): void {
   const s = rec.state;
   if (!s.alive || s.rollTicks > 0) return;
-  const chance =
-    Math.min(ctx.frames[s.frame].deflectChance, DEFLECT_CAP) +
-    (rec.state.ghostTicks > 0 ? GHOST_DEFLECT_BONUS : 0);
+  const chance = Math.min(ctx.frames[s.frame].deflectChance, DEFLECT_CAP) + rec.mods.deflectAdd;
   const deflected = ctx.rng() < chance;
   let dmg = base;
   if (deflected) dmg *= DEFLECT_DAMAGE_MUL;
-  if (rec.state.ironTicks > 0) dmg *= IRON_HIDE_DAMAGE_MUL;
+  dmg *= rec.mods.damageTakenMul;
   const dealt = damageShip(ctx, rec, dmg, attacker);
   ctx.events.push({
     type: 'hit',

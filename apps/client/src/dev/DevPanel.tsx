@@ -121,7 +121,7 @@ function Console() {
   return (
     <div
       data-ui
-      style={{ position: 'fixed', left: 28, top: 230, width: 380, font: '13px ui-monospace, monospace', color: '#cfe', pointerEvents: 'auto' }}
+      style={{ position: 'fixed', left: 28, top: 330, width: 380, font: '13px ui-monospace, monospace', color: '#cfe', pointerEvents: 'auto' }}
     >
       <div style={{ background: '#000c', padding: '2px 6px', color: '#ffd24a' }}>{rec}</div>
       <div style={{ background: '#000a', padding: 6, maxHeight: 140, overflow: 'auto' }}>

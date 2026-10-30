@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FRAMES, SKILLS } from '@skyriot/shared';
 import { useShallow } from 'zustand/react/shallow';
 import { session } from '../net/session';
@@ -86,23 +86,93 @@ function Status() {
   );
 }
 
+const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+
 function Hotbar() {
-  const { hotbar, frac, sec } = useHud(useShallow((h) => ({ hotbar: h.hotbar, frac: h.cooldownFrac, sec: h.cooldownSec })));
+  const { hotbar, frac, sec, toggles, fx } = useHud(
+    useShallow((h) => ({ hotbar: h.hotbar, frac: h.cooldownFrac, sec: h.cooldownSec, toggles: h.toggles, fx: h.skillFx })),
+  );
+  const [tip, setTip] = useState<{ i: number; left: number } | null>(null);
+  const tipSkill = tip ? SKILLS[hotbar[tip.i] ?? ''] : undefined;
   return (
-    <div className="hotbar">
+    <div className="hotbar" data-ui>
       {hotbar.map((id, i) => {
         const skill = id ? SKILLS[id] : undefined;
         const cd = frac[i] ?? 0;
+        const on = !!skill && skill.kind === 'toggle' && !!skill.toggleGroup && toggles[skill.toggleGroup] === id;
+        const punched = fx?.slot === i;
         return (
-          <div key={i} className={`slot ${skill ? '' : 'empty'} ${skill?.kind ?? ''} ${cd > 0 ? 'cooling' : ''}`} title={skill ? `${skill.name}: ${skill.description}` : ''}>
+          <div
+            key={`${i}-${punched ? fx!.nonce : 0}`}
+            className={`slot ${skill ? '' : 'empty'} ${skill?.kind ?? ''} ${cd > 0 ? 'cooling' : ''} ${on ? 'on' : ''} ${punched ? 'punch' : ''}`}
+            onMouseEnter={(e) => skill && !document.pointerLockElement && setTip({ i, left: e.currentTarget.offsetLeft + e.currentTarget.offsetWidth / 2 })}
+            onMouseLeave={() => setTip(null)}
+          >
             {id && <SkillIcon id={id} />}
             <span className="slot-k">{(i + 1) % 10}</span>
+            {on && <span className="slot-on">ON</span>}
             <div className="slot-cd" style={{ ['--p' as string]: `${cd * 360}deg` }} />
             {(sec[i] ?? 0) > 0.05 && <span className="slot-t">{(sec[i] ?? 0).toFixed(1)}</span>}
           </div>
         );
       })}
+      {tip && tipSkill && (
+        <div className="tooltip" style={{ left: tip.left }}>
+          <b>{tipSkill.name}</b>
+          <p>{tipSkill.description}</p>
+          <small>
+            {tipSkill.durationSec > 0 && `Duration ${mmss(tipSkill.durationSec)}  ·  `}Cooldown {mmss(tipSkill.cooldownSec)}
+          </small>
+        </div>
+      )}
     </div>
+  );
+}
+
+/** Active buffs under the top-left gauge: icon, timer bar, m:ss, ally marker; pulses under 10 s. */
+function BuffBar() {
+  const buffs = useHud((h) => h.buffs);
+  return (
+    <div className="buffbar">
+      {buffs.map((b, i) => (
+        <div key={`${b.skill}${i}`} className={`buff ${b.left < 10 ? 'expiring' : ''}`} title={SKILLS[b.skill]?.name}>
+          <SkillIcon id={b.skill} />
+          {b.ally && <i className="buff-ally" />}
+          <div className="buff-t">
+            <div style={{ width: `${Math.min(100, (b.left / b.total) * 100)}%` }} />
+          </div>
+          <small>{mmss(b.left)}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Activation feedback: centred name banner plus the icon flying from its slot to the buff bar. */
+function SkillFx() {
+  const fx = useHud((h) => h.skillFx);
+  const [fly, setFly] = useState<{ nonce: number; skill: string; x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!fx) return;
+    const slot = document.querySelectorAll('.hotbar .slot')[fx.slot]?.getBoundingClientRect();
+    if (slot) setFly({ nonce: fx.nonce, skill: fx.skill, x: slot.left + slot.width / 2, y: slot.top + slot.height / 2 });
+  }, [fx]);
+  if (!fx) return null;
+  return (
+    <>
+      <div key={`b${fx.nonce}`} className="skill-banner">
+        {SKILLS[fx.skill]?.name.toUpperCase()}
+      </div>
+      {fly && fly.nonce === fx.nonce && (
+        <div
+          key={`f${fly.nonce}`}
+          className="skill-fly"
+          style={{ left: fly.x, top: fly.y, ['--dx' as string]: `${70 - fly.x}px`, ['--dy' as string]: `${250 - fly.y}px` }}
+        >
+          <SkillIcon id={fly.skill} />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -248,6 +318,8 @@ export function Hud() {
       <Floaters />
       <Status />
       <Gauge />
+      <BuffBar />
+      <SkillFx />
       <Incoming />
       <Hotbar />
       <Killfeed />

@@ -3,6 +3,7 @@ import { TICK_HZ, type ShipId } from '../types';
 import type { ShipRec, SimCtx } from './ctx';
 import {
   AEGIS_RADIUS,
+  PURGE_RADIUS,
   CARPET_BOMBS,
   CARPET_BOMB_WEAPON,
   CARPET_DAMAGE_MUL,
@@ -17,6 +18,7 @@ import {
   WALL_DISTANCE,
   WALL_MAX,
 } from './constants';
+import { applyBuff, tickBuffs } from './buffs';
 import { toggleSiege } from './flight';
 import { forwardOf, rightOf } from './math';
 import { spawnProjectile } from './combat';
@@ -30,8 +32,7 @@ const PREDICTED = new Set(['afterburn-dash', 'siege-anchor']);
 export function tickTimers(rec: ShipRec): void {
   const s = rec.state;
   for (let i = 0; i < s.cooldowns.length; i++) if (s.cooldowns[i]! > 0) s.cooldowns[i]!--;
-  if (rec.state.ghostTicks > 0) rec.state.ghostTicks--;
-  if (rec.state.ironTicks > 0) rec.state.ironTicks--;
+  tickBuffs(s);
   if (rec.state.flareTicks > 0) rec.state.flareTicks--;
 }
 
@@ -43,12 +44,78 @@ export function useHotbar(ctx: SimCtx, rec: ShipRec, slot: number, predictOnly: 
   const def = id ? SKILLS[id] : undefined;
   if (!id || !def) return;
   if (def.frames !== 'all' && !def.frames.includes(s.frame)) return;
-  if (predictOnly && !PREDICTED.has(id)) return;
+  const movesShip =
+    def.kind === 'buff' &&
+    (def.buff?.speedMul !== undefined || def.buff?.turnRateMul !== undefined);
+  if (predictOnly && !PREDICTED.has(id) && !movesShip) return;
+  if (def.kind === 'toggle' && def.toggleGroup && s.toggles[def.toggleGroup] === id) return;
   const ticks = Math.ceil(def.durationSec * TICK_HZ);
   forwardOf(s.rot, _f);
   rightOf(s.rot, _r);
 
+  let targets: ShipId[] | undefined;
+  if (def.kind === 'buff' && def.buff) {
+    const radius = def.auraRadiusM;
+    if (radius !== undefined) {
+      targets = [];
+      for (const o of ctx.recList) {
+        const os = o.state;
+        if (!os.alive || os.nation !== s.nation) continue;
+        if (Math.hypot(os.pos[0] - s.pos[0], os.pos[1] - s.pos[1], os.pos[2] - s.pos[2]) > radius)
+          continue;
+        if (predictOnly && o !== rec) continue;
+        applyBuff(os, id, s.id, ticks);
+        if (o !== rec) targets.push(os.id);
+      }
+    } else {
+      applyBuff(s, id, s.id, ticks);
+    }
+  } else if (def.kind === 'toggle' && def.toggleGroup) {
+    s.toggles[def.toggleGroup] = id;
+    // Switching modes costs the cooldown on every slot of the group.
+    const cd = Math.ceil(def.cooldownSec * TICK_HZ);
+    for (let j = 0; j < fd.hotbar.length; j++) {
+      if (SKILLS[fd.hotbar[j] ?? '']?.toggleGroup === def.toggleGroup) s.cooldowns[j] = cd;
+    }
+  }
+
   switch (id) {
+    case 'purge': {
+      const allies: ShipRec[] = [];
+      for (const o of ctx.recList) {
+        const os = o.state;
+        if (!os.alive || os.nation !== s.nation) continue;
+        if (
+          Math.hypot(os.pos[0] - s.pos[0], os.pos[1] - s.pos[1], os.pos[2] - s.pos[2]) <=
+          PURGE_RADIUS
+        )
+          allies.push(o);
+      }
+      targets = [];
+      for (const a of allies) {
+        if (a !== rec) targets.push(a.state.id);
+        for (const o of ctx.recList) {
+          if (o.state.lockTarget === a.state.id) {
+            o.state.lockTarget = null;
+            o.lockCand = null;
+            o.lockTime = 0;
+          }
+        }
+        for (const p of ctx.projectiles) {
+          if (p.kind === 'missile' && p.target === a.state.id) {
+            p.target = null;
+            p.homing = 0;
+            ctx.events.push({
+              type: 'missileEvaded',
+              id: p.id,
+              victim: a.state.id,
+              reason: 'purge',
+            });
+          }
+        }
+      }
+      break;
+    }
     case 'flares':
       rec.state.flareTicks = Math.max(ticks, 1);
       s.lockTarget = null;
@@ -87,12 +154,6 @@ export function useHotbar(ctx: SimCtx, rec: ShipRec, slot: number, predictOnly: 
     case 'afterburn-dash':
       rec.state.dashTicks = Math.max(ticks, 1);
       s.speed = Math.max(s.speed, fd.boostSpeed);
-      break;
-    case 'ghost-skin':
-      rec.state.ghostTicks = ticks;
-      break;
-    case 'iron-hide':
-      rec.state.ironTicks = ticks;
       break;
     case 'repair-kit':
       s.hp = Math.min(s.maxHp, s.hp + s.maxHp * REPAIR_KIT_FRACTION);
@@ -166,7 +227,11 @@ export function useHotbar(ctx: SimCtx, rec: ShipRec, slot: number, predictOnly: 
       break;
   }
   s.cooldowns[slot] = Math.ceil(def.cooldownSec * TICK_HZ);
-  ctx.events.push({ type: 'skillUsed', id: s.id as ShipId, skill: id, slot });
+  ctx.events.push(
+    targets && targets.length > 0
+      ? { type: 'skillUsed', id: s.id as ShipId, skill: id, slot, targets }
+      : { type: 'skillUsed', id: s.id as ShipId, skill: id, slot },
+  );
 }
 
 function nearestAllyInFront(ctx: SimCtx, rec: ShipRec): ShipRec | null {

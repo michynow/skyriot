@@ -3,6 +3,7 @@ import {
   DECK,
   FRAMES,
   SIEGE,
+  SKILLS,
   TICK_HZ,
   WEAPONS,
   mulberry32,
@@ -32,11 +33,13 @@ const DECK_APPROACH_HEIGHT = 20;
 const DECK_BRAKE_DISTANCE = 250;
 const BOT_EDGE_MARGIN = 600;
 const SIEGE_SLOT = 0; // siege-anchor is hotbar slot 0 on the Bulwark
-const FLARE_SLOT = 2;
 const ROLL_WINDOW_MIN_M = 30;
 const ROLL_WINDOW_MAX_M = 80;
 const FLARE_INCOMING_M = 700;
 const FLARE_CHANCE = 0.25;
+const BUFF_ENGAGE_DIST = 900;
+const BOMB_DROP_RADIUS = 60;
+const BOMB_RUN_ALTITUDE = 120;
 const SIEGE_BOT_CHANCE = 0.5;
 const SIEGE_BOT_ENGAGE_DISTANCE = 700;
 const SIEGE_BOT_LEAVE_DISTANCE = 1100;
@@ -92,6 +95,10 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     tx = enemy.pos[0] + enemy.vel[0] * lead;
     ty = enemy.pos[1] + enemy.vel[1] * lead;
     tz = enemy.pos[2] + enemy.vel[2] * lead;
+  }
+
+  if (enemy && me.toggles.bombing === 'ground-strike-mode' && (enemy.grounded || enemy.docked)) {
+    ty = enemy.pos[1] + BOMB_RUN_ALTITUDE;
   }
 
   // Stay inside the map: head for the centre well before the sim's own edge override kicks in.
@@ -222,6 +229,7 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     input.strafe = mem.dodgeDir;
   }
 
+  const flareSlot = fd.hotbar.indexOf('flares');
   // Incoming guided missile: roll inside the break window, otherwise pop flares.
   if (me.incomingDist > 0 && !me.sieged && !me.grounded) {
     if (
@@ -234,13 +242,41 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       else input.rollRight = true;
     } else if (
       me.incomingDist < FLARE_INCOMING_M &&
-      me.cooldowns[FLARE_SLOT] === 0 &&
+      flareSlot >= 0 &&
+      me.cooldowns[flareSlot] === 0 &&
       mem.rng() < FLARE_CHANCE
     ) {
-      input.hotbar = FLARE_SLOT;
+      input.hotbar = flareSlot;
     }
   } else if (me.hp < me.maxHp * HEAL_HP_FRACTION && mem.rng() < SKILL_CHANCE * 10) {
     input.hotbar = mem.rng() < 0.5 ? HEAL_SLOT : SHIELD_SLOT;
+  }
+  // Engagement: use buff Skills off cooldown, and pick the Anvil bombing mode by target.
+  if (input.hotbar === -1 && enemy && dist < BUFF_ENGAGE_DIST && !me.docked) {
+    const wantMode = enemy.grounded || enemy.docked ? 'ground-strike-mode' : 'air-barrage-mode';
+    for (let slot = 0; slot < fd.hotbar.length; slot++) {
+      const id = fd.hotbar[slot];
+      const def = id ? SKILLS[id] : undefined;
+      if (!id || !def || me.cooldowns[slot] !== 0) continue;
+      if (def.kind === 'buff' && !me.buffs.some((x) => x.skill === id)) {
+        input.hotbar = slot;
+        break;
+      }
+      if (
+        def.kind === 'toggle' &&
+        def.toggleGroup &&
+        id === wantMode &&
+        me.toggles[def.toggleGroup] !== id
+      ) {
+        input.hotbar = slot;
+        break;
+      }
+    }
+  }
+  // Ground-strike bombers fly over grounded targets and drop.
+  if (enemy && me.toggles.bombing === 'ground-strike-mode' && (enemy.grounded || enemy.docked)) {
+    const horiz = Math.hypot(enemy.pos[0] - me.pos[0], enemy.pos[2] - me.pos[2]);
+    input.fire2 = horiz < BOMB_DROP_RADIUS && me.pos[1] > enemy.pos[1];
   }
   mem.lastBrake = input.brake;
   return input;

@@ -75,6 +75,13 @@ function parseSnapshot(m: unknown): Snapshot | null {
     rollPhase: isNum(s.rollPhase) ? s.rollPhase : -1,
     rollDir: isNum(s.rollDir) ? s.rollDir : 0,
     outOfBounds: s.outOfBounds === true,
+    buffs: Array.isArray(s.buffs)
+      ? s.buffs.filter(
+          (b): b is ShipState['buffs'][number] =>
+            isObj(b) && typeof b.skill === 'string' && typeof b.source === 'string' && isNum(b.ticksLeft),
+        )
+      : [],
+    toggles: isObj(s.toggles) ? (s.toggles as Record<string, string>) : {},
   }));
   return { tick: m.tick, serverTimeMs: m.serverTimeMs, ack: isNum(m.ack) ? m.ack : -1, ships };
 }

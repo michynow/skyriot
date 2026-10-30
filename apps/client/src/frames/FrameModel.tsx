@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { FrameId, NationId, ShipId } from '@skyriot/shared';
 import { world } from '../state/world';
 import { SLOTS } from './bricks';
+import { BuffVisuals } from './BuffVisuals';
 import { fpv } from './fpv';
 import { MODEL_SCALE, getModel } from './models';
 import { getFlameMaterials, getMaterials } from './palette';
@@ -163,6 +164,7 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
             })}
           </group>
         ))}
+      {shipId && <BuffVisuals shipId={shipId} frame={frame} nation={nation} upgrade={upgrade} data={data} />}
       {data.engines.map((e, i) => (
         <group key={i} position={e.pos} ref={(el) => void (flames.current[i] = el)}>
           <mesh geometry={flameGeo} material={flame.outer} renderOrder={5} />

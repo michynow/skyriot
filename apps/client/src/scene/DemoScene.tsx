@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FRAMES, RUSTWATER_CANYONS, generateHeightfield, sampleHeight, type FrameId, type NationId, type ShipState } from '@skyriot/shared';
+import { FRAMES, RUSTWATER_CANYONS, SKILLS, generateHeightfield, sampleHeight, type FrameId, type NationId, type ShipState } from '@skyriot/shared';
 import { Ships } from '../frames/Ships';
 import { ProjectilesFx } from '../fx/ProjectilesFx';
 import { world } from '../state/world';
@@ -56,9 +56,11 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
   }, [map, opts.showcase, opts.focus]);
 
   (window as unknown as { __world: unknown }).__world = world;
+  const skillsDemo = location.search.includes('skills=1');
   const spam = location.search.includes('missiles=1');
   const boostAll = location.search.includes('boost=1');
   const o = useMemo(() => new THREE.Object3D(), []);
+  const q0 = useMemo(() => new THREE.Quaternion(), []);
   const v = useMemo(() => new THREE.Vector3(), []);
   const gl = useThree((s) => s.gl);
   const stats = useMemo(() => ({ frames: 0, acc: 0 }), []);
@@ -112,6 +114,39 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
       const dead = demo.deadUntil.get(s.id);
       if (dead !== undefined && t > dead) { demo.deadUntil.delete(s.id); s.alive = true; s.hp = s.maxHp; push({ type: 'shipRespawned', id: s.id, pos: s.pos }); }
       s.hp = Math.max(s.maxHp * 0.2, s.maxHp * (0.6 + 0.4 * Math.sin(t * 0.3 + i)) );
+    }
+
+    if (skillsDemo) {
+      const D = demo as typeof demo & { sk?: { t: number; i: number } };
+      D.sk ??= { t: 1, i: 0 };
+      for (const s of list) {
+        for (const b of s.buffs) b.ticksLeft -= dt * 30;
+        s.buffs = s.buffs.filter((b) => b.ticksLeft > 0);
+      }
+      D.sk.t -= dt;
+      if (D.sk.t < 0) {
+        D.sk.t = 2.2;
+        const ids = Object.keys(SKILLS);
+        const id = ids[D.sk.i++ % ids.length]!;
+        const def = SKILLS[id]!;
+        const fr = def.frames === 'all' ? 'wasp' : def.frames[0]!;
+        const caster = list.find((x) => x.frame === fr && x.nation === 'concord')!;
+        if (def.kind === 'buff') caster.buffs.push({ skill: id, source: caster.id, ticksLeft: 150 });
+        if (def.kind === 'toggle') caster.toggles = { ...caster.toggles, [def.toggleGroup ?? 'g']: id };
+        if (id === 'iron-hide') caster.ironTicks = 150;
+        if (id === 'ghost-skin') caster.ghostTicks = 150;
+        const allies = list.filter((x) => x.nation === caster.nation && x.id !== caster.id).map((x) => x.id);
+        if (def.auraRadiusM) for (const a of list.filter((x) => x.nation === caster.nation && x.id !== caster.id)) a.buffs.push({ skill: id, source: caster.id, ticksLeft: 150 });
+        push({ type: 'skillUsed', id: caster.id, skill: id, slot: 0, targets: allies } as unknown as Parameters<typeof push>[0]);
+        if (id === 'ground-strike-mode') {
+          q0.set(caster.rot[0], caster.rot[1], caster.rot[2], caster.rot[3]);
+          for (let n = 0; n < 3; n++) push({ type: 'projectileSpawned', id: demo.nextId++, owner: caster.id, kind: 'rocket', weapon: 'brick-bomb', origin: [caster.pos[0] + n * 3, caster.pos[1] - 3, caster.pos[2]], dir: [0, -1, 0], speed: 140, target: null, tick: 0 });
+        }
+        if (id === 'air-barrage-mode') {
+          v.set(0, 0, -1).applyQuaternion(q0.set(caster.rot[0], caster.rot[1], caster.rot[2], caster.rot[3]));
+          for (let n = 0; n < 3; n++) push({ type: 'projectileSpawned', id: demo.nextId++, owner: caster.id, kind: 'rocket', weapon: 'brick-bomb', origin: [caster.pos[0] + (n - 1) * 3, caster.pos[1], caster.pos[2]], dir: [v.x, v.y, v.z], speed: 220, target: null, tick: 0 });
+        }
+      }
     }
 
     // fake events
