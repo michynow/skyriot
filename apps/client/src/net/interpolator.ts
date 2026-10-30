@@ -4,6 +4,7 @@ const BUFFER_MAX = 40;
 const EXTRAPOLATE_MAX_MS = 250;
 const TELEPORT_DIST = 200; // m between consecutive snapshots => respawn/teleport, snap
 const TICK_MS = 1000 / TICK_HZ;
+const SLEW_MS_PER_SNAPSHOT = 1.5; // max clock-offset change per snapshot (~30 ms/s)
 
 interface Entry {
   snap: Snapshot;
@@ -44,6 +45,7 @@ export function createInterpolator(delayMs = 100): Interpolator {
   const out = new Map<ShipId, ShipState>();
   let offset = 0; // serverTimeMs - localNow
   let haveOffset = false;
+  const samples: number[] = [];
   let tick = 0;
 
   function place(dst: ShipState, a: ShipState | undefined, b: ShipState, t: number, extraSec: number) {
@@ -74,12 +76,17 @@ export function createInterpolator(delayMs = 100): Interpolator {
   return {
     push(snap, rttMs = 0) {
       const sample = snap.serverTimeMs + rttMs / 2 - performance.now();
+      // Late packets only ever lower the sample, so the best estimate is the max over a ~2 s window.
+      // The live offset slews toward it at a bounded rate so render time never jitters per snapshot.
+      samples.push(sample);
+      if (samples.length > 40) samples.shift();
+      const best = Math.max(...samples);
       if (!haveOffset) {
-        offset = sample;
+        offset = best;
         haveOffset = true;
       } else {
-        // Late packets only ever lower the sample, so trust increases faster than decreases.
-        offset += (sample - offset) * (sample > offset ? 0.2 : 0.02);
+        const step = SLEW_MS_PER_SNAPSHOT;
+        offset += Math.max(-step, Math.min(step, best - offset));
       }
       if (buf.some((e) => e.snap.tick === snap.tick)) return;
       const entry: Entry = { snap, byId: new Map(snap.ships.map((s) => [s.id, s])) };

@@ -30,9 +30,9 @@ const PREDICTED = new Set(['afterburn-dash', 'siege-anchor']);
 export function tickTimers(rec: ShipRec): void {
   const s = rec.state;
   for (let i = 0; i < s.cooldowns.length; i++) if (s.cooldowns[i]! > 0) s.cooldowns[i]!--;
-  if (rec.ghostTicks > 0) rec.ghostTicks--;
-  if (rec.ironTicks > 0) rec.ironTicks--;
-  if (rec.flareTicks > 0) rec.flareTicks--;
+  if (rec.state.ghostTicks > 0) rec.state.ghostTicks--;
+  if (rec.state.ironTicks > 0) rec.state.ironTicks--;
+  if (rec.state.flareTicks > 0) rec.state.flareTicks--;
 }
 
 export function useHotbar(ctx: SimCtx, rec: ShipRec, slot: number, predictOnly: boolean): void {
@@ -50,7 +50,7 @@ export function useHotbar(ctx: SimCtx, rec: ShipRec, slot: number, predictOnly: 
 
   switch (id) {
     case 'flares':
-      rec.flareTicks = Math.max(ticks, 1);
+      rec.state.flareTicks = Math.max(ticks, 1);
       s.lockTarget = null;
       for (const o of ctx.recList) if (o.state.lockTarget === s.id) o.state.lockTarget = null;
       for (const p of ctx.projectiles) if (p.target === s.id) p.target = null;
@@ -85,14 +85,14 @@ export function useHotbar(ctx: SimCtx, rec: ShipRec, slot: number, predictOnly: 
       }
       break;
     case 'afterburn-dash':
-      rec.dashTicks = Math.max(ticks, 1);
+      rec.state.dashTicks = Math.max(ticks, 1);
       s.speed = Math.max(s.speed, fd.boostSpeed);
       break;
     case 'ghost-skin':
-      rec.ghostTicks = ticks;
+      rec.state.ghostTicks = ticks;
       break;
     case 'iron-hide':
-      rec.ironTicks = ticks;
+      rec.state.ironTicks = ticks;
       break;
     case 'repair-kit':
       s.hp = Math.min(s.maxHp, s.hp + s.maxHp * REPAIR_KIT_FRACTION);

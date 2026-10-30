@@ -101,6 +101,19 @@ export interface ShipState {
   ammo2: number;
   /** Docked on a Launch Deck: stationary, resupplying, waits for `launch` input. */
   docked: boolean;
+  /** Bulwark only: landed and driving on terrain; Siege Mode is only possible while grounded. */
+  grounded: boolean;
+  // Movement-affecting hidden state, kept in ShipState so reconciliation is exact.
+  /** Smoothed angular velocity (rad/s, world space) of the nose turn. */
+  angVel: Vec3;
+  /** Brake was held last tick (Siege Mode toggles on the rising edge). */
+  brakeHeld: boolean;
+  dashTicks: number;
+  ghostTicks: number;
+  ironTicks: number;
+  flareTicks: number;
+  /** Ticks spent docked (resupply fires at DECK.resupplySec). */
+  dockTicks: number;
 }
 
 export type ProjectileKind = 'tracer' | 'missile' | 'rocket' | 'shell' | 'flare';

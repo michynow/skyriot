@@ -29,10 +29,25 @@ export function getMaterials(nation: NationId, upgrade: number) {
   const std = (color: string, rough: number, metal: number) =>
     new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal });
   const accentCol = new THREE.Color(p.accent).lerp(hot, Math.max(0, u - 3) * 0.06);
+  const rimCol = new THREE.Color(p.accent);
+  /** Distance-scaled rim light so far-away silhouettes pop against terrain. */
+  const rim = (mat: THREE.MeshStandardMaterial) => {
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uRim = { value: rimCol };
+      sh.fragmentShader = sh.fragmentShader
+        .replace('void main() {', 'uniform vec3 uRim;\nvoid main() {')
+        .replace('#include <emissivemap_fragment>',
+          '#include <emissivemap_fragment>\n' +
+          '{ float d = length(vViewPosition); float k = smoothstep(120.0, 700.0, d);\n' +
+          '  float f = pow(1.0 - clamp(abs(dot(normalize(vNormal), normalize(vViewPosition))), 0.0, 1.0), 2.0);\n' +
+          '  totalEmissiveRadiance += uRim * (f * 1.4 + 0.12) * k * 1.6; }');
+    };
+    return mat;
+  };
   m = {
-    primary: std(p.primary, 0.42, 0.2),
-    secondary: std(p.secondary, 0.5, 0.1),
-    dark: std(p.dark, 0.6, 0.35),
+    primary: rim(std(p.primary, 0.42, 0.2)),
+    secondary: rim(std(p.secondary, 0.5, 0.1)),
+    dark: rim(std(p.dark, 0.6, 0.35)),
     accent: new THREE.MeshStandardMaterial({
       color: accentCol, emissive: accentCol, emissiveIntensity: 0.9 + u * 0.28, roughness: 0.4,
     }),

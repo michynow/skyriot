@@ -35,3 +35,6 @@
 .lb-launch:hover { filter: brightness(1.2); transform: scale(1.03); }
 .status-screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: #02060df0; color: #e9f3ff; font: 700 24px 'Rajdhani', sans-serif; letter-spacing: .2em; z-index: 5; }
 .status-screen button { cursor: pointer; font: 700 18px 'Rajdhani', sans-serif; padding: 10px 28px; background: transparent; color: #5fe3ff; border: 2px solid #5fe3ff; letter-spacing: .2em; }
+.lb-keys { position: relative; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 15px; opacity: .85; }
+.lb-keys b { color: var(--a); letter-spacing: .08em; margin-right: 4px; }
+.lb-bw { flex-basis: 100%; color: var(--b); }

@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { button, Leva, useControls } from 'leva';
 import { FRAMES, type FrameId } from '@skyriot/shared';
+import { inputSettings, saveInputSettings } from '../input/input';
 import { lag } from '../net/lagSim';
 import { session } from '../net/session';
 import { useSettings, type Quality } from '../ui/settings';
@@ -58,6 +59,36 @@ function Controls() {
   lag.latencyMs = l.latencyMs;
   lag.jitterMs = l.jitterMs;
   lag.loss = l.loss;
+  useControls('Mouse steering', {
+    sensitivity: {
+      value: inputSettings.sensitivity,
+      min: 0.0002,
+      max: 0.003,
+      step: 0.0001,
+      onChange: (v: number) => {
+        inputSettings.sensitivity = v;
+        saveInputSettings();
+      },
+    },
+    deadzone: {
+      value: inputSettings.deadzone,
+      min: 0,
+      max: 0.3,
+      step: 0.01,
+      onChange: (v: number) => {
+        inputSettings.deadzone = v;
+        saveInputSettings();
+      },
+    },
+    recenter: {
+      value: inputSettings.recenter,
+      label: 'soft recentre',
+      onChange: (v: boolean) => {
+        inputSettings.recenter = v;
+        saveInputSettings();
+      },
+    },
+  });
   useControls('Graphics & debug', {
     quality: { value: useSettings.getState().quality, options: ['low', 'med', 'high'], onChange: (q: Quality) => setQuality(q) },
     physicsDebug: { value: false, onChange: (on: boolean) => setPhysicsDebug(on) },
@@ -75,11 +106,24 @@ function Controls() {
 function Console() {
   const lines = useHud((h) => h.consoleLines);
   const [text, setText] = useState('');
+  const [rec, setRec] = useState('');
+  useEffect(() => {
+    let n = 0;
+    const t = setInterval(() => {
+      const st = session.predictor?.stats();
+      if (!st) return setRec('prediction off');
+      const line = `reconcile err avg ${st.avg.toFixed(2)} m  max ${st.max.toFixed(2)} m  (${st.count} snaps / 10 s)`;
+      setRec(line);
+      if (++n % 20 === 0) console.log('[reconcile]', line);
+    }, 500);
+    return () => clearInterval(t);
+  }, []);
   return (
     <div
       data-ui
       style={{ position: 'fixed', left: 28, top: 24, width: 380, font: '13px ui-monospace, monospace', color: '#cfe', pointerEvents: 'auto' }}
     >
+      <div style={{ background: '#000c', padding: '2px 6px', color: '#ffd24a' }}>{rec}</div>
       <div style={{ background: '#000a', padding: 6, maxHeight: 140, overflow: 'auto' }}>
         {lines.slice(-8).map((l, i) => (
           <div key={i}>{l}</div>

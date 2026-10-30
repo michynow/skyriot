@@ -3,12 +3,13 @@ import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { generateHeightfield, type MapDef } from '@skyriot/shared';
 import { world } from '../state/world';
+import { LaunchDecks } from './LaunchDecks';
 import { Scatter } from './Scatter';
 import { SkyDome, SUN_DIR } from './SkyDome';
 import { Terrain } from './Terrain';
 
 const LIGHT = {
-  'desert-dusk': { sun: '#ffa868', sunI: 2.5, sky: '#a89ac8', ground: '#c0703f', hemiI: 1.25 },
+  'desert-dusk': { sun: '#ffa868', sunI: 3.1, sky: '#a89ac8', ground: '#b0653a', hemiI: 0.85 },
   storm: { sun: '#9bb0d0', sunI: 1.2, sky: '#54607a', ground: '#2a2e38', hemiI: 0.9 },
   'space-nebula': { sun: '#ffe2c0', sunI: 3.0, sky: '#3a2a5a', ground: '#0a0a14', hemiI: 0.35 },
 } as const;
@@ -69,7 +70,7 @@ export function MapScene({ map }: { map: MapDef }) {
     if (!world.heightfield || world.heightfield.heights.length !== hf.heights.length) world.heightfield = hf;
   }, [map, hf]);
   useEffect(() => {
-    scene.fog = new THREE.Fog(map.env.fogColor, map.env.fogNear, map.env.fogFar);
+    scene.fog = new THREE.Fog(map.env.fogColor, map.env.fogNear * 1.6, map.env.fogFar * 1.25);
     return () => void (scene.fog = null);
   }, [scene, map]);
   const atmos = map.env.kind === 'atmosphere';
@@ -77,6 +78,7 @@ export function MapScene({ map }: { map: MapDef }) {
     <>
       <SkyDome env={map.env} />
       <Lights map={map} />
+      <LaunchDecks map={map} />
       {atmos && (
         <Suspense fallback={null}>
           <Terrain map={map} hf={hf} />

@@ -66,6 +66,7 @@ function GameLoop() {
     if (!interp || !ownId) return;
     view.camera = camera;
 
+    world.shake *= Math.exp(-delta / 0.15);
     state.acc = Math.min(state.acc + delta, 0.25);
     while (state.acc >= TICK_DT) {
       state.acc -= TICK_DT;
@@ -85,7 +86,7 @@ function GameLoop() {
     for (const [id, ship] of remotes) world.ships.set(id, ship);
     let mine: ShipState | null = null;
     try {
-      mine = session.predictor?.ownState() ?? null;
+      mine = session.predictor?.ownState(state.acc / TICK_DT) ?? null;
     } catch (err) {
       disablePrediction(err);
     }

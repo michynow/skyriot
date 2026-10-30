@@ -56,11 +56,11 @@ export function hitShip(
   if (!s.alive || s.rollTicks > 0) return;
   const chance =
     Math.min(ctx.frames[s.frame].deflectChance, DEFLECT_CAP) +
-    (rec.ghostTicks > 0 ? GHOST_DEFLECT_BONUS : 0);
+    (rec.state.ghostTicks > 0 ? GHOST_DEFLECT_BONUS : 0);
   const deflected = ctx.rng() < chance;
   let dmg = base;
   if (deflected) dmg *= DEFLECT_DAMAGE_MUL;
-  if (rec.ironTicks > 0) dmg *= IRON_HIDE_DAMAGE_MUL;
+  if (rec.state.ironTicks > 0) dmg *= IRON_HIDE_DAMAGE_MUL;
   const dealt = damageShip(ctx, rec, dmg, attacker);
   ctx.events.push({
     type: 'hit',

@@ -80,6 +80,7 @@ export function ProjectilesFx() {
 
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
+    fx.time += dt;
     handleEvents(fx, dt);
     updateProjectiles(fx, dt);
     updateDebris(fx, dt);
@@ -168,6 +169,8 @@ function makeFx() {
       v2: new THREE.Vector3(),
       fwd: new THREE.Vector3(0, 0, -1),
       c: new THREE.Color(),
+      time: 0,
+      boomT: new Map<ShipId, number>(),
     };
 }
 
@@ -223,6 +226,7 @@ function handleEvents(fx: Fx, _dt: number) {
       }
       case 'shipDestroyed': {
         const v = world.ships.get(e.victim);
+        if (!boomOnce(fx, e.victim)) break;
         explosion(fx, e.pos, v ? 1.2 + FRAMES[v.frame].radius * 0.35 : 2, true, v?.nation);
         break;
       }
@@ -244,13 +248,49 @@ function handleEvents(fx: Fx, _dt: number) {
         break;
       }
       case 'terrainImpact': {
-        dust(fx, e.pos, Math.min(2, 0.6 + e.damage / 300));
+        const s = world.ships.get(e.id);
+        dust(fx, e.pos, Math.min(2, 0.8 + e.damage / 300));
+        if (e.bounced) {
+          sparks(fx, e.pos, 26, false);
+          if (s) bubble(fx, e.id, ACCENT[s.nation], 1.4);
+        } else if (boomOnce(fx, e.id)) {
+          explosion(fx, e.pos, s ? 1.2 + FRAMES[s.frame].radius * 0.35 : 2, true, s?.nation);
+        }
+        break;
+      }
+      case 'launched': {
+        const s = world.ships.get(e.id);
+        if (!s) break;
+        const [r, g, b] = ACCENT[s.nation];
+        for (let i = 0; i < 40; i++) {
+          const a = rnd() * 6.28, sp = rr(4, 26);
+          fx.glow.emit(s.pos[0], s.pos[1] - 1, s.pos[2], Math.cos(a) * sp, rr(-30, -8), Math.sin(a) * sp, rr(0.3, 0.8), 2.2, 0.4, r * 2, g * 2, b * 2, 0.9, 1.5);
+        }
+        for (let i = 0; i < 14; i++) fx.puffs.emit(s.pos[0], s.pos[1] - 2, s.pos[2], rr(-12, 12), rr(-4, 2), rr(-12, 12), rr(1, 2), 3, 10, 0.7, 0.62, 0.55, 0.4, 1.4);
+        break;
+      }
+      case 'resupplied': {
+        const s = world.ships.get(e.id);
+        if (!s) break;
+        for (let i = 0; i < 20; i++) {
+          const a = rnd() * 6.28, rad = FRAMES[s.frame].radius * rr(0.6, 1.4);
+          fx.glow.emit(s.pos[0] + Math.cos(a) * rad, s.pos[1] + rr(-1, 1), s.pos[2] + Math.sin(a) * rad, 0, rr(3, 7), 0, rr(0.6, 1.1), 0.5, 0.1, 0.5, 2.2, 0.9, 0.9, 0.5, -1);
+        }
         break;
       }
       case 'skillUsed':
+      case 'docked':
         break;
     }
   }
+}
+
+/** True the first time a ship's death explosion is requested within 0.8s (terrainImpact + shipDestroyed both fire). */
+function boomOnce(fx: Fx, id: ShipId) {
+  const last = fx.boomT.get(id);
+  if (last !== undefined && fx.time - last < 0.8) return false;
+  fx.boomT.set(id, fx.time);
+  return true;
 }
 
 function sparks(fx: Fx, p: [number, number, number], n: number, blue: boolean) {
@@ -378,8 +418,8 @@ function updateProjectiles(fx: Fx, dt: number) {
     if (k === 0) {
       const len = Math.min(26, Math.max(7, sp * 0.03));
       const s = len / sp;
-      fx.streaks.push(x, y, z, 0.55, r, g, b, 0.85, vx * s, vy * s, vz * s);
-      fx.streaks.push(x, y, z, 0.16, 3, 3, 3, 1, vx * s * 0.7, vy * s * 0.7, vz * s * 0.7);
+      fx.streaks.push(x, y, z, 0.5, r * 0.8, g * 0.8, b * 0.8, 0.75, vx * s, vy * s, vz * s);
+      fx.streaks.push(x, y, z, 0.14, 1.8, 1.8, 1.8, 0.9, vx * s * 0.7, vy * s * 0.7, vz * s * 0.7);
     } else if (k === 4) {
       const fl = 0.8 + 0.4 * Math.sin(f[o + 9]! * 40 + i);
       fx.additive.push(x, y, z, 2.2 * fl, 3, 2.2, 1.2, 1);
@@ -535,6 +575,11 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
         }
       }
       t.x = x; t.y = y; t.z = z; t.has = true;
+    }
+    if ((s as { grounded?: boolean }).grounded && Math.hypot(s.vel[0], s.vel[2]) > 3 && rnd() < dt * 50) {
+      const r = FRAMES[s.frame].radius;
+      v.set((rnd() - 0.5) * r * 2, -1, r * 1.2).applyQuaternion(q);
+      fx.puffs.emit(s.pos[0] + v.x, s.pos[1] + v.y, s.pos[2] + v.z, -s.vel[0] * 0.15 + rr(-2, 2), rr(1, 3), -s.vel[2] * 0.15 + rr(-2, 2), rr(0.8, 1.6), 1.2, 5, 0.55, 0.4, 0.28, 0.45, 1, -0.6);
     }
     if (s.hp < s.maxHp * 0.35 && rnd() < dt * 40) {
       v.set(0, 0, 1).applyQuaternion(q);

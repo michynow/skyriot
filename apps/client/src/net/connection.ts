@@ -64,6 +64,9 @@ function parseSnapshot(m: unknown): Snapshot | null {
     ...s,
     cooldowns: Array.isArray(s.cooldowns) ? s.cooldowns : [],
     lockTarget: typeof s.lockTarget === 'string' ? s.lockTarget : null,
+    ammo1: isNum(s.ammo1) ? s.ammo1 : 0,
+    ammo2: isNum(s.ammo2) ? s.ammo2 : 0,
+    docked: s.docked === true,
   }));
   return { tick: m.tick, serverTimeMs: m.serverTimeMs, ack: isNum(m.ack) ? m.ack : -1, ships };
 }

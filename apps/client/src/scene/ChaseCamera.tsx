@@ -4,10 +4,11 @@ import * as THREE from 'three';
 import { FRAMES, sampleHeight } from '@skyriot/shared';
 import { world } from '../state/world';
 import { AIM_DISTANCE } from '../input/input';
+import { fpv } from '../frames/fpv';
 
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 
-const BASE_FOV = 68;
+const BASE_FOV = 60;
 const BOOST_FOV = 16;
 const POS_OMEGA = 9; // critically-damped spring angular frequency (1/s): higher = stiffer
 const ROT_RATE = 7;
@@ -34,6 +35,12 @@ export function ChaseCamera() {
       yaw: 0,
       pitch: 0,
       zoom: 1,
+      shake: 0,
+      fp: 0,
+      fpPos: new THREE.Vector3(),
+      qf: new THREE.Quaternion(),
+      qsh: new THREE.Quaternion(),
+      t: 0,
       tmp: new THREE.Vector3(),
       off: new THREE.Vector3(),
       qs: new THREE.Quaternion(),
@@ -73,8 +80,8 @@ export function ChaseCamera() {
     st.qo.setFromEuler(st.eu.set(st.pitch, st.yaw, 0));
     st.qs.copy(st.q).multiply(st.qo);
 
-    const dist = (6 + def.radius * 2.6) * st.zoom;
-    const height = dist * 0.26;
+    const dist = (2.4 + def.radius * 1.3) * st.zoom;
+    const height = dist * 0.2;
     st.off.set(0, height, dist).applyQuaternion(st.qs);
     // Pitch so the screen-centre ray meets the Ship's flight line at AIM_DISTANCE: centred cursor = fly straight.
     st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(height, dist + AIM_DISTANCE));
@@ -90,7 +97,7 @@ export function ChaseCamera() {
     // never clip into terrain
     const hf = world.heightfield;
     if (hf) {
-      const floor = sampleHeight(hf, st.pos.x, st.pos.z) + 4;
+      const floor = sampleHeight(hf, st.pos.x, st.pos.z) + 3;
       if (st.pos.y < floor) {
         st.pos.y = floor;
         if (st.vel.y < 0) st.vel.y = 0;
@@ -99,6 +106,33 @@ export function ChaseCamera() {
 
     camera.position.copy(st.pos);
     camera.quaternion.copy(st.qs).multiply(st.qp);
+
+    // first person from the turret while a Bulwark is sieged (eased over ~0.4 s)
+    const fpTarget = ship.sieged && ship.frame === 'bulwark' ? 1 : 0;
+    st.fp = Math.min(1, Math.max(0, st.fp + (fpTarget ? dt : -dt) / 0.4));
+    const e = st.fp * st.fp * (3 - 2 * st.fp);
+    fpv.id = e > 0 ? ship.id : '';
+    fpv.amount = e;
+    if (e > 0) {
+      const FP_H = 2.5, FP_Z = 0.6;
+      st.qsh.set(ship.rot[0], ship.rot[1], ship.rot[2], ship.rot[3]);
+      st.fpPos.set(0, FP_H, FP_Z).applyQuaternion(st.qsh).add(st.tmp.set(ship.pos[0], ship.pos[1], ship.pos[2]));
+      st.qf.copy(st.qsh).multiply(st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(FP_H, AIM_DISTANCE + FP_Z)));
+      camera.position.lerp(st.fpPos, e);
+      camera.quaternion.slerp(st.qf, e);
+    }
+
+    // screen shake: world.shake is an impulse (0..1) written by the game; consumed here and decayed
+    const w = world as unknown as { shake?: number };
+    if (w.shake) { st.shake = Math.max(st.shake, w.shake); w.shake = 0; }
+    st.t += dt;
+    if (st.shake > 0.002) {
+      const a = st.shake * st.shake * 0.5;
+      camera.position.x += Math.sin(st.t * 83) * a;
+      camera.position.y += Math.sin(st.t * 97 + 1) * a;
+      camera.rotateZ(Math.sin(st.t * 71) * st.shake * 0.02);
+      st.shake *= Math.exp(-6 * dt);
+    } else st.shake = 0;
 
     const boost = world.boosting.has(ship.id) ? BOOST_FOV : 0;
     st.fov += (BASE_FOV + boost - st.fov) * (1 - Math.exp(-5 * dt));

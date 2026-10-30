@@ -17,6 +17,12 @@ export interface FrameModelData {
   spinner?: { pivot: V3; geos: Geos; speed: number };
   /** Bulwark siege legs: geometry for one leg hanging down from its pivot; instanced at `pivots` (x sign => side). */
   legs?: { geos: Geos; pivots: V3[] };
+  /** Barrel + muzzle, separate so first-person view can keep it while hiding the hull (Bulwark). */
+  gun?: Geos;
+  /** Hover skirts + pads: lowered to ground contact when grounded (Bulwark). */
+  hover?: Geos;
+  /** Stabiliser fins for airborne siege: fin geometry extends +/-X from each pivot (side from pivot x). */
+  fins?: { geos: Geos; pivots: V3[] };
   /** Hover glow pads (Bulwark). */
   pads?: { pos: V3; r: number }[];
 }
@@ -152,22 +158,24 @@ function halo(tier: number, glow: boolean): FrameModelData {
 function bulwark(tier: number, glow: boolean): FrameModelData {
   const b = new Bricks();
   const band = tierBand(tier);
+  const h = new Bricks();
+  const gun = new Bricks();
   // hull
   b.box('primary', [3.6, 1.3, 5.2], [0, 0.1, 0.4], { studs: true });
   b.wedge('primary', [3.6, 1.0, 2.0], [0, 0.25, -3.1], { flip: true });
   // skirts
   for (const s of [1, -1]) {
-    b.box('dark', [0.7, 1.0, 6.2], [s * 2.1, -0.15, 0.3]);
-    b.box('accent', [0.06, 0.12, 5.4], [s * 2.47, -0.05, 0.3]);
-    b.wedge('dark', [0.7, 1.0, 1.2], [s * 2.1, -0.15, -3.5], { flip: true });
+    h.box('dark', [0.7, 1.0, 6.2], [s * 2.1, -0.15, 0.3]);
+    h.box('accent', [0.06, 0.12, 5.4], [s * 2.47, -0.05, 0.3]);
+    h.wedge('dark', [0.7, 1.0, 1.2], [s * 2.1, -0.15, -3.5], { flip: true });
     b.box('secondary', [0.9, 0.3, 1.3], [s * 2.1, 0.55, 0.9], { studs: true });
   }
   // turret
   b.cyl('dark', 1.15, 0.45, [0, 0.95, 0.2], { axis: 'y', seg: 16 });
   b.box('primary', [1.9, 0.9, 2.0], [0, 1.55, 0.2], { studs: true });
   b.wedge('primary', [1.9, 0.9, 1.0], [0, 1.55, -1.2], { flip: true });
-  b.cyl('dark', 0.2, 3.2, [0, 1.6, -2.6]);
-  b.cyl('secondary', 0.28, 0.5, [0, 1.6, -4.1]);
+  gun.cyl('dark', 0.2, 3.2, [0, 1.6, -2.6]);
+  gun.cyl('secondary', 0.28, 0.5, [0, 1.6, -4.1]);
   b.box('accent', [0.5, 0.12, 0.3], [0, 2.05, 0.2]);
   b.ellipsoid('glass', [0.7, 0.4, 0.8], [0, 2.0, -0.4], { top: true });
   // rear thrusters
@@ -182,8 +190,8 @@ function bulwark(tier: number, glow: boolean): FrameModelData {
 
   const pads = [[-1.4, -1.9], [1.4, -1.9], [-1.4, 1.9], [1.4, 1.9]].map(([x, z]) => ({ pos: [x!, -0.7, z!] as V3, r: 0.6 }));
   for (const p of pads) {
-    b.cyl('dark', 0.7, 0.2, [p.pos[0], -0.6, p.pos[2]], { axis: 'y' });
-    b.cyl('accent', 0.5, 0.06, [p.pos[0], -0.72, p.pos[2]], { axis: 'y' });
+    h.cyl('dark', 0.7, 0.2, [p.pos[0], -0.6, p.pos[2]], { axis: 'y' });
+    h.cyl('accent', 0.5, 0.06, [p.pos[0], -0.72, p.pos[2]], { axis: 'y' });
   }
 
   // siege leg: hangs down from its pivot
@@ -194,6 +202,15 @@ function bulwark(tier: number, glow: boolean): FrameModelData {
   l.box('accent', [0.1, 0.5, 0.1], [0, -1.6, 0.2]);
   return {
     body: b.build(),
+    gun: gun.build(),
+    hover: h.build(),
+    fins: (() => {
+      const f = new Bricks();
+      f.box('secondary', [1.8, 0.08, 1.1], [0.9, 0, 0]);
+      f.box('accent', [0.12, 0.12, 1.1], [1.8, 0, 0]);
+      f.wedge('dark', [1.2, 0.1, 0.8], [0.7, 0, 0.9], { rot: [0, 0, 0] });
+      return { geos: f.build(), pivots: [[-1.8, 0.2, -1.6], [1.8, 0.2, -1.6], [-1.8, 0.2, 2.2], [1.8, 0.2, 2.2]] as V3[] };
+    })(),
     engines,
     pads,
     legs: {

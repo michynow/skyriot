@@ -92,6 +92,12 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
         ))}
       </section>
 
+      <div className="lb-keys">
+        <span><b>MOUSE</b> steer</span><span><b>W/S</b> throttle</span><span><b>A/D</b> strafe · double-tap = roll</span>
+        <span><b>Q/E</b> down/up</span><span><b>SPACE</b> boost</span><span><b>SHIFT</b> brake{sel.frame === 'bulwark' ? ' · toggle Siege' : ''}</span>
+        <span><b>LMB/RMB</b> fire</span><span><b>1-0</b> hotbar</span><span><b>TAB</b> target</span><span><b>R</b> launch from deck</span>
+        {sel.frame === 'bulwark' && <span className="lb-bw"><b>BULWARK</b> hold Shift/Q near ground to land · W/S drive · E/Space lift off · Shift = Siege (first-person gunner)</span>}
+      </div>
       <footer>
         <label>
           CALLSIGN

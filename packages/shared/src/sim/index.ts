@@ -14,8 +14,11 @@ export interface Sim {
   readonly tuning: SimTuning;
   addShip(id: ShipId, spawn: ShipSpawn, at?: Vec3): ShipState;
   removeShip(id: ShipId): void;
-  /** Advance exactly one tick. Missing input for a Ship = EMPTY_INPUT. */
-  step(inputs: ReadonlyMap<ShipId, PilotInput>): SimEvent[];
+  /**
+   * Advance exactly one tick. Missing input for a Ship = EMPTY_INPUT. Ships in `frozen` skip their own
+   * logic this tick (a human whose input is late: stays in lockstep with client prediction).
+   */
+  step(inputs: ReadonlyMap<ShipId, PilotInput>, frozen?: ReadonlySet<ShipId>): SimEvent[];
   getShip(id: ShipId): ShipState | undefined;
   ships(): Iterable<ShipState>;
   /** Overwrite a Ship's state (client reconciliation). */

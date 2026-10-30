@@ -43,6 +43,14 @@ export function sanitizeInput(raw: unknown): PilotInput | null {
     hotbar: hotbar === null ? -1 : Math.trunc(hotbar),
     rollLeft: bool(r.rollLeft),
     rollRight: bool(r.rollRight),
+    launch: bool(r.launch),
+    target: sanitizeTarget(r.target),
     viewTick: viewTick === null ? 0 : Math.floor(viewTick),
   };
+}
+
+const MAX_TARGET_LENGTH = 64;
+
+function sanitizeTarget(v: unknown): string | null {
+  return typeof v === 'string' && v.length > 0 && v.length < MAX_TARGET_LENGTH ? v : null;
 }

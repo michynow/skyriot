@@ -1,5 +1,5 @@
 import { Vector3, type Camera } from 'three';
-import { EMPTY_INPUT, type PilotInput, type ShipId, type ShipState } from '@skyriot/shared';
+import { EMPTY_INPUT, FRAMES, TICK_DT, type PilotInput, type ShipId, type ShipState } from '@skyriot/shared';
 import { world } from '../state/world';
 
 /** Mutable input-side state shared with the HUD (read per frame, never React state). */
@@ -8,10 +8,28 @@ export const inputState = {
   typing: false,
   /** Called when Enter requests the chat line. Set by the HUD. */
   onOpenChat: null as (() => void) | null,
+  /** Last aim direction sent (unit, world space); HUD range feedback raycasts along it from the Ship. */
+  aim: [0, 0, -1] as [number, number, number],
 };
 
+const SETTINGS_KEY = 'skyriot.input';
+/** Mouse steering feel. Persisted; edited from the dev panel. */
+export const inputSettings = { sensitivity: 0.0007, deadzone: 0.06, recenter: false };
+try {
+  Object.assign(inputSettings, JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}'));
+} catch {
+  /* storage unavailable */
+}
+export function saveInputSettings(): void {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(inputSettings));
+  } catch {
+    /* ignore */
+  }
+}
+const RECENTER_RATE = 1.5; // 1/s decay of the cursor toward centre when enabled
+
 const DOUBLE_TAP_MS = 250;
-const SENSITIVITY = 0.0022;
 export const AIM_DISTANCE = 600;
 
 const keys = new Set<string>();
@@ -19,6 +37,7 @@ const lastTap: Record<string, number> = {};
 let rollLeft = false;
 let rollRight = false;
 let hotbar = -1;
+let launch = false;
 let fire1 = false;
 let fire2 = false;
 let lockFailed = false;
@@ -46,13 +65,15 @@ function reset() {
   world.freeLook = false;
 }
 
-/** Tab: select the next enemy (nearest first). Local only; the server derives locks from aim. */
+/** Tab: select the next enemy within radar range, nearest first. Sent as PilotInput.target. */
 export function cycleTarget(): void {
   const own = world.ownId ? world.ships.get(world.ownId) : undefined;
   if (!own) return;
+  const range = FRAMES[own.frame].radarRangeM;
   const enemies = [...world.ships.values()]
     .filter((s) => s.alive && s.nation !== own.nation)
     .map((s) => ({ id: s.id, d: Math.hypot(s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]) }))
+    .filter((e) => e.d <= range)
     .sort((a, b) => a.d - b.d);
   if (!enemies.length) {
     inputState.targetId = null;
@@ -92,6 +113,7 @@ export function attachInput(canvas: HTMLElement): () => void {
         lastTap[e.code] = -1e9;
       } else lastTap[e.code] = now;
     } else if (e.code === 'Tab') cycleTarget();
+    else if (e.code === 'KeyR' && !e.repeat) launch = true;
     else if (e.code.startsWith('Alt')) world.freeLook = true;
     else if (e.code.startsWith('Digit')) {
       const n = Number(e.code.slice(5));
@@ -107,8 +129,8 @@ export function attachInput(canvas: HTMLElement): () => void {
     pointerX = (e.clientX / window.innerWidth) * 2 - 1;
     pointerY = -((e.clientY / window.innerHeight) * 2 - 1);
     if (isLocked()) {
-      world.cursor.x += e.movementX * SENSITIVITY;
-      world.cursor.y -= e.movementY * SENSITIVITY;
+      world.cursor.x += e.movementX * inputSettings.sensitivity;
+      world.cursor.y -= e.movementY * inputSettings.sensitivity;
     } else if (lockFailed && !isUi(e.target)) {
       // Pointer lock refused (iframe, headless): fall back to the absolute mouse position.
       world.cursor.x = pointerX;
@@ -176,7 +198,15 @@ export function sampleInput(
   const k = (code: string) => (!typing && keys.has(code) ? 1 : 0);
 
   // Aim: cursor ray through the camera, converted to a direction from the Ship to a far point on it.
-  _aim.set(world.cursor.x, world.cursor.y, 0.5).unproject(camera);
+  if (inputSettings.recenter) {
+    const k = Math.exp(-RECENTER_RATE * TICK_DT);
+    world.cursor.x *= k;
+    world.cursor.y *= k;
+  }
+  const len = Math.hypot(world.cursor.x, world.cursor.y);
+  const dz = inputSettings.deadzone;
+  const scale = len <= dz ? 0 : (len - dz) / (1 - dz) / len;
+  _aim.set(world.cursor.x * scale, world.cursor.y * scale, 0.5).unproject(camera);
   _cam.setFromMatrixPosition(camera.matrixWorld);
   _aim.sub(_cam).normalize();
   let aim: [number, number, number] = [_aim.x, _aim.y, _aim.z];
@@ -191,6 +221,8 @@ export function sampleInput(
     }
   }
   if (!aim.every(Number.isFinite)) aim = [0, 0, -1];
+  inputState.aim = aim;
+  if (inputState.targetId && !world.ships.get(inputState.targetId)?.alive) inputState.targetId = null;
 
   const input: PilotInput = {
     ...EMPTY_INPUT,
@@ -200,15 +232,18 @@ export function sampleInput(
     throttle: k('KeyW') - k('KeyS'),
     strafe: k('KeyD') - k('KeyA'),
     vertical: k('KeyE') - k('KeyQ'),
-    boost: !!k('ShiftLeft') || !!k('ShiftRight'),
-    brake: !!k('Space'),
+    boost: !!k('Space'),
+    brake: !!k('ShiftLeft') || !!k('ShiftRight'),
     fire1: !typing && fire1,
     fire2: !typing && fire2,
     hotbar: typing ? -1 : hotbar,
     rollLeft: !typing && rollLeft,
     rollRight: !typing && rollRight,
+    launch: !typing && launch,
+    target: inputState.targetId,
   };
   rollLeft = rollRight = false;
+  launch = false;
   hotbar = -1;
   return input;
 }

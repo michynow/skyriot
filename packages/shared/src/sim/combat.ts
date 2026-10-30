@@ -1,16 +1,20 @@
-import { SIEGE } from '../content/frames';
 import { WEAPONS } from '../content/weapons';
+import { siegeLockConeMul, siegeMods } from './flight';
 import {
   LAG_COMP_MAX_MS,
   TICK_HZ,
   type PilotInput,
+  type WeaponDef,
   type ProjectileKind,
   type ShipId,
 } from '../types';
 import type { Projectile, ShipRec, SimCtx } from './ctx';
 import {
   LAG_HISTORY_TICKS,
-  LOCK_RETAIN_CONE_MUL,
+  MORTAR_GUIDE_TURN,
+  MORTAR_LOCK_CONE_RAD,
+  MORTAR_LOCK_SEC,
+  MORTAR_LOFT_RAD,
   NOSE_OFFSET,
   PROJECTILE_RADIUS,
   RAY_QUERY_GROUPS,
@@ -182,58 +186,50 @@ export function spawnProjectile(
   });
 }
 
-function acquireLock(
-  ctx: SimCtx,
-  rec: ShipRec,
-  cone: number,
-  range: number,
-  lockSec: number,
-): void {
+/** Missiles (and the siege mortar) lock only onto the selected target, if it is an enemy in cone and range. */
+function updateLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, sec: WeaponDef): void {
   const s = rec.state;
-  forwardOf(s.rot, _f);
-  if (s.lockTarget) {
-    const t = ctx.ships.get(s.lockTarget);
-    if (t && t.state.alive && t.flareTicks === 0) {
-      const dx = t.state.pos[0] - s.pos[0],
-        dy = t.state.pos[1] - s.pos[1],
-        dz = t.state.pos[2] - s.pos[2];
-      const d = Math.hypot(dx, dy, dz) || 1;
-      if (
-        d <= range &&
-        (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d >= Math.cos(cone * LOCK_RETAIN_CONE_MUL)
-      )
-        return;
+  let cone = sec.lockConeRad;
+  let range = sec.rangeM;
+  let lockSec = sec.lockTimeSec;
+  if (cone <= 0) {
+    if (sec.kind === 'shell' && s.sieged) {
+      cone = MORTAR_LOCK_CONE_RAD;
+      lockSec = MORTAR_LOCK_SEC;
+    } else {
+      s.lockTarget = null;
+      rec.lockCand = null;
+      rec.lockTime = 0;
+      return;
     }
-    s.lockTarget = null;
   }
-  const minCos = Math.cos(cone);
-  let best: ShipRec | null = null;
-  let bestCos = minCos;
-  for (const o of ctx.recList) {
-    const os = o.state;
-    if (!os.alive || os.nation === s.nation || o.flareTicks > 0) continue;
-    const dx = os.pos[0] - s.pos[0],
-      dy = os.pos[1] - s.pos[1],
-      dz = os.pos[2] - s.pos[2];
+  if (s.sieged) {
+    const mods = siegeMods(s);
+    cone *= siegeLockConeMul(s);
+    range *= mods.rangeMul;
+  }
+  const t = input.target ? ctx.ships.get(input.target) : undefined;
+  let valid = false;
+  if (t && t.state.alive && t.state.nation !== s.nation && t.state.flareTicks === 0) {
+    forwardOf(s.rot, _f);
+    const dx = t.state.pos[0] - s.pos[0],
+      dy = t.state.pos[1] - s.pos[1],
+      dz = t.state.pos[2] - s.pos[2];
     const d = Math.hypot(dx, dy, dz);
-    if (d > range || d < 1) continue;
-    const c = (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d;
-    if (c > bestCos) {
-      bestCos = c;
-      best = o;
-    }
+    valid = d <= range && d >= 1 && (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d >= Math.cos(cone);
   }
-  if (!best) {
+  if (!valid || !t) {
+    s.lockTarget = null;
     rec.lockCand = null;
     rec.lockTime = 0;
     return;
   }
-  if (best.state.id === rec.lockCand) rec.lockTime += ctx.dt;
+  if (rec.lockCand === t.state.id) rec.lockTime += ctx.dt;
   else {
-    rec.lockCand = best.state.id;
+    rec.lockCand = t.state.id;
     rec.lockTime = 0;
   }
-  if (rec.lockTime >= lockSec) s.lockTarget = rec.lockCand;
+  s.lockTarget = rec.lockTime >= lockSec ? t.state.id : null;
 }
 
 /** Lock-on progress and Primary/Secondary fire for one Ship. */
@@ -242,13 +238,16 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
   const fd = ctx.frames[s.frame];
   const weapons = [WEAPONS[fd.primary]!, WEAPONS[fd.secondary]!];
   const sec = weapons[1]!;
-  if (sec.lockConeRad > 0) acquireLock(ctx, rec, sec.lockConeRad, sec.rangeM, sec.lockTimeSec);
+  updateLock(ctx, rec, input, sec);
   const rewind = Math.min(Math.max(ctx.tick - input.viewTick, 0), MAX_REWIND_TICKS);
   const fire = [input.fire1, input.fire2];
   for (let i = 0; i < 2; i++) {
     rec.fireCd[i] = Math.max(rec.fireCd[i]! - ctx.dt, -ctx.dt);
     const w = weapons[i]!;
-    if (!fire[i] || rec.fireCd[i]! > 0) continue;
+    const ammo = i === 0 ? s.ammo1 : s.ammo2;
+    if (!fire[i] || rec.fireCd[i]! > 0 || ammo <= 0) continue;
+    if (i === 0) s.ammo1--;
+    else s.ammo2--;
     rec.fireCd[i] = rec.fireCd[i]! + w.fireIntervalSec;
     forwardOf(s.rot, _f);
     rightOf(s.rot, _r);
@@ -264,19 +263,39 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
     dx /= dl;
     dy /= dl;
     dz /= dl;
-    const siege = s.sieged;
-    const target = w.homingTurnRate > 0 ? s.lockTarget : null;
+    const mods = s.sieged ? siegeMods(s) : null;
+    let homing = w.homingTurnRate;
+    let target = homing > 0 ? s.lockTarget : null;
+    if (i === 1 && w.kind === 'shell' && s.sieged && s.lockTarget) {
+      // Siege mortar: loft toward the locked target, mild guidance pulls the shell down onto it.
+      const t = ctx.ships.get(s.lockTarget);
+      if (t) {
+        const tx = t.state.pos[0] - s.pos[0],
+          ty = t.state.pos[1] - s.pos[1],
+          tz = t.state.pos[2] - s.pos[2];
+        const tl = Math.hypot(tx, ty, tz) || 1;
+        dx = tx / tl;
+        dy = ty / tl + Math.tan(MORTAR_LOFT_RAD);
+        dz = tz / tl;
+        const ll = Math.hypot(dx, dy, dz);
+        dx /= ll;
+        dy /= ll;
+        dz /= ll;
+        homing = MORTAR_GUIDE_TURN;
+        target = s.lockTarget;
+      }
+    }
     const nose = fd.halfLength + NOSE_OFFSET;
     spawnProjectile(
       ctx,
       rec,
       w.kind,
       w.id,
-      w.damage * (siege ? SIEGE.damageMul : 1),
+      w.damage * (mods ? mods.damageMul : 1),
       w.splashRadius,
       w.speed,
-      w.rangeM * (siege ? SIEGE.rangeMul : 1),
-      w.homingTurnRate,
+      w.rangeM * (mods ? mods.rangeMul : 1),
+      homing,
       target,
       s.pos[0] + _f[0]! * nose,
       s.pos[1] + _f[1]! * nose,
@@ -332,7 +351,7 @@ export function stepProjectiles(ctx: SimCtx): void {
 
     if (p.homing > 0 && p.target) {
       const t = ctx.ships.get(p.target);
-      if (!t || !t.state.alive || t.flareTicks > 0) {
+      if (!t || !t.state.alive || t.state.flareTicks > 0) {
         p.target = null;
       } else {
         let tx = t.state.pos[0] - p.x,

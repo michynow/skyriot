@@ -24,13 +24,8 @@ export interface ShipRec {
   collider: Collider;
   /** World-space velocity not along the nose (strafe, vertical, roll, stall fall). Derivable from state. */
   lat: [number, number, number];
-  prevBrake: boolean;
   fireCd: [number, number];
   shieldDelay: number;
-  dashTicks: number;
-  ghostTicks: number;
-  ironTicks: number;
-  flareTicks: number;
   lockCand: ShipId | null;
   lockTime: number;
   spawnCounter: number;

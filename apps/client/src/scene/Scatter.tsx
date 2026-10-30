@@ -144,7 +144,7 @@ function Instances({ geo, spots, mat, fill }: {
 export function Scatter({ map, hf }: { map: MapDef; hf: Heightfield }) {
   const stuff = useMemo(() => {
     const rnd = mulberry32(map.seed ^ 0x5eed);
-    const rocks = place(hf, map, rnd, 900, () => true);
+    const rocks = place(hf, map, rnd, 320, (s) => s.slope > 0.12);
     const buttes = place(hf, map, rnd, 26, (s) => s.slope < 0.12 && s.y < map.maxHeight * 0.4);
     const towers = place(hf, map, rnd, 34, (s) => s.slope < 0.1 && s.y < map.maxHeight * 0.55);
     const pylons = place(hf, map, rnd, 45, (s) => s.slope < 0.2);
@@ -154,7 +154,7 @@ export function Scatter({ map, hf }: { map: MapDef; hf: Heightfield }) {
   }, [map, hf]);
 
   const fillRock = useMemo(() => (o: THREE.Object3D, s: Spot, r: () => number) => {
-    const k = 2 + Math.pow(r(), 3) * 16;
+    const k = 1.5 + Math.pow(r(), 4) * 10;
     o.scale.set(k * (0.8 + r() * 0.6), k * (0.6 + r() * 0.5), k * (0.8 + r() * 0.6));
     o.rotation.set((r() - 0.5) * 0.4, r() * 6.28, (r() - 0.5) * 0.4);
     o.position.y = s.y + k * 0.15;

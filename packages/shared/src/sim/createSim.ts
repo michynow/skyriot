@@ -16,6 +16,9 @@ import {
 import type { Sim, SimOptions, SimTuning } from './index';
 import type { ShipRec, SimCtx } from './ctx';
 import {
+  DECK_HALF_THICKNESS,
+  DOCK_CLEARANCE,
+  DECK_RESPAWN_SPREAD,
   KCC_OFFSET,
   LAG_HISTORY_TICKS,
   SHIP_GROUPS,
@@ -50,6 +53,16 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     }).setCollisionGroups(TERRAIN_GROUPS),
   );
   world.step(); // populate broad phase so queries see the terrain
+  for (const nation of ['concord', 'vex'] as const) {
+    for (const deck of map.launchDecks[nation]) {
+      // Thin cylinder whose top face is the deck surface.
+      world.createCollider(
+        R.ColliderDesc.cylinder(DECK_HALF_THICKNESS, deck.radius)
+          .setTranslation(deck.pos[0], deck.pos[1] - DECK_HALF_THICKNESS, deck.pos[2])
+          .setCollisionGroups(TERRAIN_GROUPS),
+      );
+    }
+  }
   const controller = world.createCharacterController(KCC_OFFSET);
   controller.setSlideEnabled(true);
 
@@ -133,14 +146,21 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.lockTarget = null;
     s.cooldowns.fill(0);
     rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;
-    rec.dashTicks = rec.ghostTicks = rec.ironTicks = rec.flareTicks = 0;
+    s.ammo1 = fd.ammo1Max;
+    s.ammo2 = fd.ammo2Max;
+    s.docked = false;
+    s.grounded = false;
+    s.dockTicks = 0;
+    s.brakeHeld = false;
+    s.angVel[0] = s.angVel[1] = s.angVel[2] = 0;
+    s.dashTicks = s.ghostTicks = s.ironTicks = s.flareTicks = 0;
     rec.lockCand = null;
     rec.lockTime = 0;
     rec.shieldDelay = 0;
     rec.fireCd[0] = rec.fireCd[1] = 0;
   }
 
-  function placeAndLaunch(rec: ShipRec, at: Vec3): void {
+  function placeAndLaunch(rec: ShipRec, at: Vec3, docked: boolean): void {
     const s = rec.state;
     s.pos[0] = at[0];
     s.pos[1] = at[1];
@@ -149,10 +169,37 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     resetVitals(rec);
     const f = [0, 0, 0];
     forwardOf(s.rot, f);
+    if (docked) {
+      s.docked = true;
+      s.speed = 0;
+    }
     s.vel[0] = f[0]! * s.speed;
     s.vel[1] = f[1]! * s.speed;
     s.vel[2] = f[2]! * s.speed;
     syncBody(ctx, rec);
+  }
+
+  /** Respawn / first spawn: docked on a deck of the Ship's nation; free-air spawns are only a fallback. */
+  function placeAtBase(rec: ShipRec): void {
+    const s = rec.state;
+    const decks = map.launchDecks[s.nation];
+    if (decks.length === 0) {
+      placeAndLaunch(rec, pickSpawn(s.nation), false);
+      return;
+    }
+    const deck = decks[spawnCursor[s.nation]++ % decks.length]!;
+    const a = ctx.rng() * Math.PI * 2;
+    const r = Math.sqrt(ctx.rng()) * deck.radius * DECK_RESPAWN_SPREAD;
+    const fd = frames[s.frame];
+    placeAndLaunch(
+      rec,
+      [
+        deck.pos[0] + Math.cos(a) * r,
+        deck.pos[1] + fd.radius + DOCK_CLEARANCE,
+        deck.pos[2] + Math.sin(a) * r,
+      ],
+      true,
+    );
   }
 
   function makeRec(id: ShipId, spawn: ShipSpawn, at: Vec3): ShipRec {
@@ -181,6 +228,17 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       sieged: false,
       cooldowns: new Array<number>(fd.hotbar.length).fill(0),
       lockTarget: null,
+      ammo1: fd.ammo1Max,
+      ammo2: fd.ammo2Max,
+      docked: false,
+      grounded: false,
+      angVel: [0, 0, 0],
+      brakeHeld: false,
+      dashTicks: 0,
+      ghostTicks: 0,
+      ironTicks: 0,
+      flareTicks: 0,
+      dockTicks: 0,
     };
     const body = world.createRigidBody(
       R.RigidBodyDesc.kinematicPositionBased().setTranslation(at[0], at[1], at[2]),
@@ -198,13 +256,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       body,
       collider,
       lat: [0, 0, 0],
-      prevBrake: false,
       fireCd: [0, 0],
       shieldDelay: 0,
-      dashTicks: 0,
-      ghostTicks: 0,
-      ironTicks: 0,
-      flareTicks: 0,
       lockCand: null,
       lockTime: 0,
       spawnCounter: 0,
@@ -216,11 +269,12 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
   function addShip(id: ShipId, spawn: ShipSpawn, at?: Vec3): ShipState {
     if (ctx.ships.has(id)) removeShip(id);
     refreshFrames();
-    const rec = makeRec(id, spawn, at ?? pickSpawn(spawn.nation));
+    const rec = makeRec(id, spawn, at ?? [0, 0, 0]);
     ctx.ships.set(id, rec);
     ctx.list.push(rec.state);
     ctx.recList.push(rec);
-    placeAndLaunch(rec, rec.state.pos as Vec3);
+    if (at) placeAndLaunch(rec, at, false);
+    else placeAtBase(rec);
     return rec.state;
   }
 
@@ -235,7 +289,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
   }
 
   function respawn(rec: ShipRec): void {
-    placeAndLaunch(rec, pickSpawn(rec.state.nation));
+    placeAtBase(rec);
     ctx.events.push({
       type: 'shipRespawned',
       id: rec.state.id,
@@ -251,7 +305,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     addShip,
     removeShip,
 
-    step(inputs) {
+    step(inputs, frozen) {
       const events: SimEvent[] = [];
       ctx.events = events;
       refreshFrames();
@@ -263,6 +317,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
           tickTimers(rec);
           continue;
         }
+        // Frozen = a human whose input hasn't arrived; skipping keeps seq-for-seq lockstep with prediction.
+        if (frozen?.has(s.id)) continue;
         stepFlight(ctx, rec, input, ctx.authoritative);
         if (!ctx.authoritative) continue;
         if (s.alive) {
@@ -289,12 +345,13 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
         addShip(id, state, state.pos);
         rec = ctx.ships.get(id)!;
       }
-      const { pos, rot, vel, cooldowns, ...scalars } = state;
+      const { pos, rot, vel, cooldowns, angVel, ...scalars } = state;
       const s = rec.state;
       Object.assign(s, scalars);
       for (let i = 0; i < 3; i++) {
         s.pos[i] = pos[i]!;
         s.vel[i] = vel[i]!;
+        s.angVel[i] = angVel[i]!;
       }
       for (let i = 0; i < 4; i++) s.rot[i] = rot[i]!;
       s.cooldowns.length = 0;
@@ -308,9 +365,10 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       if (!rec) return;
       ctx.events = discard;
       refreshFrames();
+      // Same order as step(): flight, timers, then Skills.
+      stepFlight(ctx, rec, input, false);
       tickTimers(rec);
       useHotbar(ctx, rec, input.hotbar, true);
-      stepFlight(ctx, rec, input, false);
       discard.length = 0;
     },
 

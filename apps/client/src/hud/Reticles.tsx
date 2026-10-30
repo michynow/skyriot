@@ -1,18 +1,35 @@
 import { useEffect, useRef } from 'react';
-import { FRAMES, WEAPONS, type ShipState } from '@skyriot/shared';
+import {
+  FRAMES,
+  SIEGE,
+  SIEGE_AIR,
+  WEAPONS,
+  sampleHeight,
+  type Heightfield,
+  type ShipState,
+  type WeaponDef,
+} from '@skyriot/shared';
 import { world } from '../state/world';
 import { inputState } from '../input/input';
+import { isGrounded } from './hudStore';
 import { project } from './view';
 
 const MARKERS = 40;
+const LADDER = 8;
 const NOSE_DISTANCE = 500;
 export const NATION_COLOR = { concord: '#f2c24b', vex: '#ff5a3c' } as const;
+const ENEMY = '#ff4d4d';
+const ALLY = '#ffffff';
+const RING_LEN = 2 * Math.PI * 34;
 const p = { x: 0, y: 0 };
 
 function place(el: HTMLElement | null, x: number, y: number, show: boolean) {
   if (!el) return;
   el.style.display = show ? 'block' : 'none';
   if (show) el.style.transform = `translate(${x}px,${y}px)`;
+}
+function setText(el: HTMLElement | null, text: string) {
+  if (el && el.textContent !== text) el.textContent = text;
 }
 
 /** First-order intercept: smallest t > 0 with |r + v t| = s t. */
@@ -30,16 +47,43 @@ function leadTime(r: number[], v: number[], s: number): number {
   return Number.isFinite(t) ? Math.min(t, 3) : 0;
 }
 
-/** Per-frame HUD layer: cursor, nose reticle, lead marker, target bracket, ship markers. DOM refs only. */
+/** Distance along a ray to the heightfield (coarse march + bisection), or null if none within maxD. */
+function terrainHit(hf: Heightfield, o: number[], d: number[], maxD: number): number | null {
+  const step = 25;
+  let prev = 0;
+  for (let t = step; t <= maxD; t += step) {
+    if (o[1]! + d[1]! * t < sampleHeight(hf, o[0]! + d[0]! * t, o[2]! + d[2]! * t)) {
+      let lo = prev;
+      let hi = t;
+      for (let i = 0; i < 6; i++) {
+        const m = (lo + hi) / 2;
+        if (o[1]! + d[1]! * m < sampleHeight(hf, o[0]! + d[0]! * m, o[2]! + d[2]! * m)) hi = m;
+        else lo = m;
+      }
+      return hi;
+    }
+    prev = t;
+  }
+  return null;
+}
+
+const weapon = (id: string): WeaponDef | undefined => WEAPONS[id];
+
+/** Per-frame HUD layer: cursor + range feedback, nose reticle, lead, single Target marker, name tags. */
 export function Reticles() {
-  const root = useRef<HTMLDivElement>(null);
   const cursorEl = useRef<HTMLDivElement>(null);
+  const crDist = useRef<HTMLSpanElement>(null);
+  const crTag = useRef<HTMLSpanElement>(null);
+  const crMax = useRef<HTMLSpanElement>(null);
   const noseEl = useRef<HTMLDivElement>(null);
   const leadEl = useRef<HTMLDivElement>(null);
   const targetEl = useRef<HTMLDivElement>(null);
+  const targetLabel = useRef<HTMLSpanElement>(null);
   const lockBar = useRef<HTMLDivElement>(null);
+  const gunnerEl = useRef<HTMLDivElement>(null);
+  const ringEl = useRef<SVGCircleElement>(null);
+  const ladderEls = useRef<(HTMLDivElement | null)[]>([]);
   const markerEls = useRef<(HTMLDivElement | null)[]>([]);
-  const labelEls = useRef<(HTMLSpanElement | null)[]>([]);
 
   useEffect(() => {
     let raf = 0;
@@ -55,96 +99,159 @@ export function Reticles() {
       const W = window.innerWidth;
       const H = window.innerHeight;
       const own = world.ownId ? world.ships.get(world.ownId) : undefined;
-      place(cursorEl.current, (world.cursor.x * 0.5 + 0.5) * W, (-world.cursor.y * 0.5 + 0.5) * H, true);
+      const cx = (world.cursor.x * 0.5 + 0.5) * W;
+      const cy = (-world.cursor.y * 0.5 + 0.5) * H;
       if (!own || !own.alive) {
+        place(cursorEl.current, cx, cy, true);
         place(noseEl.current, 0, 0, false);
         place(leadEl.current, 0, 0, false);
         place(targetEl.current, 0, 0, false);
+        place(gunnerEl.current, 0, 0, false);
         markerEls.current.forEach((m) => place(m, 0, 0, false));
         return;
       }
+      const def = FRAMES[own.frame];
+      const sieged = own.sieged;
+      const siegeMul = sieged ? (isGrounded(own) ? SIEGE : SIEGE_AIR) : null;
+      const rangeMul = siegeMul?.rangeMul ?? 1;
+      const coneMul = sieged && !isGrounded(own) ? SIEGE_AIR.lockConeMul : 1;
+      const primary = weapon(def.primary);
+      const secondary = weapon(def.secondary);
+      const primRange = (primary?.rangeM ?? 0) * rangeMul;
+      const secRange = (secondary?.rangeM ?? 0) * rangeMul;
+      const radar = def.radarRangeM;
+
       const [qx, qy, qz, qw] = own.rot;
       const fx = -2 * (qx * qz + qw * qy);
       const fy = -2 * (qy * qz - qw * qx);
       const fz = -(1 - 2 * (qx * qx + qy * qy));
-      const ok = project(
-        own.pos[0] + fx * NOSE_DISTANCE,
-        own.pos[1] + fy * NOSE_DISTANCE,
-        own.pos[2] + fz * NOSE_DISTANCE,
-        p,
-      );
-      place(noseEl.current, p.x, p.y, ok);
 
-      // Ship markers: nearest N others.
+      // Visible others + their distances.
       const others: { s: ShipState; d: number }[] = [];
       for (const s of world.ships.values()) {
         if (s.id === own.id || !s.alive) continue;
-        others.push({ s, d: Math.hypot(s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]) });
+        const d = Math.hypot(s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]);
+        if (d <= radar) others.push({ s, d });
       }
       others.sort((a, b) => a.d - b.d);
-      for (let i = 0; i < MARKERS; i++) {
-        const el = markerEls.current[i] ?? null;
-        const o = others[i];
-        if (!o || !el) {
-          place(el, 0, 0, false);
-          continue;
-        }
-        const on = project(o.s.pos[0], o.s.pos[1], o.s.pos[2], p);
-        place(el, p.x, p.y, on);
-        if (!on) continue;
-        const enemy = o.s.nation !== own.nation;
-        const color = NATION_COLOR[o.s.nation];
-        el.style.setProperty('--c', color);
-        el.dataset.enemy = enemy ? '1' : '0';
-        el.dataset.target = o.s.id === inputState.targetId ? '1' : '0';
-        const label = `${o.s.name} ${Math.round(o.d / 10) * 10}m`;
-        if (labelCache[i] !== label) {
-          labelCache[i] = label;
-          const span = labelEls.current[i];
-          if (span) span.textContent = label;
-        }
-      }
 
-      // Target: lead indicator + lock progress.
+      // Target (single, Tab-selected).
       let target = inputState.targetId ? world.ships.get(inputState.targetId) : undefined;
       if (target && (!target.alive || target.nation === own.nation)) {
         inputState.targetId = null;
         target = undefined;
       }
-      if (!target) {
+      const rel = target ? [target.pos[0] - own.pos[0], target.pos[1] - own.pos[1], target.pos[2] - own.pos[2]] : null;
+      const targetD = rel ? Math.hypot(rel[0]!, rel[1]!, rel[2]!) : Infinity;
+
+      // What's under the aim: nearest enemy near the aim ray, else terrain hit.
+      const aim = inputState.aim;
+      let underD: number | null = null;
+      let underEnemy = false;
+      for (const o of others) {
+        if (o.s.nation === own.nation) continue;
+        const rx = o.s.pos[0] - own.pos[0];
+        const ry = o.s.pos[1] - own.pos[1];
+        const rz = o.s.pos[2] - own.pos[2];
+        const t = rx * aim[0] + ry * aim[1] + rz * aim[2];
+        if (t <= 0) continue;
+        const perp = Math.sqrt(Math.max(0, o.d * o.d - t * t));
+        if (perp < Math.max(FRAMES[o.s.frame].radius * 2.5, t * 0.03) && (underD === null || t < underD)) {
+          underD = t;
+          underEnemy = true;
+        }
+      }
+      if (underD === null && world.heightfield) underD = terrainHit(world.heightfield, own.pos, aim, 3500);
+
+      const inRange = (underEnemy && underD! <= primRange) || targetD <= primRange;
+      let lockRange = false;
+      if (rel && secondary && secondary.lockTimeSec > 0 && targetD <= secRange) {
+        const cos = (rel[0]! * fx + rel[1]! * fy + rel[2]! * fz) / (targetD || 1);
+        lockRange = Math.acos(Math.min(1, Math.max(-1, cos))) < secondary.lockConeRad * coneMul;
+      }
+
+      const cur = cursorEl.current;
+      place(cur, cx, cy, !sieged);
+      if (cur) {
+        cur.classList.toggle('inrange', inRange);
+        cur.classList.toggle('lockrange', lockRange);
+      }
+      const distText = underD === null ? '' : `${Math.round(underD)} m`;
+      setText(crDist.current, distText);
+      setText(crTag.current, lockRange ? 'LOCK RANGE' : inRange ? 'IN RANGE' : '');
+      setText(crMax.current, `R ${Math.round(primRange)}`);
+
+      // Nose reticle (where the guns point).
+      const noseOk = project(own.pos[0] + fx * NOSE_DISTANCE, own.pos[1] + fy * NOSE_DISTANCE, own.pos[2] + fz * NOSE_DISTANCE, p);
+      place(noseEl.current, p.x, p.y, noseOk && !sieged);
+
+      // Name tags: name + distance only, red enemy / white ally.
+      for (let i = 0; i < MARKERS; i++) {
+        const el = markerEls.current[i] ?? null;
+        const o = others[i];
+        if (!o || !el || o.s.id === target?.id) {
+          place(el, 0, 0, false);
+          continue;
+        }
+        const on = project(o.s.pos[0], o.s.pos[1] + 6, o.s.pos[2], p);
+        place(el, p.x, p.y, on);
+        if (!on) continue;
+        el.style.color = o.s.nation === own.nation ? ALLY : ENEMY;
+        const label = `${o.s.name} · ${Math.round(o.d / 10) * 10}m`;
+        if (labelCache[i] !== label) {
+          labelCache[i] = label;
+          el.textContent = label;
+        }
+      }
+
+      // Range ladder + gunner info for first-person Siege.
+      const gun = gunnerEl.current;
+      place(gun, cx, cy, sieged);
+      if (sieged) {
+        const hl = Math.hypot(fx, fz) || 1;
+        const hf = world.heightfield;
+        const maxR = secRange || primRange;
+        for (let i = 0; i < LADDER; i++) {
+          const el = ladderEls.current[i] ?? null;
+          const r = ((i + 1) / LADDER) * maxR;
+          const wx = own.pos[0] + (fx / hl) * r;
+          const wz = own.pos[2] + (fz / hl) * r;
+          const wy = hf ? sampleHeight(hf, wx, wz) : own.pos[1];
+          const ok = project(wx, wy, wz, p);
+          if (el) {
+            el.style.display = ok ? 'block' : 'none';
+            if (ok) el.style.transform = `translate(0px,${p.y - cy}px)`;
+            setText(el.firstElementChild as HTMLElement, String(Math.round(r)));
+          }
+        }
+      }
+
+      // Target marker, lead indicator, lock progress.
+      if (!target || !rel) {
         place(leadEl.current, 0, 0, false);
         place(targetEl.current, 0, 0, false);
         lockProgress = 0;
+        if (ringEl.current) ringEl.current.style.strokeDashoffset = String(RING_LEN);
         return;
       }
-      const def = FRAMES[own.frame];
-      const primary = WEAPONS[def.primary];
-      const secondary = WEAPONS[def.secondary];
-      const rel = [target.pos[0] - own.pos[0], target.pos[1] - own.pos[1], target.pos[2] - own.pos[2]];
       const t = primary ? leadTime(rel, target.vel, primary.speed) : 0;
-      const onLead = project(
-        target.pos[0] + target.vel[0] * t,
-        target.pos[1] + target.vel[1] * t,
-        target.pos[2] + target.vel[2] * t,
-        p,
-      );
-      place(leadEl.current, p.x, p.y, onLead);
+      const onLead = project(target.pos[0] + target.vel[0] * t, target.pos[1] + target.vel[1] * t, target.pos[2] + target.vel[2] * t, p);
+      place(leadEl.current, p.x, p.y, onLead && targetD <= primRange);
       const onTarget = project(target.pos[0], target.pos[1], target.pos[2], p);
       place(targetEl.current, p.x, p.y, onTarget);
+      setText(targetLabel.current, `${target.name} · ${Math.round(targetD)}m`);
 
-      // Lock progress is a client estimate: time spent with the target inside the missile cone.
+      // Lock progress is a client estimate: time with the Target inside the secondary's range and cone.
       if (lockFor !== target.id) {
         lockFor = target.id;
         lockProgress = 0;
       }
-      if (secondary && secondary.kind === 'missile' && secondary.lockTimeSec > 0) {
-        const len = Math.hypot(rel[0]!, rel[1]!, rel[2]!) || 1;
-        const cos = (rel[0]! * fx + rel[1]! * fy + rel[2]! * fz) / len;
-        const inCone = Math.acos(Math.min(1, Math.max(-1, cos))) < secondary.lockConeRad;
-        lockProgress = Math.min(1, Math.max(0, lockProgress + (inCone ? dt : -dt * 2) / secondary.lockTimeSec));
+      if (secondary && secondary.lockTimeSec > 0) {
+        lockProgress = Math.min(1, Math.max(0, lockProgress + (lockRange ? dt : -dt * 2) / secondary.lockTimeSec));
         if (own.lockTarget === target.id) lockProgress = 1;
       } else lockProgress = 0;
       if (lockBar.current) lockBar.current.style.width = `${lockProgress * 100}%`;
+      if (ringEl.current) ringEl.current.style.strokeDashoffset = String(RING_LEN * (1 - lockProgress));
       if (targetEl.current) targetEl.current.dataset.locked = lockProgress >= 1 ? '1' : '0';
     };
     raf = requestAnimationFrame(frame);
@@ -152,22 +259,38 @@ export function Reticles() {
   }, []);
 
   return (
-    <div ref={root} className="hud-layer">
+    <div className="hud-layer">
       {Array.from({ length: MARKERS }, (_, i) => (
-        <div key={i} className="mk" ref={(el) => void (markerEls.current[i] = el)} style={{ display: 'none' }}>
-          <div className="mk-box" />
-          <span className="mk-label" ref={(el) => void (labelEls.current[i] = el)} />
-        </div>
+        <div key={i} className="mk" ref={(el) => void (markerEls.current[i] = el)} style={{ display: 'none' }} />
       ))}
       <div className="target-br" ref={targetEl} style={{ display: 'none' }}>
         <div className="tb" />
+        <span className="tb-label" ref={targetLabel} />
         <div className="lockbar">
           <div ref={lockBar} />
         </div>
       </div>
       <div className="lead" ref={leadEl} style={{ display: 'none' }} />
       <div className="nose" ref={noseEl} style={{ display: 'none' }} />
-      <div className="cursor" ref={cursorEl} />
+      <div className="cursor" ref={cursorEl}>
+        <span className="cr-dist" ref={crDist} />
+        <span className="cr-tag" ref={crTag} />
+        <span className="cr-max" ref={crMax} />
+      </div>
+      <div className="gunner" ref={gunnerEl} style={{ display: 'none' }}>
+        <svg width="90" height="90" viewBox="-45 -45 90 90">
+          <circle r="34" className="g-track" />
+          <circle ref={ringEl} r="34" className="g-lock" strokeDasharray={RING_LEN} strokeDashoffset={RING_LEN} transform="rotate(-90)" />
+          <path d="M-44 0h24M20 0h24M0 -44v24M0 20v24" className="g-cross" />
+        </svg>
+        <div className="ladder">
+          {Array.from({ length: LADDER }, (_, i) => (
+            <div key={i} ref={(el) => void (ladderEls.current[i] = el)} className="rung">
+              <span />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

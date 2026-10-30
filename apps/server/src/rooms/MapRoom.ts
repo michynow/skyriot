@@ -32,8 +32,11 @@ const TICK_MS = 1000 / TICK_HZ;
 const SNAPSHOT_MS = 1000 / SNAPSHOT_HZ;
 const LOOP_INTERVAL_MS = 5;
 const MAX_CATCHUP_TICKS = 4;
-const MAX_INPUT_QUEUE = 6;
-const QUEUE_TRIM_TO = 3;
+/** Inputs to accumulate before (re)starting consumption, so one late packet doesn't stall the Ship. */
+const JITTER_BUFFER = 2;
+/** Above this many queued inputs, one extra input is run per tick to catch up (never dropped). */
+const CATCHUP_BUFFER = 4;
+const MAX_INPUT_QUEUE = 30;
 const SLOW_TICK_MS = 8;
 const SLOW_LOG_INTERVAL_MS = 5000;
 const MAX_NAME_LENGTH = 16;
@@ -53,6 +56,7 @@ interface HumanSlot {
   queue: PilotInput[];
   last: PilotInput | null;
   ack: number;
+  buffering: boolean;
 }
 
 // Colyseus API code: this class is a Map Instance.
@@ -71,6 +75,7 @@ export class MapRoom extends Room {
   private accTick = 0;
   private accSnapshot = 0;
   private lastSlowLog = 0;
+  private frozen = new Set<ShipId>();
   private stepInputs = new Map<ShipId, PilotInput>();
 
   onCreate(options: { mapId?: string }) {
@@ -85,8 +90,7 @@ export class MapRoom extends Room {
       const input = sanitizeInput(raw);
       if (!slot || !input || input.seq <= slot.ack) return;
       slot.queue.push(input);
-      if (slot.queue.length > MAX_INPUT_QUEUE)
-        slot.queue.splice(0, slot.queue.length - QUEUE_TRIM_TO);
+      if (slot.queue.length > MAX_INPUT_QUEUE) slot.queue.shift();
     });
 
     this.onMessage(MSG.chat, (client, msg: ChatMessage) => {
@@ -123,7 +127,7 @@ export class MapRoom extends Room {
     this.makeSlot(nation);
     const id = client.sessionId;
     this.sim.addShip(id, { nation, frame, name, isBot: false, tier: 1, upgrade: 0 });
-    this.humans.set(id, { queue: [], last: null, ack: 0 });
+    this.humans.set(id, { queue: [], last: null, ack: 0, buffering: true });
     this.byId.set(id, client);
     const welcome: Welcome = {
       shipId: id,
@@ -192,7 +196,10 @@ export class MapRoom extends Room {
           tier: 1,
           upgrade: 0,
         });
-        this.bots.set(id, createBotMemory(this.hf, this.botCounter * 7919));
+        this.bots.set(
+          id,
+          createBotMemory(this.hf, this.botCounter * 7919, this.map.launchDecks[nation]),
+        );
         total++;
       }
       while (this.count(nation) > this.botsPerNation && this.removeBot(nation));
@@ -221,19 +228,30 @@ export class MapRoom extends Room {
     const t0 = performance.now();
     const inputs = this.stepInputs;
     inputs.clear();
+    const frozen = this.frozen;
+    frozen.clear();
     for (const [id, slot] of this.humans) {
-      const next = slot.queue.shift();
+      if (slot.buffering && slot.queue.length >= JITTER_BUFFER) slot.buffering = false;
+      const next = slot.buffering ? undefined : slot.queue.shift();
       if (next) {
         slot.last = next;
         slot.ack = next.seq;
         inputs.set(id, next);
-      } else if (slot.last) {
-        // No fresh input: hold the last one but never repeat one-shot actions.
-        inputs.set(id, { ...slot.last, hotbar: -1, rollLeft: false, rollRight: false });
+      } else {
+        // Late input: freeze this Ship for the tick so server and prediction stay seq-for-seq in step.
+        frozen.add(id);
+        slot.buffering = true;
       }
     }
     for (const [id, mem] of this.bots) inputs.set(id, botBrain(this.sim, id, mem));
-    const events = this.sim.step(inputs);
+    const events = this.sim.step(inputs, frozen);
+    for (const [id, slot] of this.humans) {
+      if (slot.queue.length > CATCHUP_BUFFER) {
+        const extra = slot.queue.shift()!;
+        this.sim.stepLocal(id, extra);
+        slot.ack = extra.seq;
+      }
+    }
     if (events.length > 0) this.broadcast(MSG.events, events);
     const ms = performance.now() - t0;
     if (ms > SLOW_TICK_MS && t0 - this.lastSlowLog > SLOW_LOG_INTERVAL_MS) {
@@ -245,10 +263,25 @@ export class MapRoom extends Room {
   }
 
   private sendSnapshots(): void {
-    const ships = [...this.sim.ships()];
-    const base = { tick: this.sim.tick, serverTimeMs: Date.now(), ships };
+    const all = [...this.sim.ships()];
+    const base = { tick: this.sim.tick, serverTimeMs: Date.now() };
     for (const [id, client] of this.byId) {
-      const snapshot: Snapshot = { ...base, ack: this.humans.get(id)?.ack ?? 0 };
+      const me = this.sim.getShip(id);
+      let ships = all;
+      if (me) {
+        // Radar: allies always, enemies only within this Frame's radar range.
+        const range2 = FRAMES[me.frame].radarRangeM ** 2;
+        ships = all.filter(
+          (o) =>
+            o.id === id ||
+            o.nation === me.nation ||
+            (o.pos[0] - me.pos[0]) ** 2 +
+              (o.pos[1] - me.pos[1]) ** 2 +
+              (o.pos[2] - me.pos[2]) ** 2 <=
+              range2,
+        );
+      }
+      const snapshot: Snapshot = { ...base, ack: this.humans.get(id)?.ack ?? 0, ships };
       client.send(MSG.snapshot, snapshot);
     }
   }

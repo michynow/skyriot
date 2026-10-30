@@ -20,7 +20,8 @@ function mk(id: string, frame: FrameId, nation: NationId, tier: number, upgrade:
   return {
     id, nation, frame, name: id, isBot: true, tier, upgrade,
     pos: [0, 0, 0], rot: [0, 0, 0, 1], vel: [0, 0, 0], hp: d.maxHp, maxHp: d.maxHp, shield: d.maxShield, maxShield: d.maxShield,
-    fuel: 1, speed: 100, alive: true, respawnAtTick: 0, rollTicks: 0, rollCooldownTicks: 0, sieged: false, cooldowns: [], lockTarget: null,
+    fuel: 1, speed: 100, alive: true, respawnAtTick: 0, rollTicks: 0, rollCooldownTicks: 0, sieged: false, cooldowns: [], lockTarget: null, ammo1: 100, ammo2: 4, docked: false,
+    angVel: [0, 0, 0], brakeHeld: false, dashTicks: 0, ghostTicks: 0, ironTicks: 0, flareTicks: 0, dockTicks: 0, grounded: false,
   };
 }
 
@@ -78,6 +79,13 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
         s.rot = [o.quaternion.x, o.quaternion.y, o.quaternion.z, o.quaternion.w];
         s.sieged = k % 4 === 3 && Math.floor(t / 4) % 2 === 1;
         if (k === 0 || k === 5) world.boosting.add(s.id); else world.boosting.delete(s.id);
+        continue;
+      }
+      if (i === 0 && location.search.includes('dock')) {
+        const d = map.launchDecks.concord[0]!;
+        s.pos = [d.pos[0] + 12, d.pos[1] + 2.5, d.pos[2] + 12];
+        s.rot = [0, 0.38, 0, 0.92];
+        s.docked = true;
         continue;
       }
       // formation circle: own ship leads, others orbit nearby on staggered radii
@@ -145,7 +153,9 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
       if (T.impact < 0) {
         T.impact = 6;
         const s = pick()!;
-        push({ type: 'terrainImpact', id: s.id, damage: 120, pos: [s.pos[0], sampleHeight(world.heightfield!, s.pos[0], s.pos[2]), s.pos[2]] });
+        push({ type: 'terrainImpact', id: s.id, damage: 120, bounced: rnd() < 0.6, pos: [s.pos[0], sampleHeight(world.heightfield!, s.pos[0], s.pos[2]), s.pos[2]] });
+        push({ type: 'launched', id: pick()!.id });
+        push({ type: 'resupplied', id: pick()!.id });
       }
       T.flare -= dt;
       if (T.flare < 0) {

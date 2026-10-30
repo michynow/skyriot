@@ -18,6 +18,11 @@ export interface ClientWorld {
   cursor: { x: number; y: number };
   freeLook: boolean;
   cameraZoom: number;
+  /**
+   * Screen-shake intensity 0..1, set by the HUD on a bounced terrain impact and decayed by the game loop
+   * (exp, ~0.15 s). B's ChaseCamera may read it to jitter the camera.
+   */
+  shake: number;
 }
 
 export const world: ClientWorld = {
@@ -30,4 +35,5 @@ export const world: ClientWorld = {
   cursor: { x: 0, y: 0 },
   freeLook: false,
   cameraZoom: 1,
+  shake: 0,
 };
