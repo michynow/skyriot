@@ -228,3 +228,29 @@ export interface SkillDef {
   durationSec: number;
   kind: 'consumable' | 'skill';
 }
+
+// ---- Wire ----
+
+export const MSG = {
+  input: 'input', // C→S PilotInput
+  chat: 'chat', // C→S ChatMessage
+  welcome: 'welcome', // S→C Welcome
+  snapshot: 'snapshot', // S→C Snapshot
+  events: 'events', // S→C SimEvent[]
+  console: 'console', // S→C { text: string } dev command replies
+} as const;
+
+export interface JoinOptions {
+  mapId: MapId;
+  nation: NationId;
+  frame: FrameId;
+  name: string;
+}
+
+export interface Welcome {
+  shipId: ShipId;
+  mapId: MapId;
+  tick: number;
+  serverTimeMs: number;
+  dev: boolean;
+}
