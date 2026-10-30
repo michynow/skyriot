@@ -12,7 +12,13 @@ const X_AXIS = new THREE.Vector3(1, 0, 0);
 const BASE_FOV = 60;
 const BOOST_FOV = -1.5; // boost narrows the view very slightly; never widens
 const POS_OMEGA = 9; // critically-damped spring angular frequency (1/s): higher = stiffer
-const ROT_RATE = 7;
+const ROT_RATE = 11;
+/** Share of the Ship's bank the camera follows: the rest shows as the Ship banking on screen. */
+const CAM_BANK = 0.3;
+/** Screen drift on hard turns: camera shifts against the turn by dist * this per rad/s, capped. */
+const DRIFT_PER_RATE = 0.07;
+const DRIFT_MAX = 0.2;
+const DRIFT_RATE = 6;
 
 /** Exact critically-damped spring step (frame-rate independent). */
 function spring(x: number, v: number, target: number, w: number, dt: number, out: [number, number]) {
@@ -55,6 +61,11 @@ export function ChaseCamera() {
       qo: new THREE.Quaternion(),
       eu: new THREE.Euler(0, 0, 0, 'YXZ'),
       qp: new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.1, 0, 0)),
+      bx: new THREE.Vector3(),
+      by: new THREE.Vector3(),
+      bz: new THREE.Vector3(),
+      m: new THREE.Matrix4(),
+      drift: new THREE.Vector3(),
       out: [0, 0] as [number, number],
     }),
     [],
@@ -73,6 +84,15 @@ export function ChaseCamera() {
       st.vel.set(0, 0, 0);
     }
     st.qs.set(ship.rot[0], ship.rot[1], ship.rot[2], ship.rot[3]);
+    // Follow only part of the bank: up = blend of world up and Ship up (all Ship up when near vertical).
+    st.bz.set(0, 0, 1).applyQuaternion(st.qs);
+    st.by.set(0, 1, 0).applyQuaternion(st.qs);
+    const vert = THREE.MathUtils.smoothstep(Math.abs(st.bz.y), 0.85, 0.98);
+    const bankW = CAM_BANK + (1 - CAM_BANK) * vert;
+    st.by.multiplyScalar(bankW).add(st.tmp.set(0, 1 - bankW, 0));
+    st.bx.crossVectors(st.by, st.bz).normalize();
+    st.by.crossVectors(st.bz, st.bx);
+    st.qs.setFromRotationMatrix(st.m.makeBasis(st.bx, st.by, st.bz));
     if (!st.init) {
       st.q.copy(st.qs);
       st.init = true;
@@ -116,6 +136,16 @@ export function ChaseCamera() {
     st.anc.addScaledVector(st.fwd, st.sp.sub(st.anc).dot(st.fwd));
     st.vel.addScaledVector(st.fwd, -st.vel.dot(st.fwd));
     st.pos.copy(st.anc).add(st.off);
+
+    // Hard turns: the Ship drifts toward the turn on screen and springs back when the turn ends.
+    st.tmp.set(ship.angVel[0], ship.angVel[1], ship.angVel[2]).applyQuaternion(st.qo.copy(st.qs).invert());
+    const dmax = DRIFT_MAX * dist;
+    const dx = THREE.MathUtils.clamp(st.tmp.y * DRIFT_PER_RATE * dist, -dmax, dmax);
+    const dy = THREE.MathUtils.clamp(-st.tmp.x * DRIFT_PER_RATE * dist, -dmax, dmax);
+    const kd = 1 - Math.exp(-DRIFT_RATE * dt);
+    st.drift.x += (dx - st.drift.x) * kd;
+    st.drift.y += (dy - st.drift.y) * kd;
+    st.pos.add(st.tmp.set(st.drift.x, st.drift.y, 0).applyQuaternion(st.qs));
 
     // never clip into terrain
     const hf = world.heightfield;
