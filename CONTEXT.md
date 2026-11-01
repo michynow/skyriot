@@ -32,7 +32,7 @@ _Avoid_: player entity, avatar
 
 **Loadout**:
 The gear items and hotbar assignments a Pilot has equipped on one Frame.
-_Avoid_: build, kit
+_Avoid_: build (and "kit" for this; a kit is the Skill Kit)
 
 **Primary / Secondary**:
 The two weapon slots fired by LMB / RMB.
@@ -40,6 +40,13 @@ The two weapon slots fired by LMB / RMB.
 **Skill**:
 An active ability on the hotbar with a cooldown, specific to a Frame (Flares is a Skill).
 _Avoid_: ability, spell, power
+
+**Skill Kit**:
+Every Skill one Frame can use (Frame-specific plus shared ones like Flares). The Hotbar holds up to 10 of them; the rest wait in reserve.
+
+**Debuff**:
+A timed effect a Skill puts on enemy Ships (slow, weaken), shown and resolved like a buff on the victim.
+_Avoid_: curse, hex (except as a Skill name)
 
 **Consumable**:
 A single-use hotbar item: shield kit, repair kit, fuel cell.
