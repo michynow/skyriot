@@ -354,6 +354,39 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
       </>
     ),
   },
+  'pivot-flip': {
+    cat: 'blue',
+    art: (
+      <>
+        {/* U-turn arc with the arrowhead coming back the other way */}
+        <path
+          d="M14 40V20a10 10 0 0 1 20 0v10"
+          fill="none"
+          stroke={G.blue}
+          strokeWidth="6"
+          strokeLinecap="round"
+        />
+        <path d="M26 28h16l-8 12z" fill={WHITE} />
+        <circle cx="14" cy="40" r="3" fill={WHITE} />
+      </>
+    ),
+  },
+  backdraft: {
+    cat: 'blue',
+    art: (
+      <>
+        {/* Ship pointing up, chevrons streaming backwards beneath it */}
+        <path d="M24 6l9 14H15z" fill={WHITE} />
+        <path
+          d="M14 26l10 7 10-7M14 34l10 7 10-7"
+          fill="none"
+          stroke={G.blue}
+          strokeWidth="4"
+          strokeLinejoin="round"
+        />
+      </>
+    ),
+  },
   'fuel-cell': {
     cat: 'gold',
     art: (

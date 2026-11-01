@@ -355,6 +355,9 @@ export function Reticles() {
       if (tgt) {
         tgt.dataset.locked = isLocked ? '1' : '0';
         tgt.dataset.assist = assist ? '1' : '0';
+        // Side pips slide in while the lock builds: the homing-missile "you can fire" cue.
+        tgt.dataset.canlock = lockRange || isLocked ? '1' : '0';
+        tgt.style.setProperty('--tri', `${(1 - lockProgress) * 18}px`);
         // Brackets close in on the Target as the lock builds.
         tgt.style.setProperty('--k', String(1.5 - 0.5 * lockProgress));
       }
@@ -363,7 +366,7 @@ export function Reticles() {
       setText(
         targetState.current,
         isLocked
-          ? 'LOCKED'
+          ? 'LOCKED · FIRE RMB'
           : lockRange
             ? `LOCKING ${Math.round(lockProgress * 100)}%`
             : secInRange
@@ -410,6 +413,8 @@ export function Reticles() {
             transform="rotate(-90)"
           />
           <path className="tgt-diamond" d="M0 -9L9 0 0 9 -9 0z" />
+          <path className="tgt-tri l" d="M-58 -9L-42 0 -58 9z" />
+          <path className="tgt-tri r" d="M58 -9L42 0 58 9z" />
         </svg>
         <span className="tgt-name" ref={targetLabel} />
         <span className="tgt-state" ref={targetState} />

@@ -113,9 +113,13 @@ export function ChaseCamera() {
 
     // zoom + free-look orbit (smoothed)
     st.zoom += (world.cameraZoom - st.zoom) * (1 - Math.exp(-8 * dt));
-    const ty = world.freeLook ? -world.cursor.x * Math.PI * 0.95 : 0;
-    const tp = world.freeLook ? Math.max(-0.2, Math.min(1.1, world.cursor.y * 0.9)) : 0;
-    const k = 1 - Math.exp(-10 * dt);
+    const ty = world.lookBack ? Math.PI : world.freeLook ? -world.cursor.x * Math.PI * 0.95 : 0;
+    const tp = world.lookBack
+      ? 0.12
+      : world.freeLook
+        ? Math.max(-0.2, Math.min(1.1, world.cursor.y * 0.9))
+        : 0;
+    const k = 1 - Math.exp(-(world.lookBack ? 16 : 10) * dt);
     st.yaw += (ty - st.yaw) * k;
     st.pitch += (tp - st.pitch) * k;
     st.qo.setFromEuler(st.eu.set(st.pitch, st.yaw, 0));

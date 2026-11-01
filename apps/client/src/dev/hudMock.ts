@@ -31,7 +31,7 @@ export const hudMock = {
   tunnel: 1,
   /** -1 = leave the real value. */
   speed: -1,
-  stalled: false,
+  halted: false,
 };
 
 const structureId = (n: NationId, kind: StructureState['kind'], i: number) => `${n}:${kind}:${i}`;
@@ -138,7 +138,7 @@ function apply(own: ShipState): ShipState {
     tunnel:
       hudMock.launchPhase === 'none' || hudMock.launchPhase === 'hangar' ? -1 : hudMock.tunnel,
     launchTicks: Math.round(stagingSec * TICK_HZ),
-    stalled: hudMock.stalled,
+    halted: hudMock.halted || own.halted,
     speed: hudMock.speed >= 0 ? hudMock.speed : own.speed,
   };
 }

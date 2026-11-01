@@ -303,7 +303,7 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
   const sec = weapons[1]!;
   updateLock(ctx, rec, input, sec);
   const rewind = Math.min(Math.max(ctx.tick - input.viewTick, 0), MAX_REWIND_TICKS);
-  const fire = [input.fire1, input.fire2];
+  const fire = s.halted ? [false, false] : [input.fire1, input.fire2];
   for (let i = 0; i < 2; i++) {
     rec.fireCd[i] = Math.max(rec.fireCd[i]! - ctx.dt, -ctx.dt);
     const w = weapons[i]!;

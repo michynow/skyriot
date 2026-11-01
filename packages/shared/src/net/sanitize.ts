@@ -44,6 +44,7 @@ export function sanitizeInput(raw: unknown): PilotInput | null {
     rollLeft: bool(r.rollLeft),
     rollRight: bool(r.rollRight),
     launch: bool(r.launch),
+    halt: bool(r.halt),
     target: sanitizeTarget(r.target),
     viewTick: viewTick === null ? 0 : Math.floor(viewTick),
   };

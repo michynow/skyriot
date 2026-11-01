@@ -9,6 +9,8 @@ export const inputState = {
   typing: false,
   /** Called when Enter requests the chat line. Set by the HUD. */
   onOpenChat: null as (() => void) | null,
+  /** performance.now() until which a first B press waits for confirmation (B again or Y) to halt. */
+  haltPromptUntil: 0,
   /** Last aim direction sent (unit, world space); HUD range feedback raycasts along it from the Ship. */
   aim: [0, 0, -1] as [number, number, number],
 };
@@ -38,6 +40,8 @@ let rollLeft = false;
 let rollRight = false;
 let hotbar = -1;
 let launch = false;
+let halt = false;
+const HALT_CONFIRM_MS = 3000;
 let fire1 = false;
 let fire2 = false;
 let lockFailed = false;
@@ -48,6 +52,8 @@ let aimYaw = 0;
 let aimPitch = 0;
 let aimFor: ShipId | null = null;
 const AIM_PITCH_MAX = 1.45;
+/** Shift picks enemies within ~35 degrees of the nose. */
+const LOCK_PICK_COS = Math.cos((35 * Math.PI) / 180);
 /** Cursor is kept inside this NDC box so the aim point never leaves the screen. */
 const CURSOR_EDGE = 0.92;
 
@@ -71,6 +77,34 @@ function reset() {
   keys.clear();
   fire1 = fire2 = false;
   world.freeLook = false;
+  world.lookBack = false;
+}
+
+/** Shift: lock onto the enemy nearest the centre crosshair (on screen, in radar); Shift on it again releases. */
+export function lockNearestToCrosshair(): void {
+  const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+  if (!own) return;
+  const range = FRAMES[own.frame].radarRangeM;
+  const [x, y, z, w] = own.rot;
+  const fx = -2 * (x * z + w * y),
+    fy = -2 * (y * z - w * x),
+    fz = -(1 - 2 * (x * x + y * y));
+  let best: ShipId | null = null;
+  let bestCos = LOCK_PICK_COS;
+  for (const s of world.ships.values()) {
+    if (!s.alive || s.nation === own.nation) continue;
+    const dx = s.pos[0] - own.pos[0],
+      dy = s.pos[1] - own.pos[1],
+      dz = s.pos[2] - own.pos[2];
+    const d = Math.hypot(dx, dy, dz);
+    if (d > range || d < 1) continue;
+    const cos = (dx * fx + dy * fy + dz * fz) / d;
+    if (cos > bestCos) {
+      bestCos = cos;
+      best = s.id;
+    }
+  }
+  inputState.targetId = best !== null && best === inputState.targetId ? null : best;
 }
 
 /** Tab: select the next enemy within radar range, nearest first. Sent as PilotInput.target. */
@@ -128,19 +162,34 @@ export function attachInput(canvas: HTMLElement): () => void {
         lastUp[e.code] = -1e9;
       }
     } else if (e.code === 'Tab') cycleTarget();
-    else if (e.code === 'KeyR' && !e.repeat) launch = true;
+    else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') lockNearestToCrosshair();
+    else if (e.code === 'KeyX') world.lookBack = true;
+    else if (e.code === 'KeyB' || (e.code === 'KeyY' && inputState.haltPromptUntil > 0)) {
+      const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+      const now = performance.now();
+      // Leaving a halt needs no confirmation; entering one does (B, then B or Y within 3 s).
+      if (own?.halted || now < inputState.haltPromptUntil) {
+        halt = true;
+        inputState.haltPromptUntil = 0;
+      } else if (e.code === 'KeyB') inputState.haltPromptUntil = now + HALT_CONFIRM_MS;
+    } else if (e.code === 'KeyR' && !e.repeat) launch = true;
     else if (e.code.startsWith('Alt')) {
       world.freeLook = true;
       world.cursor.x = world.cursor.y = 0;
     } else if (e.code.startsWith('Digit')) {
       const n = Number(e.code.slice(5));
       hotbar = n === 0 ? 9 : n - 1;
+      const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+      // Pivot Flip turns the steering aim around; the sim only lifts the turn-rate cap.
+      if (own && FRAMES[own.frame].hotbar[hotbar] === 'pivot-flip' && !own.cooldowns[hotbar])
+        aimYaw += Math.PI;
     }
   };
   const onKeyUp = (e: KeyboardEvent) => {
     keys.delete(e.code);
     if (e.code === 'KeyA' || e.code === 'KeyD') lastUp[e.code] = performance.now();
     if (e.code.startsWith('Alt')) world.freeLook = false;
+    if (e.code === 'KeyX') world.lookBack = false;
   };
   const onMouseMove = (e: MouseEvent) => {
     if (inputState.typing) return;
@@ -297,19 +346,22 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
     strafe: k('KeyD') - k('KeyA'),
     vertical: k('KeyE') - k('KeyQ'),
     boost: !!k('Space'),
-    brake: !!k('ShiftLeft') || !!k('ShiftRight'),
+    // S is the brake: down to the engine's min speed, or onto the Launch Deck when over it.
+    brake: !!k('KeyS'),
     fire1: !typing && fire1,
     fire2: !typing && fire2,
     hotbar: typing ? -1 : hotbar,
     rollLeft: !typing && rollLeft,
     rollRight: !typing && rollRight,
     launch: !typing && launch,
+    halt: !typing && halt,
     target: inputState.targetId,
   };
   if (import.meta.env.DEV && (input.rollLeft || input.rollRight))
     console.debug('[roll] sent', input.rollLeft ? 'left' : 'right', 'seq', seq);
   rollLeft = rollRight = false;
   launch = false;
+  halt = false;
   hotbar = -1;
   return input;
 }

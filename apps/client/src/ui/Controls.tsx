@@ -4,12 +4,14 @@ import './controls.css';
 const BINDINGS: [key: string, action: string][] = [
   ['MOUSE', 'steer / aim'],
   ['LMB · RMB', 'fire Primary / Secondary'],
-  ['W · S', 'throttle'],
+  ['W · S', 'throttle: max / min speed (S over Launch Deck lands)'],
   ['A · D', 'strafe — double-tap to Barrel Roll'],
   ['Q · E', 'descend / climb'],
   ['SPACE', 'boost'],
-  ['SHIFT', 'brake'],
+  ['SHIFT', 'lock Target nearest crosshair'],
   ['TAB', 'cycle Target'],
+  ['X', 'look behind'],
+  ['B', 'halt in place + Loadout (confirm B / Y)'],
   ['1 – 0', 'Hotbar'],
   ['ALT', 'free look'],
   ['R', 'launch from Launch Deck'],
@@ -30,7 +32,7 @@ export function Controls({ frame, compact = false }: { frame: FrameId | null; co
       ))}
       {frame === 'bulwark' && (
         <p className="ctl-note">
-          <b>BULWARK</b> hold Shift or Q near ground to land · W/S drive while Grounded · E or Space
+          <b>BULWARK</b> hold S or Q near ground to land · W/S drive while Grounded · E or Space
           lifts off · Hotbar 1 = Siege Anchor (first-person gunner)
         </p>
       )}

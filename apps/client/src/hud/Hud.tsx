@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FRAMES, SKILLS } from '@skyriot/shared';
+import { ENGINES, FRAMES, SKILLS, WEAPONS } from '@skyriot/shared';
 import { useShallow } from 'zustand/react/shallow';
 import { session } from '../net/session';
 import { inputState, setTyping } from '../input/input';
@@ -42,39 +42,100 @@ function Arc({ r, pct, cls, width = 9 }: { r: number; pct: number; cls: string; 
   );
 }
 
-/** Concentric gauge: shield outside, HP inside, fuel innermost; numbers in the middle. */
+/** Half ring from the bottom up one side: left = hull, right = shield (mirrored). */
+function Half({ r, pct, cls, side }: { r: number; pct: number; cls: string; side: 1 | -1 }) {
+  const v = Math.max(0, Math.min(1, pct)) * 49;
+  const tf = side === 1 ? 'rotate(90)' : 'scale(-1,1) rotate(90)';
+  return (
+    <>
+      <circle
+        r={r}
+        pathLength={100}
+        className="arc-bg"
+        strokeWidth={13}
+        strokeDasharray="49 100"
+        transform={tf}
+      />
+      <circle
+        r={r}
+        pathLength={100}
+        className={`arc ${cls}`}
+        strokeWidth={13}
+        strokeDasharray={`${v} 100`}
+        transform={tf}
+      />
+    </>
+  );
+}
+
+/** Tick on the 270-degree speed ring at fraction `f` of boost speed. */
+function Tick({ f, r }: { f: number; r: number }) {
+  const a = ((135 + f * 270) * Math.PI) / 180;
+  const c = Math.cos(a),
+    s = Math.sin(a);
+  return (
+    <line className="g-tick" x1={c * (r - 6)} y1={s * (r - 6)} x2={c * (r + 6)} y2={s * (r + 6)} />
+  );
+}
+
+/**
+ * Status dial: hull (left half, red) and shield (right half, blue) around a speed ring that spans the engine's
+ * envelope (ticks at min and max, past max = boost), fuel innermost; speed readout in the middle.
+ */
 function Gauge() {
   const g = useHud(
     useShallow((h) => ({
+      frame: h.frame,
       hp: h.hp,
       maxHp: h.maxHp,
       shield: h.shield,
       maxShield: h.maxShield,
       fuel: h.fuel,
+      speed: h.speed,
+      halted: h.halted,
       taken: h.taken,
       impact: h.impactText,
       nonce: h.impactNonce,
     })),
   );
+  const fd = g.frame ? FRAMES[g.frame] : null;
+  const top = fd?.boostSpeed ?? 1;
+  const boosting = !!fd && g.speed > fd.maxSpeed * 1.02;
+  const reverse = g.speed < -1;
   return (
     <div className="gauge">
       <svg viewBox="-100 -100 200 200">
-        <Arc r={88} pct={g.shield / Math.max(1, g.maxShield)} cls="sh" />
-        <Arc
-          r={74}
+        <Half
+          r={86}
           pct={g.hp / Math.max(1, g.maxHp)}
           cls={g.hp / g.maxHp < 0.3 ? 'hp low' : 'hp'}
+          side={1}
         />
-        <Arc r={62} pct={g.fuel} cls="fu" width={5} />
+        <Half r={86} pct={g.shield / Math.max(1, g.maxShield)} cls="sh" side={-1} />
+        <Arc
+          r={64}
+          pct={Math.abs(g.speed) / top}
+          cls={boosting ? 'spd boost' : reverse ? 'spd rev' : 'spd'}
+          width={7}
+        />
+        {fd && <Tick f={fd.minSpeed / top} r={64} />}
+        {fd && <Tick f={fd.maxSpeed / top} r={64} />}
+        <Arc r={52} pct={g.fuel} cls={g.fuel < 0.2 ? 'fu low' : 'fu'} width={4} />
       </svg>
       <div className="g-num">
-        <b className="hp">{Math.round(g.hp)}</b>
-        <span className="sh">{Math.round(g.shield)}</span>
+        <small className="g-cap">
+          {g.halted ? 'HALTED' : reverse ? 'REVERSE' : boosting ? 'BOOST' : 'SPEED'}
+        </small>
+        <b className={boosting ? 'boost' : ''}>{Math.abs(Math.round(g.speed))}</b>
+        <div className="g-pair">
+          <span className="hp">{Math.round(g.hp)}</span>
+          <span className="sh">{Math.round(g.shield)}</span>
+        </div>
       </div>
       <div className="g-lbl">
-        <i className="sh">SHIELD</i>
         <i className="hp">HULL</i>
-        <i className="fu">FUEL</i>
+        <i className="fu">FUEL {Math.round(g.fuel * 100)}%</i>
+        <i className="sh">SHIELD</i>
       </div>
       {g.taken.map((t) => (
         <div key={t.id} className="taken" style={{ left: `calc(50% + ${t.x}px)` }}>
@@ -338,6 +399,10 @@ function Warnings() {
       resupply: x.resupply,
       resupplied: x.resupplied,
       launchPhase: x.launchPhase,
+      incomingDist: x.incomingDist,
+      halted: x.halted,
+      haltPrompt: x.haltPrompt,
+      overDeck: x.overDeck,
     })),
   );
   // In the hangar / tunnel the Ship is hidden: no lock, bounds or dock warnings apply.
@@ -345,7 +410,22 @@ function Warnings() {
   const fullyStocked = h.resupplied || h.resupply >= 0.999;
   return (
     <>
-      {h.locked && flying && <div className="warn-lock">MISSILE LOCK</div>}
+      {flying && h.incomingDist >= 0 && <div className="alarm missile" />}
+      {flying && h.locked && h.incomingDist < 0 && <div className="alarm lock" />}
+      {h.locked && flying && h.incomingDist < 0 && (
+        <div className="warn-lock">LOCKED ON — EVADE</div>
+      )}
+      {h.haltPrompt && !h.halted && flying && (
+        <div className="halt-ask">
+          HALT IN PLACE? <kbd>B</kbd> / <kbd>Y</kbd> confirm
+        </div>
+      )}
+      {h.halted && flying && <Loadout />}
+      {h.overDeck && flying && !h.docked && (
+        <div className="deck-hint">
+          HOLD <kbd>S</kbd> TO LAND
+        </div>
+      )}
       {h.outOfBounds && flying && <div className="oob">RETURN TO COMBAT AREA</div>}
       {h.evadedNonce > 0 && (
         <div key={h.evadedNonce} className="evaded">
@@ -382,6 +462,57 @@ function Warnings() {
         </div>
       )}
     </>
+  );
+}
+
+/** Halted mid-air: read-only Loadout (engine, weapons, hotbar). Swapping parts arrives with inventory (M2). */
+function Loadout() {
+  const frame = useHud((h) => h.frame);
+  if (!frame) return null;
+  const fd = FRAMES[frame];
+  const engine = ENGINES[fd.engine];
+  const weapons = [WEAPONS[fd.primary], WEAPONS[fd.secondary]];
+  return (
+    <div className="loadout" data-ui>
+      <h3>
+        {fd.name.toUpperCase()} <small>LOADOUT · HALTED</small>
+      </h3>
+      <section>
+        <h4>ENGINE — {engine?.name}</h4>
+        <p>
+          Speed {fd.minSpeed}–{fd.maxSpeed} m/s · Boost {fd.boostSpeed} · Accel {fd.accel} · Turn{' '}
+          {fd.turnRate.toFixed(2)} rad/s
+        </p>
+      </section>
+      <section>
+        <h4>WEAPONS</h4>
+        {weapons.map(
+          (w, i) =>
+            w && (
+              <p key={w.id}>
+                <b>{i === 0 ? 'LMB' : 'RMB'}</b> {w.name} · {w.damage} dmg · {w.rangeM} m ·{' '}
+                {i === 0 ? fd.ammo1Max : fd.ammo2Max} rds
+              </p>
+            ),
+        )}
+      </section>
+      <section className="lo-skills">
+        {fd.hotbar.map(
+          (id, i) =>
+            id && (
+              <div key={i} title={SKILLS[id]?.description}>
+                <SkillIcon id={id} />
+                <small>
+                  {(i + 1) % 10} {SKILLS[id]?.name}
+                </small>
+              </div>
+            ),
+        )}
+      </section>
+      <footer>
+        <kbd>B</kbd> or <kbd>W</kbd> to resume
+      </footer>
+    </div>
   );
 }
 

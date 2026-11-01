@@ -37,6 +37,8 @@ export interface PilotInput {
   rollRight: boolean;
   /** Rising edge of the launch key (R): take off from a Launch Deck. */
   launch: boolean;
+  /** Rising edge of a confirmed B: toggle a mid-air halt (Ship stops in place to inspect its Loadout). */
+  halt: boolean;
   /** Currently selected target (Tab). Missiles only lock onto this Ship. */
   target: ShipId | null;
   /** Client's estimate of server tick it is viewing remotes at (for lag compensation). */
@@ -56,6 +58,7 @@ export const EMPTY_INPUT: Omit<PilotInput, 'seq' | 'viewTick'> = {
   rollLeft: false,
   rollRight: false,
   launch: false,
+  halt: false,
   target: null,
 };
 
@@ -143,8 +146,12 @@ export interface ShipState {
   tunnel: number;
   /** Ticks left in the current launch phase (staging countdown, catapult stroke). */
   launchTicks: number;
-  /** Stalled: too slow to fly; nose drops and steering is weak until speed recovers. */
-  stalled: boolean;
+  /** Ticks left of a Pivot Flip (fast 180-degree turn; turn rate is boosted). */
+  flipTicks: number;
+  /** Ticks left of a Backdraft (burst flying backwards, nose held). */
+  reverseTicks: number;
+  /** Halted mid-air (B + confirm): stationary, weapons cold, until throttle/boost or B again. */
+  halted: boolean;
 }
 
 /**
@@ -278,8 +285,6 @@ export interface ChatMessage {
 export interface EnvironmentProfile {
   kind: 'atmosphere' | 'space';
   gravity: number; // m/s² downward; 0 in space
-  /** Minimum forward speed before stalling (atmosphere). 0 = no stall. */
-  stallSpeed: number;
   /** Bulwark hover/siege attaches to terrain (atmosphere) or any static hull (space). */
   groundMode: 'terrain' | 'hull';
   fogColor: string;
@@ -337,14 +342,12 @@ export interface LaunchDeck {
   radius: number;
 }
 
-export interface FrameDef {
-  id: FrameId;
+export type EngineId = string;
+
+/** An engine part: sets a Frame's speed envelope and handling. Throttle spans minSpeed..maxSpeed. */
+export interface EngineDef {
+  id: EngineId;
   name: string;
-  role: string;
-  maxHp: number;
-  maxShield: number;
-  shieldRegenPerSec: number;
-  shieldRegenDelaySec: number;
   minSpeed: number;
   cruiseSpeed: number;
   maxSpeed: number;
@@ -352,6 +355,18 @@ export interface FrameDef {
   accel: number; // m/s² toward throttle target
   /** Max angular rate toward aim (rad/s). */
   turnRate: number;
+}
+
+/** Engine stats are resolved onto the Frame (from its equipped `engine`) so the sim reads one record. */
+export interface FrameDef extends Omit<EngineDef, 'id' | 'name'> {
+  id: FrameId;
+  name: string;
+  role: string;
+  engine: EngineId;
+  maxHp: number;
+  maxShield: number;
+  shieldRegenPerSec: number;
+  shieldRegenDelaySec: number;
   strafeSpeed: number;
   verticalSpeed: number;
   fuelBurnPerSec: number; // fraction of tank

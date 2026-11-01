@@ -201,12 +201,7 @@ export class MapRoom extends Room {
         });
         this.bots.set(
           id,
-          createBotMemory(
-            this.hf,
-            this.botCounter * 7919,
-            this.map.launchDecks[nation],
-            this.map.env.stallSpeed,
-          ),
+          createBotMemory(this.hf, this.botCounter * 7919, this.map.launchDecks[nation]),
         );
         total++;
       }

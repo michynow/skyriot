@@ -11,7 +11,6 @@ export const RUSTWATER_CANYONS: MapDef = {
   env: {
     kind: 'atmosphere',
     gravity: 9.8,
-    stallSpeed: 30,
     groundMode: 'terrain',
     fogColor: '#c98a5a',
     fogNear: 400,

@@ -34,10 +34,7 @@ for (let i = 0; i < SHIPS; i++) {
     tier: 1,
     upgrade: 0,
   });
-  mems.set(
-    id,
-    createBotMemory(hf, i + 1, map.launchDecks[i % 2 ? 'vex' : 'concord'], map.env.stallSpeed),
-  );
+  mems.set(id, createBotMemory(hf, i + 1, map.launchDecks[i % 2 ? 'vex' : 'concord']));
 }
 
 let total = 0,
@@ -75,7 +72,8 @@ for (let t = 0; t < TICKS; t++) {
     else if (e.type === 'barrelRoll') rolls++;
   }
   for (const s of sim.ships()) {
-    if (!s.alive) continue;
+    // Ships in the Launch Queue / tunnel sit inside the Base, below the terrain surface by design.
+    if (!s.alive || s.launchPhase !== 'none') continue;
     const clearance = s.pos[1] - sampleHeight(hf, s.pos[0], s.pos[2]);
     minClearance = Math.min(minClearance, clearance);
     if (clearance < -FLOOR_TOLERANCE) belowTerrain++;
