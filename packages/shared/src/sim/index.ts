@@ -72,3 +72,16 @@ export interface SimOptions {
 }
 
 export { createSim } from './createSim';
+// Projectile tuning the client needs to draw where Secondary / bombing Skills will land.
+export {
+  AIR_BARRAGE_COUNT,
+  AIR_BARRAGE_SPREAD_RAD,
+  BOMB_DROP_SPEED,
+  BOMB_GRAVITY,
+  CARPET_BOMB_WEAPON,
+  CARPET_BOMBS,
+  CARPET_SPACING,
+  GROUND_STRIKE_SPLASH_MUL,
+  NOSE_OFFSET,
+  ROLL_DURATION_SEC,
+} from './constants';

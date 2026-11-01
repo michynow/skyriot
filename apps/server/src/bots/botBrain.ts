@@ -24,8 +24,8 @@ const AVOID_LOOKAHEAD_SEC = 2.2;
 const AVOID_MARGIN = 90;
 const SINK_LOOKAHEAD_SEC = 0.8;
 const CRUISE_THROTTLE = 0.6;
-/** Below stallSpeed times this, Bots go full throttle. */
-const SLOW_SPEED_MUL = 2;
+/** Below the engine's min speed times this, Bots go full throttle. */
+const SLOW_SPEED_MUL = 1.3;
 const CRUISE_ALTITUDE = 160;
 const FIRE_CONE_RAD = 0.07;
 const FAR_BOOST_DISTANCE = 1200;
@@ -67,8 +67,6 @@ export interface BotMemory {
   hf: Heightfield;
   /** Launch Decks of the bot's own nation. */
   decks: LaunchDeck[];
-  /** The Map's stall speed. */
-  stallSpeed: number;
   rng: () => number;
   seq: number;
   lastHealth: number;
@@ -83,17 +81,11 @@ export interface BotMemory {
   raider: boolean;
 }
 
-export function createBotMemory(
-  hf: Heightfield,
-  seed: number,
-  decks: LaunchDeck[],
-  stallSpeed: number,
-): BotMemory {
+export function createBotMemory(hf: Heightfield, seed: number, decks: LaunchDeck[]): BotMemory {
   const rng = mulberry32(seed);
   return {
     hf,
     decks,
-    stallSpeed,
     rng,
     seq: 0,
     lastHealth: 0,
@@ -258,8 +250,8 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     }
   }
   input.aim = [dx, dy, dz];
-  // Full throttle when slow or climbing away from terrain: climbs bleed speed and a stall drops the nose.
-  const slow = me.speed < mem.stallSpeed * SLOW_SPEED_MUL;
+  // Full throttle when slow or climbing away from terrain.
+  const slow = me.speed < fd.minSpeed * SLOW_SPEED_MUL;
   if (!siegeMode || me.grounded)
     input.throttle = siegeMode ? 0 : slow || pullUp > 0 ? 1 : CRUISE_THROTTLE;
   input.boost =

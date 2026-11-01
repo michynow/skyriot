@@ -21,7 +21,14 @@ const DRIFT_MAX = 0.2;
 const DRIFT_RATE = 6;
 
 /** Exact critically-damped spring step (frame-rate independent). */
-function spring(x: number, v: number, target: number, w: number, dt: number, out: [number, number]) {
+function spring(
+  x: number,
+  v: number,
+  target: number,
+  w: number,
+  dt: number,
+  out: [number, number],
+) {
   const d = x - target;
   const e = Math.exp(-w * dt);
   const t = (v + w * d) * dt;
@@ -106,9 +113,13 @@ export function ChaseCamera() {
 
     // zoom + free-look orbit (smoothed)
     st.zoom += (world.cameraZoom - st.zoom) * (1 - Math.exp(-8 * dt));
-    const ty = world.freeLook ? -world.cursor.x * Math.PI * 0.95 : 0;
-    const tp = world.freeLook ? Math.max(-0.2, Math.min(1.1, world.cursor.y * 0.9)) : 0;
-    const k = 1 - Math.exp(-10 * dt);
+    const ty = world.lookBack ? Math.PI : world.freeLook ? -world.cursor.x * Math.PI * 0.95 : 0;
+    const tp = world.lookBack
+      ? 0.12
+      : world.freeLook
+        ? Math.max(-0.2, Math.min(1.1, world.cursor.y * 0.9))
+        : 0;
+    const k = 1 - Math.exp(-(world.lookBack ? 16 : 10) * dt);
     st.yaw += (ty - st.yaw) * k;
     st.pitch += (tp - st.pitch) * k;
     st.qo.setFromEuler(st.eu.set(st.pitch, st.yaw, 0));
@@ -125,20 +136,27 @@ export function ChaseCamera() {
     // Anchor springs toward the ship (soft lateral/vertical sway), but its error ALONG the ship's forward
     // axis is removed every frame, so acceleration/boost never stretches the camera distance.
     st.sp.set(ship.pos[0], ship.pos[1], ship.pos[2]);
-    if (!st.ancInit) { st.anc.copy(st.sp); st.ancInit = true; }
+    if (!st.ancInit) {
+      st.anc.copy(st.sp);
+      st.ancInit = true;
+    }
     for (let i = 0; i < 3; i++) {
       const key = (['x', 'y', 'z'] as const)[i]!;
       spring(st.anc[key], st.vel[key], st.sp[key], POS_OMEGA, dt, st.out);
       st.anc[key] = st.out[0];
       st.vel[key] = st.out[1];
     }
-    st.fwd.set(0, 0, -1).applyQuaternion(st.qsh.set(ship.rot[0], ship.rot[1], ship.rot[2], ship.rot[3]));
+    st.fwd
+      .set(0, 0, -1)
+      .applyQuaternion(st.qsh.set(ship.rot[0], ship.rot[1], ship.rot[2], ship.rot[3]));
     st.anc.addScaledVector(st.fwd, st.sp.sub(st.anc).dot(st.fwd));
     st.vel.addScaledVector(st.fwd, -st.vel.dot(st.fwd));
     st.pos.copy(st.anc).add(st.off);
 
     // Hard turns: the Ship drifts toward the turn on screen and springs back when the turn ends.
-    st.tmp.set(ship.angVel[0], ship.angVel[1], ship.angVel[2]).applyQuaternion(st.qo.copy(st.qs).invert());
+    st.tmp
+      .set(ship.angVel[0], ship.angVel[1], ship.angVel[2])
+      .applyQuaternion(st.qo.copy(st.qs).invert());
     const dmax = DRIFT_MAX * dist;
     const dx = THREE.MathUtils.clamp(st.tmp.y * DRIFT_PER_RATE * dist, -dmax, dmax);
     const dy = THREE.MathUtils.clamp(-st.tmp.x * DRIFT_PER_RATE * dist, -dmax, dmax);
@@ -167,17 +185,26 @@ export function ChaseCamera() {
     fpv.id = e > 0 ? ship.id : '';
     fpv.amount = e;
     if (e > 0) {
-      const FP_H = 2.5 * MODEL_SCALE, FP_Z = 0.6 * MODEL_SCALE;
+      const FP_H = 2.5 * MODEL_SCALE,
+        FP_Z = 0.6 * MODEL_SCALE;
       st.qsh.set(ship.rot[0], ship.rot[1], ship.rot[2], ship.rot[3]);
-      st.fpPos.set(0, FP_H, FP_Z).applyQuaternion(st.qsh).add(st.tmp.set(ship.pos[0], ship.pos[1], ship.pos[2]));
-      st.qf.copy(st.qsh).multiply(st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(FP_H, AIM_DISTANCE + FP_Z)));
+      st.fpPos
+        .set(0, FP_H, FP_Z)
+        .applyQuaternion(st.qsh)
+        .add(st.tmp.set(ship.pos[0], ship.pos[1], ship.pos[2]));
+      st.qf
+        .copy(st.qsh)
+        .multiply(st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(FP_H, AIM_DISTANCE + FP_Z)));
       camera.position.lerp(st.fpPos, e);
       camera.quaternion.slerp(st.qf, e);
     }
 
     // screen shake: world.shake is an impulse (0..1) written by the game; consumed here and decayed
     const w = world as unknown as { shake?: number };
-    if (w.shake) { st.shake = Math.max(st.shake, w.shake); w.shake = 0; }
+    if (w.shake) {
+      st.shake = Math.max(st.shake, w.shake);
+      w.shake = 0;
+    }
     st.t += dt;
     if (st.shake > 0.002) {
       const a = st.shake * st.shake * 0.5;

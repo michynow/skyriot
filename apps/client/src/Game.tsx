@@ -12,6 +12,7 @@ import {
 } from '@skyriot/shared';
 import { world } from './state/world';
 import { MapScene } from './scene/MapScene';
+import { AimPreview } from './scene/AimPreview';
 import { Ships } from './frames/Ships';
 import { ProjectilesFx } from './fx/ProjectilesFx';
 import { ChaseCamera } from './scene/ChaseCamera';
@@ -134,6 +135,7 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
         const mapDef = MAPS[w.mapId];
         if (!mapDef) return fail(`Unknown map "${w.mapId}".`);
         world.map = mapDef;
+        music.setMap(mapDef);
         world.heightfield = generateHeightfield(mapDef);
         world.ownId = w.shipId;
         session.dev = w.dev;
@@ -211,6 +213,7 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
             <MapScene map={map} />
             <Ships />
             <ProjectilesFx />
+            <AimPreview />
             <ChaseCamera />
             <PostFx quality={quality} />
             <GameLoop />

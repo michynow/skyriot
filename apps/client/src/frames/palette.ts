@@ -12,15 +12,33 @@ interface Palette {
 }
 
 export const PALETTES: Record<NationId, Palette> = {
-  concord: { primary: '#e2b13c', secondary: '#f1eee4', dark: '#3b404c', accent: '#22d3ff', glass: '#9defff', trim: '#bff6ff' },
-  vex: { primary: '#b92329', secondary: '#1d1c22', dark: '#2c2426', accent: '#ff7418', glass: '#ffa066', trim: '#ffd0a0' },
+  concord: {
+    primary: '#e2b13c',
+    secondary: '#f1eee4',
+    dark: '#3b404c',
+    accent: '#22d3ff',
+    glass: '#9defff',
+    trim: '#bff6ff',
+  },
+  vex: {
+    primary: '#b92329',
+    secondary: '#1d1c22',
+    dark: '#2c2426',
+    accent: '#ff7418',
+    glass: '#ffa066',
+    trim: '#ffd0a0',
+  },
 };
 
 let shipEnvTex: THREE.Texture | null = null;
 /** Reflection environment for ship materials only (terrain stays unaffected). */
 export function setShipEnv(t: THREE.Texture | null) {
   shipEnvTex = t;
-  for (const m of mats.values()) for (const k of Object.keys(m) as (keyof typeof m)[]) { m[k].envMap = t; m[k].needsUpdate = true; }
+  for (const m of mats.values())
+    for (const k of Object.keys(m) as (keyof typeof m)[]) {
+      m[k].envMap = t;
+      m[k].needsUpdate = true;
+    }
 }
 
 const mats = new Map<string, Record<Slot, THREE.MeshStandardMaterial>>();
@@ -34,7 +52,12 @@ export function getMaterials(nation: NationId, upgrade: number) {
   if (m) return m;
   const p = PALETTES[nation];
   const std = (color: string, rough: number, metal: number) =>
-    new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, envMapIntensity: 0.6 });
+    new THREE.MeshStandardMaterial({
+      color,
+      roughness: rough,
+      metalness: metal,
+      envMapIntensity: 0.6,
+    });
   const accentCol = new THREE.Color(p.accent).lerp(hot, Math.max(0, u - 3) * 0.06);
   const rimCol = new THREE.Color(p.accent);
   /** Distance-scaled rim light so far-away silhouettes pop against terrain. */
@@ -43,11 +66,13 @@ export function getMaterials(nation: NationId, upgrade: number) {
       sh.uniforms.uRim = { value: rimCol };
       sh.fragmentShader = sh.fragmentShader
         .replace('void main() {', 'uniform vec3 uRim;\nvoid main() {')
-        .replace('#include <emissivemap_fragment>',
+        .replace(
+          '#include <emissivemap_fragment>',
           '#include <emissivemap_fragment>\n' +
-          '{ float d = length(vViewPosition); float k = smoothstep(120.0, 700.0, d);\n' +
-          '  float f = pow(1.0 - clamp(abs(dot(normalize(vNormal), normalize(vViewPosition))), 0.0, 1.0), 2.0);\n' +
-          '  totalEmissiveRadiance += uRim * (f * 1.4 + 0.12) * k * 1.6; }');
+            '{ float d = length(vViewPosition); float k = smoothstep(120.0, 700.0, d);\n' +
+            '  float f = pow(1.0 - clamp(abs(dot(normalize(vNormal), normalize(vViewPosition))), 0.0, 1.0), 2.0);\n' +
+            '  totalEmissiveRadiance += uRim * (f * 1.4 + 0.12) * k * 1.6; }',
+        );
     };
     return mat;
   };
@@ -56,13 +81,26 @@ export function getMaterials(nation: NationId, upgrade: number) {
     secondary: rim(std(p.secondary, 0.5, 0.1)),
     dark: rim(std(p.dark, 0.6, 0.35)),
     accent: new THREE.MeshStandardMaterial({
-      color: accentCol, emissive: accentCol, emissiveIntensity: 0.9 + u * 0.28, roughness: 0.4,
+      color: accentCol,
+      emissive: accentCol,
+      emissiveIntensity: 0.9 + u * 0.28,
+      roughness: 0.4,
     }),
     glass: new THREE.MeshStandardMaterial({
-      color: p.glass, emissive: p.glass, emissiveIntensity: 0.25, roughness: 0.08, metalness: 0.9, envMapIntensity: 2.2, transparent: true, opacity: 0.85,
+      color: p.glass,
+      emissive: p.glass,
+      emissiveIntensity: 0.25,
+      roughness: 0.08,
+      metalness: 0.9,
+      envMapIntensity: 2.2,
+      transparent: true,
+      opacity: 0.85,
     }),
     trim: new THREE.MeshStandardMaterial({
-      color: p.trim, emissive: p.trim, emissiveIntensity: 2.6, roughness: 0.3,
+      color: p.trim,
+      emissive: p.trim,
+      emissiveIntensity: 2.6,
+      roughness: 0.3,
     }),
   };
   for (const k of Object.keys(m) as (keyof typeof m)[]) m[k].envMap = shipEnvTex;
@@ -70,14 +108,22 @@ export function getMaterials(nation: NationId, upgrade: number) {
   return m;
 }
 
-const flames = new Map<string, { outer: THREE.MeshBasicMaterial; inner: THREE.MeshBasicMaterial }>();
+const flames = new Map<
+  string,
+  { outer: THREE.MeshBasicMaterial; inner: THREE.MeshBasicMaterial }
+>();
 export function getFlameMaterials(nation: NationId) {
   let f = flames.get(nation);
   if (!f) {
     const mk = (c: THREE.Color, k: number, o: number) => {
       const mat = new THREE.MeshBasicMaterial({
-        color: c.clone().multiplyScalar(k), transparent: true, opacity: o, blending: THREE.AdditiveBlending,
-        depthWrite: false, toneMapped: false, fog: false,
+        color: c.clone().multiplyScalar(k),
+        transparent: true,
+        opacity: o,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false,
+        fog: false,
       });
       return mat;
     };

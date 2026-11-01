@@ -82,7 +82,14 @@ export function createPredictor(sim: Sim, ownId: ShipId): Predictor {
       if (!existing) {
         sim.addShip(
           ownId,
-          { nation: own.nation, frame: own.frame, name: own.name, isBot: false, tier: own.tier, upgrade: own.upgrade },
+          {
+            nation: own.nation,
+            frame: own.frame,
+            name: own.name,
+            isBot: false,
+            tier: own.tier,
+            upgrade: own.upgrade,
+          },
           own.pos,
         );
         sim.setShipState(ownId, cloneShip(own));

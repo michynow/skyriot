@@ -1,4 +1,12 @@
-import { FRAMES, SKILLS, WEAPONS, type ProjectileKind, type ShipState, type SimEvent, type Vec3 } from '@skyriot/shared';
+import {
+  FRAMES,
+  SKILLS,
+  WEAPONS,
+  type ProjectileKind,
+  type ShipState,
+  type SimEvent,
+  type Vec3,
+} from '@skyriot/shared';
 import { world } from '../state/world';
 import { music, playSfx, startLoop, type LoopHandle, type SfxName } from './engine';
 
@@ -25,12 +33,14 @@ let wasBoosting = false;
 let engine: LoopHandle | null = null;
 let burner: LoopHandle | null = null;
 let lockTone: LoopHandle | null = null;
+let nextAlarm = 0;
 let nextBeep = 0;
 let nextWarn = 0;
 
 const now = () => performance.now() / 1000;
 const hash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
-const ownShip = (): ShipState | undefined => (world.ownId ? world.ships.get(world.ownId) : undefined);
+const ownShip = (): ShipState | undefined =>
+  world.ownId ? world.ships.get(world.ownId) : undefined;
 
 function skillSfx(id: string): SfxName {
   const def = SKILLS[id];
@@ -55,7 +65,14 @@ export function handleAudioEvent(ev: SimEvent): void {
         else playSfx(name, { pos: ev.origin, volume: 0.6 });
         break;
       }
-      const t: Tracked = { kind: ev.kind, origin: ev.origin, dir: ev.dir, speed: ev.speed, born: now(), loop: null };
+      const t: Tracked = {
+        kind: ev.kind,
+        origin: ev.origin,
+        dir: ev.dir,
+        speed: ev.speed,
+        born: now(),
+        loop: null,
+      };
       if (ev.kind === 'missile') {
         playSfx('missile-launch', mine ? { volume: 0.8 } : { pos: ev.origin });
         t.loop = startLoop('missile-hiss', ev.origin);
@@ -69,10 +86,20 @@ export function handleAudioEvent(ev: SimEvent): void {
       if (t) {
         t.loop?.stop();
         tracked.delete(ev.id);
-        if (t.kind !== 'flare') playSfx(t.kind === 'missile' ? 'explosion' : 'boom', { pos: ev.pos, volume: t.kind === 'missile' ? 0.7 : 1 });
+        if (t.kind !== 'flare')
+          playSfx(t.kind === 'missile' ? 'explosion' : 'boom', {
+            pos: ev.pos,
+            volume: t.kind === 'missile' ? 0.7 : 1,
+          });
       }
       break;
     }
+    case 'structureHit':
+      if (ev.attacker === ownShip()?.id) {
+        lastCombat = now();
+        playSfx(ev.shielded ? 'hit-shield' : 'hit-dealt', { volume: 0.9 });
+      }
+      break;
     case 'hit': {
       const t = tracked.get(ev.projectile);
       if (t) {
@@ -81,7 +108,11 @@ export function handleAudioEvent(ev: SimEvent): void {
         playSfx(t.kind === 'missile' ? 'explosion' : 'boom', { pos: ev.pos, volume: 0.9 });
       }
       const victim = world.ships.get(ev.victim);
-      const layer: SfxName = ev.deflected ? 'hit-deflect' : (victim?.shield ?? 0) > 1 ? 'hit-shield' : 'hit-hull';
+      const layer: SfxName = ev.deflected
+        ? 'hit-deflect'
+        : (victim?.shield ?? 0) > 1
+          ? 'hit-shield'
+          : 'hit-hull';
       if (ev.attacker === own) {
         lastCombat = now();
         playSfx('hit-dealt');
@@ -100,7 +131,10 @@ export function handleAudioEvent(ev: SimEvent): void {
       break;
     case 'barrelRoll': {
       const s = world.ships.get(ev.id);
-      playSfx('roll', ev.id === own ? { volume: 0.8 } : { pos: s?.pos as Vec3 | undefined, volume: 0.6 });
+      playSfx(
+        'roll',
+        ev.id === own ? { volume: 0.8 } : { pos: s?.pos as Vec3 | undefined, volume: 0.6 },
+      );
       break;
     }
     case 'terrainImpact':
@@ -167,6 +201,14 @@ export function updateAudio(): void {
     playSfx('lock-beep', { pitch: 0.8 + own!.lockProgress * 0.9, volume: 0.8 });
     nextBeep = t + 0.35 - own!.lockProgress * 0.25;
   }
+  // An enemy holding a lock on us (no missile yet): warble until it fires or loses the lock.
+  let lockedOn = false;
+  if (alive && own)
+    for (const s of world.ships.values()) if (s.alive && s.lockTarget === own.id) lockedOn = true;
+  if (lockedOn && own!.incomingDist < 0 && t >= nextAlarm) {
+    playSfx('lock-alarm', { volume: 0.7 });
+    nextAlarm = t + 0.6;
+  }
   if (alive && own && own.incomingDist >= 0) {
     lastCombat = t;
     if (t >= nextWarn) {
@@ -185,7 +227,11 @@ export function updateAudio(): void {
     }
     m.loop?.update({
       gain: 0.6,
-      pos: [m.origin[0] + m.dir[0] * m.speed * age, m.origin[1] + m.dir[1] * m.speed * age, m.origin[2] + m.dir[2] * m.speed * age],
+      pos: [
+        m.origin[0] + m.dir[0] * m.speed * age,
+        m.origin[1] + m.dir[1] * m.speed * age,
+        m.origin[2] + m.dir[2] * m.speed * age,
+      ],
     });
   }
 
@@ -195,7 +241,11 @@ export function updateAudio(): void {
     const radar = FRAMES[own.frame].radarRangeM;
     let near = false;
     for (const s of world.ships.values()) {
-      if (s.alive && s.nation !== own.nation && Math.hypot(s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]) <= radar) {
+      if (
+        s.alive &&
+        s.nation !== own.nation &&
+        Math.hypot(s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]) <= radar
+      ) {
         near = true;
         break;
       }

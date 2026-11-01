@@ -4,6 +4,7 @@ import {
   FRAMES,
   RESPAWN_SEC,
   SKILLS,
+  STRUCTURES,
   TICK_HZ,
   WEAPONS,
   sampleHeight,
@@ -18,6 +19,7 @@ import {
 import { world } from '../state/world';
 import { session } from '../net/session';
 import { view } from './view';
+import { inputState } from '../input/input';
 import { pushFloater } from './Floaters';
 
 export interface KillEntry {
@@ -116,7 +118,13 @@ export interface HudState {
   chat: ChatLine[];
   chatOpen: boolean;
   consoleLines: string[];
-  stalled: boolean;
+  halted: boolean;
+  /** First B pressed: waiting for B / Y to confirm the halt. */
+  haltPrompt: boolean;
+  /** Over our own Launch Deck's approach (S lands). */
+  overDeck: boolean;
+  /** Distance (m) of the nearest guided missile homing on us; -1 = none. */
+  incomingDist: number;
   launchPhase: LaunchPhase;
   queuePos: number;
   tunnel: number;
@@ -136,7 +144,14 @@ export interface HudState {
   banner: Banner | null;
 }
 
-const EMPTY_BASE: BaseView = { shield: true, stations: [true, true], coreHp: 1, coreMax: 1, turretsAlive: 0, turretsTotal: 0 };
+const EMPTY_BASE: BaseView = {
+  shield: true,
+  stations: [true, true],
+  coreHp: 1,
+  coreMax: 1,
+  turretsAlive: 0,
+  turretsTotal: 0,
+};
 
 export const useHud = create<HudState>(() => ({
   status: 'connecting',
@@ -188,7 +203,10 @@ export const useHud = create<HudState>(() => ({
   chat: [],
   chatOpen: false,
   consoleLines: [],
-  stalled: false,
+  halted: false,
+  haltPrompt: false,
+  overDeck: false,
+  incomingDist: -1,
   launchPhase: 'none',
   queuePos: -1,
   tunnel: -1,
@@ -219,7 +237,10 @@ export function ownShip(): ShipState | undefined {
   return import.meta.env.DEV && own && devHooks.ownShip ? devHooks.ownShip(own) : own;
 }
 
-export const NATION_NAME: Record<NationId, string> = { concord: 'Aurelian Concord', vex: 'Vex Freehold' };
+export const NATION_NAME: Record<NationId, string> = {
+  concord: 'Aurelian Concord',
+  vex: 'Vex Freehold',
+};
 export const enemyOf = (n: NationId): NationId => (n === 'concord' ? 'vex' : 'concord');
 
 /**
@@ -298,12 +319,51 @@ function objectiveLine(me: NationId, bases: Record<NationId, BaseView>): string 
 
 export const structureName = (st: StructureState): string => STRUCTURE_NAME[st.kind];
 
+/** The selected Target (Ship or Base structure) in one shape: id, name, nation, aim point, velocity. */
+export interface TargetView {
+  id: string;
+  name: string;
+  nation: NationId;
+  alive: boolean;
+  pos: [number, number, number];
+  vel: [number, number, number];
+}
+const _structTarget: TargetView = {
+  id: '',
+  name: '',
+  nation: 'concord',
+  alive: false,
+  pos: [0, 0, 0],
+  vel: [0, 0, 0],
+};
+export function targetView(id: string | null): TargetView | undefined {
+  if (!id) return undefined;
+  const ship = world.ships.get(id);
+  if (ship) return ship;
+  const st = world.structures.get(id);
+  if (!st) return undefined;
+  const t = _structTarget;
+  t.id = st.id;
+  t.name = structureName(st);
+  t.nation = st.nation;
+  t.alive = st.alive;
+  t.pos[0] = st.pos[0];
+  t.pos[1] = st.pos[1] + STRUCTURES[st.kind].height / 2;
+  t.pos[2] = st.pos[2];
+  return t;
+}
+
 /** Route sim events the HUD cares about (killfeed, hit markers, damage numbers, impacts, deck). */
 export function handleHudEvent(ev: SimEvent): void {
   const ownId = world.ownId;
   if (ev.type === 'projectileSpawned') {
     if (ev.kind === 'missile' && ev.target === ownId) {
-      incoming.set(ev.id, { id: ev.id, origin: [...ev.origin], speed: ev.speed, bornMs: performance.now() });
+      incoming.set(ev.id, {
+        id: ev.id,
+        origin: [...ev.origin],
+        speed: ev.speed,
+        bornMs: performance.now(),
+      });
     }
     return;
   }
@@ -317,7 +377,9 @@ export function handleHudEvent(ev: SimEvent): void {
     return;
   }
   if (ev.type === 'skillUsed' && ev.id === ownId) {
-    useHud.setState((st) => ({ skillFx: { nonce: (st.skillFx?.nonce ?? 0) + 1, slot: ev.slot, skill: ev.skill } }));
+    useHud.setState((st) => ({
+      skillFx: { nonce: (st.skillFx?.nonce ?? 0) + 1, slot: ev.slot, skill: ev.skill },
+    }));
     return;
   }
   if (ev.type === 'hit') incoming.delete(ev.projectile);
@@ -326,14 +388,24 @@ export function handleHudEvent(ev: SimEvent): void {
       useHud.setState((s) => ({ hitNonce: s.hitNonce + 1, hitDeflected: ev.deflected }));
       const victim = world.ships.get(ev.victim);
       // Shield-vs-HP is inferred from the victim's last known shield (snapshot lag makes this approximate).
-      pushFloater(ev.pos, ev.deflected ? 'DEFLECT' : String(Math.round(ev.damage)), ev.deflected ? 'defl' : (victim?.shield ?? 0) > 1 ? 'shield' : 'hp');
+      pushFloater(
+        ev.pos,
+        ev.deflected ? 'DEFLECT' : String(Math.round(ev.damage)),
+        ev.deflected ? 'defl' : (victim?.shield ?? 0) > 1 ? 'shield' : 'hp',
+        ev.victim,
+        ev.deflected ? 0 : ev.damage,
+      );
     }
     if (ev.victim === ownId) {
       const attacker = world.ships.get(ev.attacker);
       const own = ownId ? world.ships.get(ownId) : undefined;
       let angleDeg = 0;
       if (attacker && own && view.camera) {
-        _d.set(attacker.pos[0] - own.pos[0], attacker.pos[1] - own.pos[1], attacker.pos[2] - own.pos[2]);
+        _d.set(
+          attacker.pos[0] - own.pos[0],
+          attacker.pos[1] - own.pos[1],
+          attacker.pos[2] - own.pos[2],
+        );
         _d.transformDirection(view.camera.matrixWorldInverse);
         angleDeg = (Math.atan2(_d.x, _d.y) * 180) / Math.PI;
       }
@@ -344,7 +416,11 @@ export function handleHudEvent(ev: SimEvent): void {
         taken: [...s.taken.slice(-5), { id, text, x: Math.round((Math.random() - 0.5) * 60) }],
       }));
       setTimeout(
-        () => useHud.setState((s) => ({ damageFlashes: s.damageFlashes.filter((f) => f.id !== id), taken: s.taken.filter((t) => t.id !== id) })),
+        () =>
+          useHud.setState((s) => ({
+            damageFlashes: s.damageFlashes.filter((f) => f.id !== id),
+            taken: s.taken.filter((t) => t.id !== id),
+          })),
         1100,
       );
     }
@@ -378,16 +454,32 @@ export function handleHudEvent(ev: SimEvent): void {
     }
     if (st?.kind === 'shieldStation' && me) {
       const ours = st.nation === me;
-      const left = [...world.structures.values()].filter((x) => x.kind === 'shieldStation' && x.nation === st.nation && x.alive && x.id !== st.id).length;
-      showBanner(ours ? 'SHIELD STATION LOST' : 'SHIELD STATION DESTROYED', left > 0 ? `${left} remaining` : ours ? 'Our Core is exposed' : 'Enemy Core exposed', ours ? 'bad' : 'good');
+      const left = [...world.structures.values()].filter(
+        (x) => x.kind === 'shieldStation' && x.nation === st.nation && x.alive && x.id !== st.id,
+      ).length;
+      showBanner(
+        ours ? 'SHIELD STATION LOST' : 'SHIELD STATION DESTROYED',
+        left > 0 ? `${left} remaining` : ours ? 'Our Core is exposed' : 'Enemy Core exposed',
+        ours ? 'bad' : 'good',
+      );
     }
   } else if (ev.type === 'shieldDown') {
     const me = ownShip()?.nation;
     if (me) {
       const ours = ev.nation === me;
-      showBanner(ours ? 'SHIELD DOWN' : 'ENEMY SHIELD DOWN', ours ? 'Defend the Core!' : 'Core exposed — attack!', ours ? 'bad' : 'good');
+      showBanner(
+        ours ? 'SHIELD DOWN' : 'ENEMY SHIELD DOWN',
+        ours ? 'Defend the Core!' : 'Core exposed — attack!',
+        ours ? 'bad' : 'good',
+      );
     }
-  } else if (ev.type === 'structureHit' && !ev.shielded) {
+  }
+  if (ev.type === 'structureHit' && ev.attacker === ownId) {
+    useHud.setState((s) => ({ hitNonce: s.hitNonce + 1, hitDeflected: ev.shielded }));
+    if (ev.shielded) pushFloater(ev.pos, 'ABSORBED', 'absorb', ev.structure);
+    else pushFloater(ev.pos, String(Math.round(ev.damage)), 'struct', ev.structure, ev.damage);
+  }
+  if (ev.type === 'structureHit' && !ev.shielded) {
     const st = world.structures.get(ev.structure);
     const me = ownShip()?.nation;
     if (st && st.nation === me) {
@@ -402,7 +494,10 @@ export function handleHudEvent(ev: SimEvent): void {
   } else if (ev.type === 'terrainImpact' && ev.id === ownId) {
     if (ev.bounced) {
       world.shake = 1;
-      useHud.setState((s) => ({ impactText: `HULL IMPACT −${Math.round(ev.damage)}`, impactNonce: s.impactNonce + 1 }));
+      useHud.setState((s) => ({
+        impactText: `HULL IMPACT −${Math.round(ev.damage)}`,
+        impactNonce: s.impactNonce + 1,
+      }));
     } else useHud.setState({ crashed: true });
   } else if (ev.type === 'docked' && ev.id === ownId) useHud.setState({ resupplied: false });
   else if (ev.type === 'resupplied' && ev.id === ownId) useHud.setState({ resupplied: true });
@@ -416,11 +511,14 @@ export function startHudFeed(): () => void {
     const own = ownShip();
     const patch: Partial<HudState> = { pingMs: Math.round(session.conn?.rtt ?? 0) };
     const feed = useHud.getState().killfeed;
-    if (feed.some((k) => now - k.at > KILLFEED_MS)) patch.killfeed = feed.filter((k) => now - k.at <= KILLFEED_MS);
+    if (feed.some((k) => now - k.at > KILLFEED_MS))
+      patch.killfeed = feed.filter((k) => now - k.at <= KILLFEED_MS);
     if (own) {
       const def = FRAMES[own.frame];
       const hotbar = def.hotbar;
-      const total = hotbar.map((id) => (id ? Math.max(1, (SKILLS[id]?.cooldownSec ?? 1) * TICK_HZ) : 1));
+      const total = hotbar.map((id) =>
+        id ? Math.max(1, (SKILLS[id]?.cooldownSec ?? 1) * TICK_HZ) : 1,
+      );
       const cd = hotbar.map((_, i) => Math.max(0, own.cooldowns[i] ?? 0));
       const hf = world.heightfield;
       let locked = false;
@@ -443,7 +541,9 @@ export function startHudFeed(): () => void {
         grounded,
         outOfBounds: own.outOfBounds,
         locked,
-        respawnIn: own.alive ? 0 : Math.min(RESPAWN_SEC, Math.max(0, (own.respawnAtTick - tick) / TICK_HZ)),
+        respawnIn: own.alive
+          ? 0
+          : Math.min(RESPAWN_SEC, Math.max(0, (own.respawnAtTick - tick) / TICK_HZ)),
         rollCd: Math.min(1, own.rollCooldownTicks / Math.max(1, def.rollCooldownSec * TICK_HZ)),
         ammo1: own.ammo1,
         ammo2: own.ammo2,
@@ -465,16 +565,29 @@ export function startHudFeed(): () => void {
         hotbar,
         cooldownFrac: cd.map((c, i) => Math.min(1, c / total[i]!)),
         cooldownSec: cd.map((c) => c / TICK_HZ),
-        stalled: own.stalled === true && own.alive,
+        halted: own.halted === true,
+        haltPrompt: now < inputState.haltPromptUntil,
+        overDeck:
+          !own.docked &&
+          !!world.map?.launchDecks[own.nation].some(
+            (d) =>
+              own.pos[1] >= d.pos[1] &&
+              own.pos[1] - d.pos[1] < 120 &&
+              Math.hypot(own.pos[0] - d.pos[0], own.pos[2] - d.pos[2]) < d.radius * 4,
+          ),
+        incomingDist: own.incomingDist ?? -1,
         launchPhase: own.launchPhase ?? 'none',
         queuePos: own.queuePos ?? -1,
         tunnel: own.tunnel ?? -1,
         launchSec: (own.launchTicks ?? 0) / TICK_HZ,
       });
       const queue = world.match?.queues[own.nation] ?? [];
-      const ahead = queue.slice(0, Math.max(0, queue.indexOf(own.id))).map((id) => world.ships.get(id)?.name ?? 'Pilot');
+      const ahead = queue
+        .slice(0, Math.max(0, queue.indexOf(own.id)))
+        .map((id) => world.ships.get(id)?.name ?? 'Pilot');
       const prev = useHud.getState();
-      if (ahead.length !== prev.queueAhead.length || ahead.some((n, i) => n !== prev.queueAhead[i])) patch.queueAhead = ahead;
+      if (ahead.length !== prev.queueAhead.length || ahead.some((n, i) => n !== prev.queueAhead[i]))
+        patch.queueAhead = ahead;
       const bases = baseViews();
       const m = world.match;
       // Structures change rarely; only re-render the objectives panel when something actually did.
@@ -488,7 +601,6 @@ export function startHudFeed(): () => void {
   }, 100);
   return () => clearInterval(timer);
 }
-
 
 // Dev-only handle for poking the HUD from the console (e.g. __hud.setState({ skillFx: ... })).
 if (import.meta.env.DEV) (window as unknown as { __hud: typeof useHud }).__hud = useHud;

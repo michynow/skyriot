@@ -178,7 +178,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.dockTicks = 0;
     s.brakeHeld = false;
     s.angVel[0] = s.angVel[1] = s.angVel[2] = 0;
-    s.dashTicks = s.ghostTicks = s.ironTicks = s.flareTicks = 0;
+    s.dashTicks = s.ghostTicks = s.ironTicks = s.flareTicks = s.flipTicks = s.reverseTicks = 0;
+    s.halted = false;
     rec.lockCand = null;
     rec.lockTime = 0;
     rec.shieldDelay = 0;
@@ -255,7 +256,9 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       queuePos: -1,
       tunnel: -1,
       launchTicks: 0,
-      stalled: false,
+      flipTicks: 0,
+      reverseTicks: 0,
+      halted: false,
     };
     const body = world.createRigidBody(
       R.RigidBodyDesc.kinematicPositionBased().setTranslation(at[0], at[1], at[2]),

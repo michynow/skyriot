@@ -24,7 +24,8 @@ function loadAudio(): AudioPrefs {
   const d: AudioPrefs = { master: 0.8, sfx: 0.9, music: 0.6, muted: false };
   try {
     const v = JSON.parse(localStorage.getItem(AUDIO_KEY) ?? '{}');
-    for (const k of ['master', 'sfx', 'music'] as const) if (typeof v[k] === 'number') d[k] = Math.min(1, Math.max(0, v[k]));
+    for (const k of ['master', 'sfx', 'music'] as const)
+      if (typeof v[k] === 'number') d[k] = Math.min(1, Math.max(0, v[k]));
     d.muted = v.muted === true;
   } catch {
     /* ignore */

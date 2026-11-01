@@ -27,7 +27,7 @@ const _f = [0, 0, 0];
 const _r = [0, 0, 0];
 
 /** Skills that change movement and therefore must also run in client prediction. */
-const PREDICTED = new Set(['afterburn-dash', 'siege-anchor']);
+const PREDICTED = new Set(['afterburn-dash', 'siege-anchor', 'pivot-flip', 'backdraft']);
 
 export function tickTimers(rec: ShipRec): void {
   const s = rec.state;
@@ -154,6 +154,15 @@ export function useHotbar(ctx: SimCtx, rec: ShipRec, slot: number, predictOnly: 
     case 'afterburn-dash':
       rec.state.dashTicks = Math.max(ticks, 1);
       s.speed = Math.max(s.speed, fd.boostSpeed);
+      break;
+    case 'pivot-flip':
+      // The steering aim is flipped client-side; the sim only lifts the turn-rate cap.
+      s.flipTicks = Math.max(ticks, 1);
+      s.halted = false;
+      break;
+    case 'backdraft':
+      s.reverseTicks = Math.max(ticks, 1);
+      s.halted = false;
       break;
     case 'repair-kit':
       s.hp = Math.min(s.maxHp, s.hp + s.maxHp * REPAIR_KIT_FRACTION);

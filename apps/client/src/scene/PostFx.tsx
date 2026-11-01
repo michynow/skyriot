@@ -17,7 +17,13 @@ export function PostFx({ quality }: { quality: Quality }) {
     <>
       <SpeedLines />
       <EffectComposer multisampling={0} enableNormalPass={false}>
-        <Bloom mipmapBlur luminanceThreshold={1.0} luminanceSmoothing={0.2} intensity={hi ? 0.9 : 0.7} radius={0.7} />
+        <Bloom
+          mipmapBlur
+          luminanceThreshold={1.0}
+          luminanceSmoothing={0.2}
+          intensity={hi ? 0.9 : 0.7}
+          radius={0.7}
+        />
         <primitive object={boost} />
         <Vignette eskil={false} offset={0.25} darkness={0.55} />
         <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />

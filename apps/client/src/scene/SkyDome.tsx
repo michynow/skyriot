@@ -9,7 +9,11 @@ export const SUN_DIR: Record<EnvironmentProfile['sky'], THREE.Vector3> = {
   storm: new THREE.Vector3(0.3, 0.7, 0.4).normalize(),
   'space-nebula': new THREE.Vector3(0.6, 0.35, -0.7).normalize(),
 };
-const MODE: Record<EnvironmentProfile['sky'], number> = { 'desert-dusk': 0, storm: 1, 'space-nebula': 2 };
+const MODE: Record<EnvironmentProfile['sky'], number> = {
+  'desert-dusk': 0,
+  storm: 1,
+  'space-nebula': 2,
+};
 
 const vert = /* glsl */ `
 varying vec3 vDir;
@@ -103,7 +107,15 @@ export function SkyDome({ env }: { env: EnvironmentProfile }) {
   return (
     <mesh frustumCulled={false} renderOrder={-1000}>
       <boxGeometry args={[2, 2, 2]} />
-      <shaderMaterial ref={mat} side={THREE.BackSide} depthWrite={false} fog={false} vertexShader={vert} fragmentShader={frag} uniforms={uniforms} />
+      <shaderMaterial
+        ref={mat}
+        side={THREE.BackSide}
+        depthWrite={false}
+        fog={false}
+        vertexShader={vert}
+        fragmentShader={frag}
+        uniforms={uniforms}
+      />
     </mesh>
   );
 }

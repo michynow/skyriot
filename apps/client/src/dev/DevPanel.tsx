@@ -45,7 +45,12 @@ function Tuning({ frame }: { frame: FrameId }) {
     });
     return s;
   }, [frame]);
-  useControls(`Tuning: ${FRAMES[frame].name} (local prediction only)`, schema as never, { collapsed: true }, [frame]);
+  useControls(
+    `Tuning: ${FRAMES[frame].name} (local prediction only)`,
+    schema as never,
+    { collapsed: true },
+    [frame],
+  );
   return null;
 }
 
@@ -75,13 +80,38 @@ function Controls() {
   });
   const a = useSettings();
   useControls('Audio', {
-    master: { value: a.master, min: 0, max: 1, step: 0.05, onChange: (v: number) => useSettings.getState().setAudio({ master: v }) },
-    sfx: { value: a.sfx, min: 0, max: 1, step: 0.05, onChange: (v: number) => useSettings.getState().setAudio({ sfx: v }) },
-    music: { value: a.music, min: 0, max: 1, step: 0.05, onChange: (v: number) => useSettings.getState().setAudio({ music: v }) },
-    muted: { value: a.muted, onChange: (v: boolean) => useSettings.getState().setAudio({ muted: v }) },
+    master: {
+      value: a.master,
+      min: 0,
+      max: 1,
+      step: 0.05,
+      onChange: (v: number) => useSettings.getState().setAudio({ master: v }),
+    },
+    sfx: {
+      value: a.sfx,
+      min: 0,
+      max: 1,
+      step: 0.05,
+      onChange: (v: number) => useSettings.getState().setAudio({ sfx: v }),
+    },
+    music: {
+      value: a.music,
+      min: 0,
+      max: 1,
+      step: 0.05,
+      onChange: (v: number) => useSettings.getState().setAudio({ music: v }),
+    },
+    muted: {
+      value: a.muted,
+      onChange: (v: boolean) => useSettings.getState().setAudio({ muted: v }),
+    },
   });
   useControls('Graphics & debug', {
-    quality: { value: useSettings.getState().quality, options: ['low', 'med', 'high'], onChange: (q: Quality) => setQuality(q) },
+    quality: {
+      value: useSettings.getState().quality,
+      options: ['low', 'med', 'high'],
+      onChange: (q: Quality) => setQuality(q),
+    },
     physicsDebug: { value: false, onChange: (on: boolean) => setPhysicsDebug(on) },
   });
   useControls('Server commands', {
@@ -95,15 +125,50 @@ function Controls() {
   useControls('HUD mock', {
     scenario: {
       value: hudMock.scenario,
-      options: ['off', 'intact', 'enemyStationDown', 'enemyShieldDown', 'ourShieldDown', 'coreCritical', 'bothExposed'],
+      options: [
+        'off',
+        'intact',
+        'enemyStationDown',
+        'enemyShieldDown',
+        'ourShieldDown',
+        'coreCritical',
+        'bothExposed',
+      ],
       onChange: (v: MockScenario) => (hudMock.scenario = v),
     },
-    battle: { value: hudMock.battle, options: ['battle', 'victory', 'defeat'], onChange: (v: MockBattle) => (hudMock.battle = v) },
-    launchPhase: { value: hudMock.launchPhase, options: ['none', 'hangar', 'staging', 'ready', 'catapult'], onChange: (v: LaunchPhase) => (hudMock.launchPhase = v) },
-    queuePos: { value: hudMock.queuePos, min: 0, max: 9, step: 1, onChange: (v: number) => (hudMock.queuePos = v) },
-    tunnel: { value: hudMock.tunnel, min: 0, max: 2, step: 1, onChange: (v: number) => (hudMock.tunnel = v) },
-    stalled: { value: false, onChange: (v: boolean) => (hudMock.stalled = v) },
-    speed: { value: -1, min: -1, max: 200, step: 1, label: 'speed (-1 = real)', onChange: (v: number) => (hudMock.speed = v) },
+    battle: {
+      value: hudMock.battle,
+      options: ['battle', 'victory', 'defeat'],
+      onChange: (v: MockBattle) => (hudMock.battle = v),
+    },
+    launchPhase: {
+      value: hudMock.launchPhase,
+      options: ['none', 'hangar', 'staging', 'ready', 'catapult'],
+      onChange: (v: LaunchPhase) => (hudMock.launchPhase = v),
+    },
+    queuePos: {
+      value: hudMock.queuePos,
+      min: 0,
+      max: 9,
+      step: 1,
+      onChange: (v: number) => (hudMock.queuePos = v),
+    },
+    tunnel: {
+      value: hudMock.tunnel,
+      min: 0,
+      max: 2,
+      step: 1,
+      onChange: (v: number) => (hudMock.tunnel = v),
+    },
+    halted: { value: false, onChange: (v: boolean) => (hudMock.halted = v) },
+    speed: {
+      value: -1,
+      min: -1,
+      max: 200,
+      step: 1,
+      label: 'speed (-1 = real)',
+      onChange: (v: number) => (hudMock.speed = v),
+    },
     'enemy shield down': button(() => mockEvent('enemyShieldDown')),
     'our shield down': button(() => mockEvent('ourShieldDown')),
     'enemy station destroyed': button(() => mockEvent('enemyStationDestroyed')),
@@ -126,7 +191,9 @@ function Console() {
       if (!st) return setRec('prediction off');
       const line = `reconcile err avg ${st.avg.toFixed(2)} m  max ${st.max.toFixed(2)} m  (${st.count} snaps / 10 s)`;
       const au = audioStats();
-      setRec(`${line}\naudio ${au.state} voices ${au.voices} (peak ${au.peak}, stolen ${au.dropped}) loops ${au.loops} music I=${au.music?.intensity.toFixed(2) ?? '-'}`);
+      setRec(
+        `${line}\naudio ${au.state} voices ${au.voices} (peak ${au.peak}, stolen ${au.dropped}) loops ${au.loops} music I=${au.music?.intensity.toFixed(2) ?? '-'}`,
+      );
       if (++n % 20 === 0) console.log('[reconcile]', line);
     }, 500);
     return () => clearInterval(t);
@@ -134,9 +201,19 @@ function Console() {
   return (
     <div
       data-ui
-      style={{ position: 'fixed', left: 28, top: 330, width: 380, font: '13px ui-monospace, monospace', color: '#cfe', pointerEvents: 'auto' }}
+      style={{
+        position: 'fixed',
+        left: 28,
+        top: 330,
+        width: 380,
+        font: '13px ui-monospace, monospace',
+        color: '#cfe',
+        pointerEvents: 'auto',
+      }}
     >
-      <div style={{ background: '#000c', padding: '2px 6px', color: '#ffd24a' }}><span style={{ whiteSpace: 'pre-line' }}>{rec}</span></div>
+      <div style={{ background: '#000c', padding: '2px 6px', color: '#ffd24a' }}>
+        <span style={{ whiteSpace: 'pre-line' }}>{rec}</span>
+      </div>
       <div style={{ background: '#000a', padding: 6, maxHeight: 140, overflow: 'auto' }}>
         {lines.slice(-8).map((l, i) => (
           <div key={i}>{l}</div>
@@ -145,7 +222,14 @@ function Console() {
       <input
         value={text}
         placeholder="dev console: /god /bots n /timescale x"
-        style={{ width: '100%', boxSizing: 'border-box', background: '#000c', color: '#fff', border: '1px solid #345', padding: 4 }}
+        style={{
+          width: '100%',
+          boxSizing: 'border-box',
+          background: '#000c',
+          color: '#fff',
+          border: '1px solid #345',
+          padding: 4,
+        }}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
           e.stopPropagation();

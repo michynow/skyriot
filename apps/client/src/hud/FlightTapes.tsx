@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { FRAMES, sampleHeight } from '@skyriot/shared';
+import { sampleHeight } from '@skyriot/shared';
 import { world } from '../state/world';
 import { isFlying, ownShip } from './hudStore';
 
@@ -205,64 +205,28 @@ function headingScale(g: CanvasRenderingContext2D, headingDeg: number) {
 }
 
 /**
- * Fighter-style flight instruments: speed tape (left, stall zone hatched red), radar-altitude tape (right, AGL,
- * ground hatched), vertical-speed chevron, heading scale with pitch readout, and the STALL warning.
+ * Fighter-style flight instruments: radar-altitude tape (right, AGL, ground hatched), vertical-speed chevron,
+ * heading scale with pitch readout. Speed lives in the status gauge.
  */
 export function FlightTapes() {
-  const speedEl = useRef<HTMLCanvasElement>(null);
   const altEl = useRef<HTMLCanvasElement>(null);
   const hdgEl = useRef<HTMLCanvasElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
-  const stallEl = useRef<HTMLDivElement>(null);
   const pitchEl = useRef<HTMLSpanElement>(null);
   const vsEl = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    const gs = setup(speedEl.current!, TAPE_W, TAPE_H);
     const ga = setup(altEl.current!, TAPE_W, TAPE_H);
     const gh = setup(hdgEl.current!, HEADING_W, HEADING_H);
     let raf = 0;
-    let lastStall = false;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const own = ownShip();
       const show = !!own && isFlying(own) && !own.sieged;
       if (wrap.current) wrap.current.style.display = show ? 'block' : 'none';
-      if (!own || !show) {
-        if (stallEl.current) stallEl.current.style.display = 'none';
-        return;
-      }
-      const def = FRAMES[own.frame];
-      const env = world.map?.env;
-      const stallSpeed = env?.stallSpeed ?? 0;
+      if (!own || !show) return;
       const hf = world.heightfield;
       const agl = hf ? own.pos[1] - sampleHeight(hf, own.pos[0], own.pos[2]) : own.pos[1];
-      const stalled = own.stalled === true;
-
-      // Speed: 2.4 px per m/s, so the stall band and the Frame's top speed are both usually in view.
-      tape(gs, 'right', own.speed, 2.4, 10, 20, stallSpeed > 0 ? stallSpeed : null, 0);
-      if (def.maxSpeed) {
-        const y = TAPE_H / 2 - (def.maxSpeed - own.speed) * 2.4;
-        if (y > 0 && y < TAPE_H) {
-          gs.strokeStyle = AMBER;
-          gs.lineWidth = 2;
-          gs.beginPath();
-          gs.moveTo(TAPE_W - 24, y);
-          gs.lineTo(TAPE_W - 1, y);
-          gs.stroke();
-        }
-      }
-      const slow = stallSpeed > 0 && own.speed < stallSpeed * 1.25;
-      readout(
-        gs,
-        String(Math.round(own.speed)),
-        10,
-        TAPE_H / 2,
-        TAPE_W - 10,
-        'right',
-        stalled ? RED : slow ? AMBER : INK,
-        stalled ? 'rgba(90,10,10,0.92)' : 'rgba(6,18,31,0.92)',
-      );
 
       // Altitude AGL: 1 px per metre; the ground is the hatched floor.
       const low = agl < 60 && own.vel[1] < -5;
@@ -294,11 +258,6 @@ export function FlightTapes() {
         if (vsEl.current.textContent !== vsText) vsEl.current.textContent = vsText;
         vsEl.current.style.color = vs < -25 ? RED : INK;
       }
-
-      if (stalled !== lastStall) {
-        lastStall = stalled;
-        if (stallEl.current) stallEl.current.style.display = stalled ? 'block' : 'none';
-      }
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
@@ -307,10 +266,6 @@ export function FlightTapes() {
   return (
     <>
       <div className="tapes" ref={wrap}>
-        <div className="tape tape-spd">
-          <small>SPD m/s</small>
-          <canvas ref={speedEl} style={{ width: TAPE_W, height: TAPE_H }} />
-        </div>
         <div className="tape tape-alt">
           <small>RALT m</small>
           <canvas ref={altEl} style={{ width: TAPE_W, height: TAPE_H }} />
@@ -322,10 +277,6 @@ export function FlightTapes() {
             PITCH <b ref={pitchEl} />
           </span>
         </div>
-      </div>
-      <div className="stall" ref={stallEl} style={{ display: 'none' }}>
-        STALL
-        <small>NOSE DOWN · FULL THROTTLE</small>
       </div>
     </>
   );

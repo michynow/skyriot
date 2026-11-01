@@ -79,7 +79,10 @@ function parseSnapshot(m: unknown): Snapshot | null {
     buffs: Array.isArray(s.buffs)
       ? s.buffs.filter(
           (b): b is ShipState['buffs'][number] =>
-            isObj(b) && typeof b.skill === 'string' && typeof b.source === 'string' && isNum(b.ticksLeft),
+            isObj(b) &&
+            typeof b.skill === 'string' &&
+            typeof b.source === 'string' &&
+            isNum(b.ticksLeft),
         )
       : [],
     toggles: isObj(s.toggles) ? (s.toggles as Record<string, string>) : {},
@@ -87,7 +90,8 @@ function parseSnapshot(m: unknown): Snapshot | null {
   const isVec3 = (v: unknown): v is Vec3 => Array.isArray(v) && v.length === 3 && v.every(isNum);
   const missiles = Array.isArray(m.missiles)
     ? m.missiles.filter(
-        (x): x is Snapshot['missiles'][number] => isObj(x) && isNum(x.id) && isVec3(x.pos) && isVec3(x.vel),
+        (x): x is Snapshot['missiles'][number] =>
+          isObj(x) && isNum(x.id) && isVec3(x.pos) && isVec3(x.vel),
       )
     : [];
   const structures = Array.isArray(m.structures)
@@ -97,7 +101,15 @@ function parseSnapshot(m: unknown): Snapshot | null {
       )
     : [];
   const match = isObj(m.match) ? (m.match as unknown as Snapshot['match']) : NO_MATCH;
-  return { tick: m.tick, serverTimeMs: m.serverTimeMs, ack: isNum(m.ack) ? m.ack : -1, ships, missiles, structures, match };
+  return {
+    tick: m.tick,
+    serverTimeMs: m.serverTimeMs,
+    ack: isNum(m.ack) ? m.ack : -1,
+    ships,
+    missiles,
+    structures,
+    match,
+  };
 }
 
 const NO_MATCH: Snapshot['match'] = {
@@ -164,7 +176,9 @@ export async function connect(options: JoinOptions, h: ConnectionHandlers): Prom
     clearTimeout(timeout);
     if (!closed) h.onClose(`Disconnected (code ${code}).`);
   });
-  room.onError((code: number, message?: string) => h.onClose(`Connection error ${code}: ${message ?? ''}`));
+  room.onError((code: number, message?: string) =>
+    h.onClose(`Connection error ${code}: ${message ?? ''}`),
+  );
 
   return {
     get rtt() {

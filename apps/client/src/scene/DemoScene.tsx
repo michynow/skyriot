@@ -1,7 +1,16 @@
 import { useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FRAMES, RUSTWATER_CANYONS, SKILLS, generateHeightfield, sampleHeight, type FrameId, type NationId, type ShipState } from '@skyriot/shared';
+import {
+  FRAMES,
+  RUSTWATER_CANYONS,
+  SKILLS,
+  generateHeightfield,
+  sampleHeight,
+  type FrameId,
+  type NationId,
+  type ShipState,
+} from '@skyriot/shared';
 import { Ships } from '../frames/Ships';
 import { ProjectilesFx } from '../fx/ProjectilesFx';
 import { world } from '../state/world';
@@ -15,19 +24,76 @@ const TIERS = [2, 5, 8, 10];
 const UPGRADES = [0, 3, 7, 10];
 const rnd = Math.random;
 
-function mk(id: string, frame: FrameId, nation: NationId, tier: number, upgrade: number): ShipState {
+function mk(
+  id: string,
+  frame: FrameId,
+  nation: NationId,
+  tier: number,
+  upgrade: number,
+): ShipState {
   const d = FRAMES[frame];
   return {
-    id, nation, frame, name: id, isBot: true, tier, upgrade,
-    pos: [0, 0, 0], rot: [0, 0, 0, 1], vel: [0, 0, 0], hp: d.maxHp, maxHp: d.maxHp, shield: d.maxShield, maxShield: d.maxShield,
-    fuel: 1, speed: 100, alive: true, respawnAtTick: 0, rollTicks: 0, rollCooldownTicks: 0, sieged: false, cooldowns: [], lockTarget: null, ammo1: 100, ammo2: 4, docked: false,
-    angVel: [0, 0, 0], brakeHeld: false, dashTicks: 0, ghostTicks: 0, ironTicks: 0, flareTicks: 0, dockTicks: 0, grounded: false, buffs: [], toggles: {}, rollPhase: -1, rollDir: 1, outOfBounds: false,
-    siegePending: false, incomingDist: -1, incomingTti: -1, canLock: false, lockProgress: 0,
-    launchPhase: 'none', queuePos: -1, tunnel: -1, launchTicks: 0, stalled: false,
+    id,
+    nation,
+    frame,
+    name: id,
+    isBot: true,
+    tier,
+    upgrade,
+    pos: [0, 0, 0],
+    rot: [0, 0, 0, 1],
+    vel: [0, 0, 0],
+    hp: d.maxHp,
+    maxHp: d.maxHp,
+    shield: d.maxShield,
+    maxShield: d.maxShield,
+    fuel: 1,
+    speed: 100,
+    alive: true,
+    respawnAtTick: 0,
+    rollTicks: 0,
+    rollCooldownTicks: 0,
+    sieged: false,
+    cooldowns: [],
+    lockTarget: null,
+    ammo1: 100,
+    ammo2: 4,
+    docked: false,
+    angVel: [0, 0, 0],
+    brakeHeld: false,
+    dashTicks: 0,
+    ghostTicks: 0,
+    ironTicks: 0,
+    flareTicks: 0,
+    dockTicks: 0,
+    grounded: false,
+    buffs: [],
+    toggles: {},
+    rollPhase: -1,
+    rollDir: 1,
+    outOfBounds: false,
+    siegePending: false,
+    incomingDist: -1,
+    incomingTti: -1,
+    canLock: false,
+    lockProgress: 0,
+    launchPhase: 'none',
+    queuePos: -1,
+    tunnel: -1,
+    launchTicks: 0,
+    flipTicks: 0,
+    reverseTicks: 0,
+    halted: false,
   };
 }
 
-interface Opts { showcase: boolean; focus: number; dist: number; yaw: number; pitch: number }
+interface Opts {
+  showcase: boolean;
+  focus: number;
+  dist: number;
+  yaw: number;
+  pitch: number;
+}
 
 /** Standalone render preview: fake ships + fake events, no network. Mount inside <Canvas>. */
 export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
@@ -52,8 +118,17 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
     world.ownId = opts.showcase ? list[1 + opts.focus]!.id : 'own';
     // altitude: above the highest ground within the flight circle
     let hmax = 0;
-    for (let a = 0; a < 64; a++) hmax = Math.max(hmax, sampleHeight(hf, Math.cos(a / 10) * 260, Math.sin(a / 10) * 260));
-    return { list, hmax, t: 0, nextId: 1, ev: 0, timers: { fire: 0, missile: 2, hit: 1, kill: 6, roll: 3, impact: 4, flare: 5 }, deadUntil: new Map<string, number>() };
+    for (let a = 0; a < 64; a++)
+      hmax = Math.max(hmax, sampleHeight(hf, Math.cos(a / 10) * 260, Math.sin(a / 10) * 260));
+    return {
+      list,
+      hmax,
+      t: 0,
+      nextId: 1,
+      ev: 0,
+      timers: { fire: 0, missile: 2, hit: 1, kill: 6, roll: 3, impact: 4, flare: 5 },
+      deadUntil: new Map<string, number>(),
+    };
   }, [map, opts.showcase, opts.focus]);
 
   (window as unknown as { __world: unknown }).__world = world;
@@ -76,15 +151,21 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
     for (let i = 0; i < list.length; i++) {
       const s = list[i]!;
       if (opts.showcase) {
-        if (i === 0) { s.alive = false; continue; }
-        const k = i - 1, row = Math.floor(k / 4), col = k % 4;
+        if (i === 0) {
+          s.alive = false;
+          continue;
+        }
+        const k = i - 1,
+          row = Math.floor(k / 4),
+          col = k % 4;
         s.pos = [(col - 1.5) * 16, alt, row * 16];
         o.position.set(s.pos[0], s.pos[1], s.pos[2]);
         o.rotation.set(0, Math.PI * 0 + 0.0, 0);
         o.quaternion.setFromEuler(new THREE.Euler(0, 0, 0));
         s.rot = [o.quaternion.x, o.quaternion.y, o.quaternion.z, o.quaternion.w];
         s.sieged = k % 4 === 3 && Math.floor(t / 4) % 2 === 1;
-        if (k === 0 || k === 5) world.boosting.add(s.id); else world.boosting.delete(s.id);
+        if (k === 0 || k === 5) world.boosting.add(s.id);
+        else world.boosting.delete(s.id);
         continue;
       }
       if (i === 0 && location.search.includes('dock')) {
@@ -99,7 +180,8 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
       const R = 260 + (i === 0 ? 0 : (i % 3) * 18);
       const w = 0.2 - (i === 0 ? 0 : 0.002 * i);
       const a = t * w + ph;
-      const x = Math.cos(a) * R, z = Math.sin(a) * R;
+      const x = Math.cos(a) * R,
+        z = Math.sin(a) * R;
       const y = alt + (i === 0 ? 0 : Math.sin(t * 0.7 + i) * 12 + (i % 4) * 7);
       const a2 = a + 0.02;
       // moving direction (tangent) – object faces +Z toward target, we want -Z so look at the mirror point
@@ -110,11 +192,17 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
       s.pos = [x, y, z];
       s.rot = [o.quaternion.x, o.quaternion.y, o.quaternion.z, o.quaternion.w];
       s.sieged = false;
-      if (i === 0 || i % 3 === 0 || boostAll) world.boosting.add(s.id); else world.boosting.delete(s.id);
+      if (i === 0 || i % 3 === 0 || boostAll) world.boosting.add(s.id);
+      else world.boosting.delete(s.id);
       if (s.rollPhase >= 0) s.rollPhase = s.rollPhase + dt / 0.7 > 1 ? -1 : s.rollPhase + dt / 0.7;
       const dead = demo.deadUntil.get(s.id);
-      if (dead !== undefined && t > dead) { demo.deadUntil.delete(s.id); s.alive = true; s.hp = s.maxHp; push({ type: 'shipRespawned', id: s.id, pos: s.pos }); }
-      s.hp = Math.max(s.maxHp * 0.2, s.maxHp * (0.6 + 0.4 * Math.sin(t * 0.3 + i)) );
+      if (dead !== undefined && t > dead) {
+        demo.deadUntil.delete(s.id);
+        s.alive = true;
+        s.hp = s.maxHp;
+        push({ type: 'shipRespawned', id: s.id, pos: s.pos });
+      }
+      s.hp = Math.max(s.maxHp * 0.2, s.maxHp * (0.6 + 0.4 * Math.sin(t * 0.3 + i)));
     }
 
     if (skillsDemo) {
@@ -132,20 +220,58 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
         const def = SKILLS[id]!;
         const fr = def.frames === 'all' ? 'wasp' : def.frames[0]!;
         const caster = list.find((x) => x.frame === fr && x.nation === 'concord')!;
-        if (def.kind === 'buff') caster.buffs.push({ skill: id, source: caster.id, ticksLeft: 150 });
-        if (def.kind === 'toggle') caster.toggles = { ...caster.toggles, [def.toggleGroup ?? 'g']: id };
+        if (def.kind === 'buff')
+          caster.buffs.push({ skill: id, source: caster.id, ticksLeft: 150 });
+        if (def.kind === 'toggle')
+          caster.toggles = { ...caster.toggles, [def.toggleGroup ?? 'g']: id };
         if (id === 'iron-hide') caster.ironTicks = 150;
         if (id === 'ghost-skin') caster.ghostTicks = 150;
-        const allies = list.filter((x) => x.nation === caster.nation && x.id !== caster.id).map((x) => x.id);
-        if (def.auraRadiusM) for (const a of list.filter((x) => x.nation === caster.nation && x.id !== caster.id)) a.buffs.push({ skill: id, source: caster.id, ticksLeft: 150 });
-        push({ type: 'skillUsed', id: caster.id, skill: id, slot: 0, targets: allies } as unknown as Parameters<typeof push>[0]);
+        const allies = list
+          .filter((x) => x.nation === caster.nation && x.id !== caster.id)
+          .map((x) => x.id);
+        if (def.auraRadiusM)
+          for (const a of list.filter((x) => x.nation === caster.nation && x.id !== caster.id))
+            a.buffs.push({ skill: id, source: caster.id, ticksLeft: 150 });
+        push({
+          type: 'skillUsed',
+          id: caster.id,
+          skill: id,
+          slot: 0,
+          targets: allies,
+        } as unknown as Parameters<typeof push>[0]);
         if (id === 'ground-strike-mode') {
           q0.set(caster.rot[0], caster.rot[1], caster.rot[2], caster.rot[3]);
-          for (let n = 0; n < 3; n++) push({ type: 'projectileSpawned', id: demo.nextId++, owner: caster.id, kind: 'rocket', weapon: 'brick-bomb', origin: [caster.pos[0] + n * 3, caster.pos[1] - 3, caster.pos[2]], dir: [0, -1, 0], speed: 140, target: null, tick: 0 });
+          for (let n = 0; n < 3; n++)
+            push({
+              type: 'projectileSpawned',
+              id: demo.nextId++,
+              owner: caster.id,
+              kind: 'rocket',
+              weapon: 'brick-bomb',
+              origin: [caster.pos[0] + n * 3, caster.pos[1] - 3, caster.pos[2]],
+              dir: [0, -1, 0],
+              speed: 140,
+              target: null,
+              tick: 0,
+            });
         }
         if (id === 'air-barrage-mode') {
-          v.set(0, 0, -1).applyQuaternion(q0.set(caster.rot[0], caster.rot[1], caster.rot[2], caster.rot[3]));
-          for (let n = 0; n < 3; n++) push({ type: 'projectileSpawned', id: demo.nextId++, owner: caster.id, kind: 'rocket', weapon: 'brick-bomb', origin: [caster.pos[0] + (n - 1) * 3, caster.pos[1], caster.pos[2]], dir: [v.x, v.y, v.z], speed: 220, target: null, tick: 0 });
+          v.set(0, 0, -1).applyQuaternion(
+            q0.set(caster.rot[0], caster.rot[1], caster.rot[2], caster.rot[3]),
+          );
+          for (let n = 0; n < 3; n++)
+            push({
+              type: 'projectileSpawned',
+              id: demo.nextId++,
+              owner: caster.id,
+              kind: 'rocket',
+              weapon: 'brick-bomb',
+              origin: [caster.pos[0] + (n - 1) * 3, caster.pos[1], caster.pos[2]],
+              dir: [v.x, v.y, v.z],
+              speed: 220,
+              target: null,
+              tick: 0,
+            });
         }
       }
     }
@@ -160,24 +286,66 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
         T.fire = 0.06;
         for (const s of [list[0]!, pick()!]) {
           v.set(0, 0, -1).applyQuaternion(o.quaternion.set(s.rot[0], s.rot[1], s.rot[2], s.rot[3]));
-          push({ type: 'projectileSpawned', id: demo.nextId++, owner: s.id, kind: 'tracer', weapon: 'needle-cannon', origin: [s.pos[0] + v.x * 5, s.pos[1] + v.y * 5, s.pos[2] + v.z * 5], dir: [v.x, v.y, v.z], speed: 900, target: null, tick: 0 });
+          push({
+            type: 'projectileSpawned',
+            id: demo.nextId++,
+            owner: s.id,
+            kind: 'tracer',
+            weapon: 'needle-cannon',
+            origin: [s.pos[0] + v.x * 5, s.pos[1] + v.y * 5, s.pos[2] + v.z * 5],
+            dir: [v.x, v.y, v.z],
+            speed: 900,
+            target: null,
+            tick: 0,
+          });
         }
       }
       T.missile -= dt;
       if (T.missile < 0) {
         T.missile = spam ? 0.25 : 2.5;
-        const a = pick()!, b = spam && rnd() < 0.5 ? list[0]! : pick()!;
+        const a = pick()!,
+          b = spam && rnd() < 0.5 ? list[0]! : pick()!;
         v.set(0, 0, -1).applyQuaternion(o.quaternion.set(a.rot[0], a.rot[1], a.rot[2], a.rot[3]));
-        push({ type: 'projectileSpawned', id: demo.nextId++, owner: a.id, kind: 'missile', weapon: spam && rnd() < 0.4 ? 'seeker-pod' : 'sting-missile', origin: [a.pos[0], a.pos[1] - 1, a.pos[2]], dir: [v.x, v.y, v.z], speed: 190, target: b.id, tick: 0 });
+        push({
+          type: 'projectileSpawned',
+          id: demo.nextId++,
+          owner: a.id,
+          kind: 'missile',
+          weapon: spam && rnd() < 0.4 ? 'seeker-pod' : 'sting-missile',
+          origin: [a.pos[0], a.pos[1] - 1, a.pos[2]],
+          dir: [v.x, v.y, v.z],
+          speed: 190,
+          target: b.id,
+          tick: 0,
+        });
         const r = list[0]!;
         v.set(0, 0, -1).applyQuaternion(o.quaternion.set(r.rot[0], r.rot[1], r.rot[2], r.rot[3]));
-        push({ type: 'projectileSpawned', id: demo.nextId++, owner: r.id, kind: 'rocket', weapon: 'brick-bomb', origin: [r.pos[0], r.pos[1] - 1, r.pos[2]], dir: [v.x, v.y - 0.1, v.z], speed: 140, target: null, tick: 0 });
+        push({
+          type: 'projectileSpawned',
+          id: demo.nextId++,
+          owner: r.id,
+          kind: 'rocket',
+          weapon: 'brick-bomb',
+          origin: [r.pos[0], r.pos[1] - 1, r.pos[2]],
+          dir: [v.x, v.y - 0.1, v.z],
+          speed: 140,
+          target: null,
+          tick: 0,
+        });
       }
       T.hit -= dt;
       if (T.hit < 0) {
         T.hit = 0.5;
         const s = pick()!;
-        push({ type: 'hit', projectile: -1, attacker: 'own', victim: s.id, damage: 30, deflected: rnd() < 0.2, pos: [s.pos[0] + rnd() - 0.5, s.pos[1], s.pos[2]] });
+        push({
+          type: 'hit',
+          projectile: -1,
+          attacker: 'own',
+          victim: s.id,
+          damage: 30,
+          deflected: rnd() < 0.2,
+          pos: [s.pos[0] + rnd() - 0.5, s.pos[1], s.pos[2]],
+        });
       }
       T.kill -= dt;
       if (T.kill < 0) {
@@ -188,12 +356,24 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
         push({ type: 'shipDestroyed', victim: s.id, killer: 'own', pos: s.pos });
       }
       T.roll -= dt;
-      if (T.roll < 0) { T.roll = 4; const rs = rnd() < 0.5 ? list[0]! : pick()!; rs.rollPhase = 0; rs.rollDir = rnd() < 0.5 ? -1 : 1; push({ type: 'barrelRoll', id: rs.id, dir: rnd() < 0.5 ? -1 : 1 }); }
+      if (T.roll < 0) {
+        T.roll = 4;
+        const rs = rnd() < 0.5 ? list[0]! : pick()!;
+        rs.rollPhase = 0;
+        rs.rollDir = rnd() < 0.5 ? -1 : 1;
+        push({ type: 'barrelRoll', id: rs.id, dir: rnd() < 0.5 ? -1 : 1 });
+      }
       T.impact -= dt;
       if (T.impact < 0) {
         T.impact = 6;
         const s = pick()!;
-        push({ type: 'terrainImpact', id: s.id, damage: 120, bounced: rnd() < 0.6, pos: [s.pos[0], sampleHeight(world.heightfield!, s.pos[0], s.pos[2]), s.pos[2]] });
+        push({
+          type: 'terrainImpact',
+          id: s.id,
+          damage: 120,
+          bounced: rnd() < 0.6,
+          pos: [s.pos[0], sampleHeight(world.heightfield!, s.pos[0], s.pos[2]), s.pos[2]],
+        });
         push({ type: 'launched', id: pick()!.id });
         push({ type: 'resupplied', id: pick()!.id });
       }
@@ -201,7 +381,18 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
       if (T.flare < 0) {
         T.flare = 5;
         const s = pick()!;
-        push({ type: 'projectileSpawned', id: demo.nextId++, owner: s.id, kind: 'flare', weapon: 'flares', origin: s.pos, dir: [0.2, -0.3, 0.9], speed: 40, target: null, tick: 0 });
+        push({
+          type: 'projectileSpawned',
+          id: demo.nextId++,
+          owner: s.id,
+          kind: 'flare',
+          weapon: 'flares',
+          origin: s.pos,
+          dir: [0.2, -0.3, 0.9],
+          speed: 40,
+          target: null,
+          tick: 0,
+        });
       }
     }
 

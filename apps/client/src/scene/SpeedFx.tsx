@@ -113,7 +113,13 @@ export class BoostEffect extends Effect {
         c.b = mix(c.b, texture2D(inputBuffer, uv + d * ca).b, min(1.0, uKick * 2.0));
         outputColor = vec4(c, inputColor.a);
       }`,
-      { blendFunction: BlendFunction.NORMAL, uniforms: new Map<string, THREE.Uniform>([['uKick', new THREE.Uniform(0)], ['uSus', new THREE.Uniform(0)]]) },
+      {
+        blendFunction: BlendFunction.NORMAL,
+        uniforms: new Map<string, THREE.Uniform>([
+          ['uKick', new THREE.Uniform(0)],
+          ['uSus', new THREE.Uniform(0)],
+        ]),
+      },
     );
   }
   update() {

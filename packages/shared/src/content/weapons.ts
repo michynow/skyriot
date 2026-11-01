@@ -7,14 +7,14 @@ export const WEAPONS: Record<string, WeaponDef> = {
   }),
   'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 34, 0.11, 800, 950, 0.015),
   'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 48, 0.12, 750, 1000, 0.02),
-  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 300, 4, 280, 1500, 0, {
-    homingTurnRate: 1.7,
+  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 480, 1.6, 250, 1500, 0, {
+    homingTurnRate: 2.4,
     lockConeRad: 0.45,
     lockTimeSec: 1.2,
     splashRadius: 5,
   }),
-  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 200, 3.2, 260, 1300, 0, {
-    homingTurnRate: 1.8,
+  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 340, 1.6, 240, 1300, 0, {
+    homingTurnRate: 2.5,
     lockConeRad: 0.5,
     lockTimeSec: 1,
     splashRadius: 5,
@@ -198,6 +198,22 @@ export const SKILLS: Record<string, SkillDef> = {
     ['bulwark'],
     30,
     8,
+  ),
+  'pivot-flip': s(
+    'pivot-flip',
+    'Pivot Flip',
+    'Snap the nose around 180 degrees, keeping your speed.',
+    'all',
+    12,
+    0.7,
+  ),
+  backdraft: s(
+    'backdraft',
+    'Backdraft',
+    'Reverse thrusters: burst backwards for a moment, guns still facing forward.',
+    'all',
+    10,
+    0.8,
   ),
   'repair-kit': c('repair-kit', 'Repair Kit', 'Restore 35% HP.', 20),
   'shield-kit': c('shield-kit', 'Shield Kit', 'Restore full shield.', 20),

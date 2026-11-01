@@ -2,21 +2,52 @@ import { useEffect, useRef } from 'react';
 import type { Vec3 } from '@skyriot/shared';
 import { project } from './view';
 
-type Kind = 'shield' | 'hp' | 'defl';
+type Kind = 'shield' | 'hp' | 'defl' | 'struct' | 'absorb';
 interface Floater {
   pos: Vec3;
   text: string;
   kind: Kind;
   born: number;
+  /** Victim key: rapid hits on the same victim merge into one growing number. */
+  key: string;
+  sum: number;
+  /** Screen jitter so stacked numbers don't overlap. */
+  jx: number;
 }
 const POOL = 24;
-const LIFE_MS = 900;
+const LIFE_MS = 1200;
+/** Hits on the same victim within this window add up in one number. */
+const MERGE_MS = 350;
+/** Hits worth at least this much (missiles, bombs) get the big size. */
+const BIG_DAMAGE = 200;
 const live: Floater[] = [];
 const p = { x: 0, y: 0 };
 
-/** Floating damage number at a world position (hits the own Ship deals). */
-export function pushFloater(pos: Vec3, text: string, kind: Kind): void {
-  live.push({ pos: [...pos], text, kind, born: performance.now() });
+/** Floating damage number at a world position (hits the own Ship deals). Pass `damage` to merge rapid hits. */
+export function pushFloater(pos: Vec3, text: string, kind: Kind, key = '', damage = 0): void {
+  const now = performance.now();
+  let last: Floater | undefined;
+  for (let i = live.length - 1; i >= 0 && key; i--)
+    if (live[i]!.key === key && live[i]!.kind === kind) {
+      last = live[i];
+      break;
+    }
+  if (last && damage > 0 && now - last.born < MERGE_MS) {
+    last.sum += damage;
+    last.text = String(Math.round(last.sum));
+    last.pos = [...pos];
+    last.born = now;
+    return;
+  }
+  live.push({
+    pos: [...pos],
+    text,
+    kind,
+    born: now,
+    key,
+    sum: damage,
+    jx: (Math.random() - 0.5) * 40,
+  });
   if (live.length > POOL) live.shift();
 }
 
@@ -38,9 +69,11 @@ export function Floaters() {
         const age = (now - f.born) / LIFE_MS;
         el.style.display = 'block';
         if (el.textContent !== f.text) el.textContent = f.text;
-        el.className = `fl ${f.kind}`;
+        el.className = `fl ${f.kind}${f.sum >= BIG_DAMAGE ? ' big' : ''}`;
         el.style.opacity = String(1 - age * age);
-        el.style.transform = `translate(${p.x}px,${p.y - age * 70}px)`;
+        // Pop in large, settle, then float up.
+        const pop = 1 + Math.max(0, 1 - age / 0.12) * 0.8;
+        el.style.transform = `translate(${p.x + f.jx}px,${p.y - age * 90}px) scale(${pop})`;
       }
     };
     raf = requestAnimationFrame(frame);

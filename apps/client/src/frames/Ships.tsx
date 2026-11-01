@@ -28,7 +28,13 @@ export function Ships() {
     if (!changed) {
       for (const s of world.ships.values()) {
         const k = known.current.get(s.id);
-        if (!k || k.frame !== s.frame || k.nation !== s.nation || k.tier !== s.tier || k.upgrade !== s.upgrade) {
+        if (
+          !k ||
+          k.frame !== s.frame ||
+          k.nation !== s.nation ||
+          k.tier !== s.tier ||
+          k.upgrade !== s.upgrade
+        ) {
           changed = true;
           break;
         }
@@ -65,7 +71,13 @@ export function Ships() {
             else groups.current.delete(e.id);
           }}
         >
-          <FrameModel frame={e.frame} nation={e.nation} tier={e.tier} upgrade={e.upgrade} shipId={e.id} />
+          <FrameModel
+            frame={e.frame}
+            nation={e.nation}
+            tier={e.tier}
+            upgrade={e.upgrade}
+            shipId={e.id}
+          />
         </group>
       ))}
     </>

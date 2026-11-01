@@ -10,22 +10,6 @@ export const BANK_RATE_RAD = 9;
 /** Bank (rad) per rad/s of yaw rate. */
 export const BANK_PER_YAW_RATE = 0.5;
 export const BANK_PER_STRAFE = 0.35;
-/** Terminal fall speed when fully stalled = gravity * this. */
-export const STALL_FALL_SECONDS = 2;
-// Stall (atmosphere, non-hover Frames): below env.stallSpeed the Ship stalls; it recovers above stallSpeed * this.
-export const STALL_RECOVER_MUL = 1.2;
-/** Turn rate multiplier while stalled. */
-export const STALL_TURN_MUL = 0.3;
-/** How hard a stall drags the aim toward straight down (0..1 blend). */
-export const STALL_NOSE_DROP = 0.75;
-/** While stalled, throttle changes speed at this fraction of accel... */
-export const STALL_THRUST_MUL = 0.3;
-/** ...and gravity along the nose adds -forward.y * gravity * this (m/s^2): dive to recover. */
-export const STALL_DIVE_GAIN = 2;
-/** The nose drop fades out below this height above ground. */
-export const STALL_GROUND_FADE_M = 40;
-/** Climbing/diving shifts the target speed by -forward.y * this (m/s): climbs bleed speed, dives build it. */
-export const CLIMB_SPEED_SHIFT = 45;
 /** Hover gap between the hull's lowest point and the ground. */
 export const HOVER_CLEARANCE = 2.6;
 export const HOVER_MAX_SPEED = 15;
@@ -80,6 +64,10 @@ export const AEGIS_RADIUS = 60;
 export const WALL_DISTANCE = 45;
 export const WALL_RADIUS = 14;
 export const WALL_MAX = 16;
+/** Pivot Flip: the steering aim is turned 180 degrees and turn rate is raised to this for the duration. */
+export const FLIP_TURN_RATE = 6.5;
+/** Backdraft: fly backwards at this fraction of boost speed, then resume at min speed. */
+export const REVERSE_SPEED_MUL = 0.7;
 
 // Steering smoothing
 /** Desired turn rate = angle-to-aim * gain (capped at turnRate): eases out of turns. */
@@ -116,7 +104,7 @@ export const MORTAR_LOFT_RAD = 0.6;
 export const MORTAR_GUIDE_TURN = 0.9;
 
 // Barrel Roll: displacement = rollImpulse * factor over ROLL_DURATION_SEC (half-sine velocity curve).
-export const ROLL_DURATION_SEC = 0.35;
+export const ROLL_DURATION_SEC = 1.1;
 export const ROLL_DISPLACEMENT_PER_IMPULSE = 0.25;
 
 // Frame core kits
@@ -134,8 +122,8 @@ export const PURGE_RADIUS = 120;
 export const NAV_MAX_LEAD_SEC = 5;
 export const WEAVE_PERIOD_MIN_SEC = 0.6;
 export const WEAVE_PERIOD_SPAN_SEC = 0.3;
-export const WEAVE_AMP_MIN_M = 6;
-export const WEAVE_AMP_SPAN_M = 4;
+export const WEAVE_AMP_MIN_M = 3;
+export const WEAVE_AMP_SPAN_M = 2;
 export const WEAVE_RAMP_SEC = 0.3;
 export const ROCKET_WOBBLE_AMP_M = 1.2;
 export const ROCKET_WOBBLE_PERIOD_SEC = 0.5;
@@ -145,8 +133,10 @@ export const ROCKET_WOBBLE_PERIOD_SEC = 0.5;
 export const SEEKER_CONE_RAD = 0.6;
 /** Guidance only while the motor burns; afterwards the missile flies on dumb until its range runs out. */
 export const MISSILE_MOTOR_SEC = 5;
+/** Proximity fuse: a guided missile still tracking detonates this close to its target's hull (direct hit). */
+export const MISSILE_FUSE_M = 8;
 /**
  * A target pulling at least this lateral acceleration (speed * turn rate, m/s^2) while the missile is in its
  * endgame out-turns it. Wasp manages it at cruise, Halo needs throttle, Anvil/Bulwark only while boosting.
  */
-export const BREAK_TURN_ACCEL = 260;
+export const BREAK_TURN_ACCEL = 230;
