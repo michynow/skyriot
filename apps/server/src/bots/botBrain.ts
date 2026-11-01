@@ -1,4 +1,5 @@
 import {
+  CLOAK_REVEAL_M,
   EMPTY_INPUT,
   DECK,
   FRAMES,
@@ -8,6 +9,7 @@ import {
   TICK_HZ,
   TURRET,
   WEAPONS,
+  isCloaked,
   mulberry32,
   sampleHeight,
   type Heightfield,
@@ -46,6 +48,13 @@ const FLARE_INCOMING_M = 700;
 const FLARE_CHANCE = 0.25;
 const BUFF_ENGAGE_DIST = 900;
 const BOMB_DROP_RADIUS = 60;
+/** Distance to the enemy under which a Bot fires each offensive Skill (roughly its effect reach). */
+const OFFENSIVE_REACH_M: Record<string, number> = {
+  'snare-tag': 400,
+  'sapping-hex': 130,
+  'quake-round': 180,
+  'cinder-cloud': 60,
+};
 const BOMB_RUN_ALTITUDE = 120;
 const SIEGE_BOT_CHANCE = 0.5;
 const SIEGE_BOT_ENGAGE_DISTANCE = 700;
@@ -338,6 +347,12 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
         input.hotbar = slot;
         break;
       }
+      // Offensive Skills (debuffs, damage areas): only once the enemy is inside their reach.
+      const reach = OFFENSIVE_REACH_M[id];
+      if (reach !== undefined && dist < reach) {
+        input.hotbar = slot;
+        break;
+      }
       if (
         def.kind === 'toggle' &&
         def.toggleGroup &&
@@ -392,7 +407,7 @@ function nearestEnemy(sim: Sim, me: ShipState): ShipState | null {
     if (!o.alive || o.nation === me.nation || o.launchPhase !== 'none') continue;
     const d =
       (o.pos[0] - me.pos[0]) ** 2 + (o.pos[1] - me.pos[1]) ** 2 + (o.pos[2] - me.pos[2]) ** 2;
-    if (d < bestD) {
+    if (d < bestD && (d <= CLOAK_REVEAL_M ** 2 || !isCloaked(o))) {
       bestD = d;
       best = o;
     }

@@ -30,7 +30,7 @@ import {
 import { stepProjectiles, stepWeapons, pushHistory } from './combat';
 import { deriveLateral, stepFlight, syncBody } from './flight';
 import { forwardOf } from './math';
-import { tickTimers, useHotbar } from './skills';
+import { castSkill, stepSkillEffects, tickTimers, useHotbar } from './skills';
 import { createMods, initToggles, resolveMods } from './buffs';
 import {
   applyStructures,
@@ -104,6 +104,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     projectiles: [],
     pool: [],
     walls: [],
+    zones: [],
     nextProjectileId: 1,
     events: [],
     structures: [],
@@ -380,6 +381,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       if (ctx.authoritative) {
         stepTurrets(ctx);
         stepProjectiles(ctx);
+        stepSkillEffects(ctx);
       }
       return events;
     },
@@ -484,6 +486,13 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     structures: () => structureStates,
     match: () => ctx.match,
     setStructures: (list) => applyStructures(ctx, list),
+
+    castSkill(id, skill) {
+      const rec = ctx.ships.get(id);
+      if (!rec) return false;
+      ctx.events = pending;
+      return castSkill(ctx, rec, skill, -1, false);
+    },
 
     destroyStructures(nation: NationId, kind: StructureKind) {
       ctx.events = pending;

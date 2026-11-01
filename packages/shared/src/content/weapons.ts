@@ -215,6 +215,130 @@ export const SKILLS: Record<string, SkillDef> = {
     10,
     0.8,
   ),
+  // ---- Wasp: stealth, burst fire, single-target snare ----
+  'shroud-veil': b(
+    'shroud-veil',
+    'Shroud Veil',
+    'Stealth: vanish from enemy radar beyond 180 m and refuse missile locks. Firing drops the veil.',
+    ['wasp'],
+    38,
+    7,
+    { cloak: true },
+  ),
+  'hot-barrels': b(
+    'hot-barrels',
+    'Hot Barrels',
+    'Short burst: +55% Primary fire rate, -10% turn rate.',
+    ['wasp'],
+    26,
+    6,
+    { fireRateMul: 1.55, turnRateMul: 0.9 },
+  ),
+  'snare-tag': d(
+    'snare-tag',
+    'Snare Tag',
+    'Tag the nearest enemy ahead (450 m): -30% speed, -35% turn rate.',
+    ['wasp'],
+    28,
+    4.5,
+    { speedMul: 0.7, turnRateMul: 0.65 },
+  ),
+  // ---- Anvil: area denial, payload, charge ----
+  'cinder-cloud': s(
+    'cinder-cloud',
+    'Cinder Cloud',
+    'Leave a burning cloud where you are: enemies inside take 80 damage per second.',
+    ['anvil'],
+    36,
+    8,
+  ),
+  'heavy-payload': b(
+    'heavy-payload',
+    'Heavy Payload',
+    'All weapons +30% damage and +20% splash, Primary fires 15% slower.',
+    ['anvil'],
+    45,
+    10,
+    { damageMul: 1.3, splashMul: 1.2, fireRateMul: 0.85 },
+  ),
+  'ram-surge': b(
+    'ram-surge',
+    'Ram Surge',
+    'Engines to the stops: +35% speed and 15% less damage taken.',
+    ['anvil'],
+    30,
+    5,
+    { speedMul: 1.35, damageTakenMul: 0.85 },
+  ),
+  // ---- Halo: heal-over-time, defense aura, weaken ----
+  'renewal-pulse': b(
+    'renewal-pulse',
+    'Renewal Pulse',
+    'Allies within 110 m regain 3.5% max HP per second.',
+    ['halo'],
+    34,
+    8,
+    { hpRegenPerSec: 0.035 },
+    110,
+  ),
+  'ward-lattice': b(
+    'ward-lattice',
+    'Ward Lattice',
+    'Allies within 100 m: +12% Deflect (ignores cap), 10% less damage taken.',
+    ['halo'],
+    55,
+    12,
+    { deflectAdd: 0.12, damageTakenMul: 0.9 },
+    100,
+  ),
+  'sapping-hex': d(
+    'sapping-hex',
+    'Sapping Hex',
+    'Enemies within 140 m deal 20% less damage and fly 15% slower.',
+    ['halo'],
+    42,
+    6,
+    { damageMul: 0.8, speedMul: 0.85 },
+  ),
+  // ---- Bulwark: shock shell, damage aura, mobility, team defense ----
+  'quake-round': d(
+    'quake-round',
+    'Quake Round',
+    'Burst a shock charge 140 m ahead: 150 damage and a heavy slow to enemies within 60 m.',
+    ['bulwark'],
+    30,
+    4,
+    { speedMul: 0.6, turnRateMul: 0.7 },
+  ),
+  'shrapnel-ring': b(
+    'shrapnel-ring',
+    'Shrapnel Ring',
+    'Spin a ring of shrapnel around the hull: enemies within 55 m take 60 damage per second.',
+    ['bulwark'],
+    40,
+    8,
+    { damageAuraDps: 60 },
+  ),
+  'servo-overclock': b(
+    'servo-overclock',
+    'Servo Overclock',
+    'Overclock the drive: +25% speed, +25% turn rate.',
+    ['bulwark'],
+    32,
+    8,
+    { speedMul: 1.25, turnRateMul: 1.25 },
+  ),
+  'bastion-field': b(
+    'bastion-field',
+    'Bastion Field',
+    'Allies within 90 m take 15% less damage and regen shields 50% faster.',
+    ['bulwark'],
+    60,
+    15,
+    { damageTakenMul: 0.85, shieldRegenMul: 1.5 },
+    90,
+  ),
+
   'repair-kit': c('repair-kit', 'Repair Kit', 'Restore 35% HP.', 20),
   'shield-kit': c('shield-kit', 'Shield Kit', 'Restore full shield.', 20),
   'fuel-cell': c('fuel-cell', 'Fuel Cell', 'Refill booster fuel.', 15),
@@ -280,6 +404,19 @@ function b(
     buff,
     auraRadiusM,
   };
+}
+
+/** Enemy debuff: a 'skill' whose `buff` is carried by the victims the cast picks. */
+function d(
+  id: string,
+  name: string,
+  description: string,
+  frames: SkillDef['frames'],
+  cooldownSec: number,
+  durationSec: number,
+  buff: SkillDef['buff'],
+): SkillDef {
+  return { id, name, description, frames, cooldownSec, durationSec, kind: 'skill', buff };
 }
 
 function t(

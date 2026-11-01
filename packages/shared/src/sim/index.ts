@@ -7,6 +7,7 @@ import type {
   ShipSpawn,
   ShipState,
   SimEvent,
+  SkillId,
   StructureKind,
   StructureState,
   Vec3,
@@ -47,6 +48,8 @@ export interface Sim {
   match(): MatchState;
   /** Client: mirror server structures so colliders and shield domes match the server. */
   setStructures(list: readonly StructureState[]): void;
+  /** Dev: cast any Skill of the Ship's Frame kit, hotbar or not (no cooldown). False if it can't. */
+  castSkill(id: ShipId, skill: SkillId): boolean;
   /** Dev: destroy every live structure of a kind in a Nation's Base. Returns how many. */
   destroyStructures(nation: NationId, kind: StructureKind): number;
   /** Dev: end the Battle now with `winner`; Bases rebuild after the usual delay. */
@@ -72,6 +75,16 @@ export interface SimOptions {
 }
 
 export { createSim } from './createSim';
+export { isCloaked } from './buffs';
+// Skill area sizes the client draws.
+export {
+  CINDER_RADIUS,
+  CLOAK_REVEAL_M,
+  DAMAGE_AURA_RADIUS,
+  QUAKE_DISTANCE,
+  QUAKE_RADIUS,
+  SAP_RADIUS,
+} from './constants';
 // Projectile tuning the client needs to draw where Secondary / bombing Skills will land.
 export {
   AIR_BARRAGE_COUNT,

@@ -68,6 +68,18 @@ export const WALL_MAX = 16;
 export const FLIP_TURN_RATE = 6.5;
 /** Backdraft: fly backwards at this fraction of boost speed, then resume at min speed. */
 export const REVERSE_SPEED_MUL = 0.7;
+/** Shroud Veil: enemies closer than this still see (and can lock) a veiled Ship. */
+export const CLOAK_REVEAL_M = 180;
+export const SNARE_RANGE = 450;
+export const SNARE_CONE_RAD = 0.35;
+export const CINDER_RADIUS = 45;
+export const CINDER_DPS = 80;
+export const CINDER_MAX = 8;
+export const SAP_RADIUS = 140;
+export const QUAKE_DISTANCE = 140;
+export const QUAKE_RADIUS = 60;
+export const QUAKE_DAMAGE = 150;
+export const DAMAGE_AURA_RADIUS = 55;
 
 // Steering smoothing
 /** Desired turn rate = angle-to-aim * gain (capped at turnRate): eases out of turns. */

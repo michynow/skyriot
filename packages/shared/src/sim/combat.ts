@@ -41,6 +41,7 @@ import {
   SPLASH_MIN_FRACTION,
   WALL_RADIUS,
 } from './constants';
+import { breakCloak } from './buffs';
 import { hitShip } from './damage';
 import { damageStructure, domeEntry, domeHitCore, splashStructures } from './structures';
 import { forwardOf, rightOf, upOf } from './math';
@@ -239,7 +240,13 @@ function updateLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, sec: WeaponDef
   }
   const t = input.target ? ctx.ships.get(input.target) : undefined;
   let valid = false;
-  if (t && t.state.alive && t.state.nation !== s.nation && t.state.flareTicks === 0) {
+  if (
+    t &&
+    t.state.alive &&
+    t.state.nation !== s.nation &&
+    t.state.flareTicks === 0 &&
+    !t.mods.cloak
+  ) {
     forwardOf(s.rot, _f);
     const dx = t.state.pos[0] - s.pos[0],
       dy = t.state.pos[1] - s.pos[1],
@@ -311,6 +318,10 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
     if (!fire[i] || rec.fireCd[i]! > 0 || ammo <= 0) continue;
     if (i === 0) s.ammo1--;
     else s.ammo2--;
+    if (rec.mods.cloak) {
+      breakCloak(s);
+      rec.mods.cloak = false;
+    }
     rec.fireCd[i] = rec.fireCd[i]! + w.fireIntervalSec / (i === 0 ? rec.mods.fireRateMul : 1);
     forwardOf(s.rot, _f);
     rightOf(s.rot, _r);

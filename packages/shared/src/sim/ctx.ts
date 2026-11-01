@@ -33,6 +33,9 @@ export interface BuffMods {
   fuelRegenMul: number;
   lockTimeMul: number;
   splashMul: number;
+  hpRegenPerSec: number;
+  cloak: boolean;
+  damageAuraDps: number;
 }
 
 export interface ShipRec {
@@ -91,6 +94,18 @@ export interface Wall {
   expireTick: number;
 }
 
+/** Static damage area (Cinder Cloud): hurts enemies of `nation` inside `radius` until `expireTick`. */
+export interface Zone {
+  x: number;
+  y: number;
+  z: number;
+  radius: number;
+  dps: number;
+  nation: NationId;
+  owner: ShipId;
+  expireTick: number;
+}
+
 export interface StructureRec {
   state: StructureState;
   collider: Collider;
@@ -123,6 +138,7 @@ export interface SimCtx {
   projectiles: Projectile[];
   pool: Projectile[];
   walls: Wall[];
+  zones: Zone[];
   nextProjectileId: number;
   events: SimEvent[];
   structures: StructureRec[];

@@ -386,7 +386,10 @@ export interface FrameDef extends Omit<EngineDef, 'id' | 'name'> {
   canHover: boolean;
   primary: WeaponId;
   secondary: WeaponId;
-  /** Default hotbar, 10 entries; null = empty. */
+  /**
+   * Default hotbar, 10 entries; null = empty. The Frame's full kit is every SKILLS entry listing it
+   * (or 'all'); kit Skills off the hotbar wait for Loadout editing.
+   */
   hotbar: (SkillId | null)[];
 }
 
@@ -416,7 +419,10 @@ export interface SkillDef {
   cooldownSec: number;
   durationSec: number;
   kind: 'consumable' | 'skill' | 'buff' | 'toggle';
-  /** For 'buff': stat changes while active (durationSec). Applied to self, or to allies in `auraRadiusM`. */
+  /**
+   * For 'buff': stat changes while active (durationSec). Applied to self, or to allies in `auraRadiusM`.
+   * For a 'skill' that debuffs enemies: the effect its victims carry (the cast picks who).
+   */
   buff?: BuffEffect;
   /** Buff also/only applies to allies within this radius (self included). */
   auraRadiusM?: number;
@@ -437,6 +443,12 @@ export interface BuffEffect {
   fuelRegenMul?: number;
   lockTimeMul?: number;
   splashMul?: number;
+  /** Heal-over-time: fraction of max HP restored per second. */
+  hpRegenPerSec?: number;
+  /** Stealth: hidden from enemy radar beyond CLOAK_REVEAL_M and can't be locked; firing ends it. */
+  cloak?: boolean;
+  /** Damage aura: enemies within DAMAGE_AURA_RADIUS of the holder take this much damage per second. */
+  damageAuraDps?: number;
 }
 
 export interface ActiveBuff {

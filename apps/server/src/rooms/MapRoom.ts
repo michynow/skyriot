@@ -2,6 +2,7 @@ import { Room, type Client } from '@colyseus/core';
 import * as RAPIER from '@dimforge/rapier3d-compat';
 import {
   BOTS_PER_NATION,
+  CLOAK_REVEAL_M,
   FRAMES,
   MAPS,
   MAX_SHIPS_PER_INSTANCE,
@@ -11,6 +12,7 @@ import {
   TICK_HZ,
   createSim,
   generateHeightfield,
+  isCloaked,
   mulberry32,
   sanitizeInput,
   type ChatMessage,
@@ -294,8 +296,9 @@ export class MapRoom extends Room {
       const me = this.sim.getShip(id);
       let ships = packed;
       if (me) {
-        // Radar: allies always, enemies only within this Frame's radar range.
+        // Radar: allies always, enemies only within this Frame's radar range (a veiled one: reveal range).
         const range2 = FRAMES[me.frame].radarRangeM ** 2;
+        const reveal2 = CLOAK_REVEAL_M ** 2;
         // Ships in the enemy hangar are hidden.
         ships = packed.filter((_, i) => {
           const o = all[i]!;
@@ -306,7 +309,7 @@ export class MapRoom extends Room {
               (o.pos[0] - me.pos[0]) ** 2 +
                 (o.pos[1] - me.pos[1]) ** 2 +
                 (o.pos[2] - me.pos[2]) ** 2 <=
-                range2)
+                (isCloaked(o) ? reveal2 : range2))
           );
         });
       }

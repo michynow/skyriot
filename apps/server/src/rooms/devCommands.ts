@@ -1,4 +1,4 @@
-import type { NationId, Sim, ShipId, StructureKind } from '@skyriot/shared';
+import { SKILLS, type NationId, type Sim, type ShipId, type StructureKind } from '@skyriot/shared';
 
 const NATION_IDS: NationId[] = ['concord', 'vex'];
 const STRUCTURE_KINDS: Record<string, StructureKind> = {
@@ -59,6 +59,14 @@ export function runDevCommand(host: DevHost, shipId: ShipId, line: string): stri
       sim.endBattle(winner);
       return `battle ended, ${winner} wins; Bases rebuild shortly`;
     }
+    case 'cast': {
+      const skill = args[0] ?? '';
+      const me = sim.getShip(shipId);
+      if (!me || !SKILLS[skill]) return 'usage: /cast <skill-id> (any Skill of your Frame kit)';
+      return sim.castSkill(shipId, skill)
+        ? `cast ${SKILLS[skill]!.name}`
+        : `can't cast ${skill} (not in the ${me.frame} kit, or dead)`;
+    }
     case 'level':
     case 'glory':
     case 'spawn':
@@ -66,7 +74,7 @@ export function runDevCommand(host: DevHost, shipId: ShipId, line: string): stri
     case 'event':
       return 'events: not yet implemented';
     case 'help':
-      return '/god, /bots <n>, /timescale <x>, /tp <x> <y> <z>, /base <nation> <stations|core|turrets>, /battle end <winner>, /level <n>, /glory <n>, /spawn <item> [+n], /event start <type>, /help';
+      return '/god, /bots <n>, /timescale <x>, /cast <skill>, /tp <x> <y> <z>, /base <nation> <stations|core|turrets>, /battle end <winner>, /level <n>, /glory <n>, /spawn <item> [+n], /event start <type>, /help';
     default:
       return `unknown command: /${cmd} (try /help)`;
   }

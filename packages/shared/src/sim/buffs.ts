@@ -15,6 +15,9 @@ export function createMods(): BuffMods {
     fuelRegenMul: 1,
     lockTimeMul: 1,
     splashMul: 1,
+    hpRegenPerSec: 0,
+    cloak: false,
+    damageAuraDps: 0,
   };
 }
 
@@ -27,7 +30,8 @@ export function resolveMods(ctx: SimCtx, rec: ShipRec): void {
   const s = rec.state;
   m.fireRateMul = m.speedMul = m.turnRateMul = m.damageMul = m.damageTakenMul = 1;
   m.maxHpMul = m.shieldRegenMul = m.fuelRegenMul = m.lockTimeMul = m.splashMul = 1;
-  m.deflectAdd = 0;
+  m.deflectAdd = m.hpRegenPerSec = m.damageAuraDps = 0;
+  m.cloak = false;
   for (const b of s.buffs) {
     const e = SKILLS[b.skill]?.buff;
     if (!e) continue;
@@ -42,6 +46,9 @@ export function resolveMods(ctx: SimCtx, rec: ShipRec): void {
     m.lockTimeMul *= e.lockTimeMul ?? 1;
     m.splashMul *= e.splashMul ?? 1;
     m.deflectAdd += e.deflectAdd ?? 0;
+    m.hpRegenPerSec += e.hpRegenPerSec ?? 0;
+    m.damageAuraDps += e.damageAuraDps ?? 0;
+    m.cloak ||= e.cloak === true;
   }
   if (!s.alive) return;
   const target = ctx.frames[s.frame].maxHp * m.maxHpMul;
@@ -62,6 +69,18 @@ export function applyBuff(s: ShipState, skill: SkillId, source: ShipId, ticks: n
     }
   }
   s.buffs.push({ skill, source, ticksLeft: ticks });
+}
+
+/** Shroud Veil (or any cloak buff) is up. Derived from `buffs`, so the client sees it too. */
+export function isCloaked(s: ShipState): boolean {
+  for (const b of s.buffs) if (SKILLS[b.skill]?.buff?.cloak) return true;
+  return false;
+}
+
+/** Drop every cloak buff (the Ship fired). */
+export function breakCloak(s: ShipState): void {
+  for (let i = s.buffs.length - 1; i >= 0; i--)
+    if (SKILLS[s.buffs[i]!.skill]?.buff?.cloak) s.buffs.splice(i, 1);
 }
 
 /** Count down buffs and drop expired ones. */
