@@ -1,7 +1,7 @@
 /**
  * Composed score data (original material, ADR 0005). Pitches are MIDI numbers; times are in beats (4/4).
  * Lobby title themes share one 8-bar main hook (the "Skyriot theme") re-harmonised per nation; each Map
- * sky has its own song (rock / ambient / spacey) with its own hook.
+ * sky has its own song (rock / ambient / spacey) with its own call-and-answer hook and intro sting.
  * Hooks, progressions and stingers are written note-for-note; the engine in music.ts plays them.
  */
 import type { MapDef } from '@skyriot/shared';
@@ -85,8 +85,8 @@ const CHORDS_VEX: ChordDef[] = [
   C(40, 56, 59, 64),
 ];
 
-export type DrumStyle = 'none' | 'half' | 'drive' | 'build' | 'roll' | 'pulse';
-export type BassStyle = 'none' | 'drone' | 'eighths' | 'gallop' | 'riff';
+export type DrumStyle = 'none' | 'half' | 'drive' | 'build' | 'roll' | 'pulse' | 'taiko' | 'hits';
+export type BassStyle = 'none' | 'drone' | 'eighths' | 'gallop' | 'riff' | 'octaves';
 
 export interface SectionDef {
   name: string;
@@ -110,8 +110,12 @@ export interface SectionDef {
   arp?: boolean;
   /** Distorted power-chord guitar: 'chug' palm-muted 8ths, 'riff' plays the theme riff, 'power' open hits. */
   gtr?: 'chug' | 'riff' | 'power';
-  /** 'solo' = soft hook; 'bells' = hook on bells; 'hook' = supersaw hook (1 pass); 'hook2x' = double-time hook, twice. */
-  lead?: 'solo' | 'bells' | 'hook' | 'hook2x';
+  /**
+   * 'solo' = soft hook; 'tease' = only the hook's call bars, quieter (verses hint at the chorus);
+   * 'bells' = hook on bells; 'hook' = full hook in the theme's lead voice, octave-doubled;
+   * 'hook2x' = double-time hook, twice; 'sting' = the theme's 2-bar intro fanfare.
+   */
+  lead?: 'solo' | 'tease' | 'bells' | 'hook' | 'hook2x' | 'sting';
   crash?: boolean;
   riser?: boolean;
   /** Key lift in semitones for the whole section (chorus key change). */
@@ -122,10 +126,13 @@ export interface ThemeDef {
   id: string;
   bpm: number;
   chords: ChordDef[];
+  /** 8 bars in call/answer pairs: bars 1-2 call, 3-4 answer, 5-6 the same call, 7-8 the closing answer. */
   hook: N[];
+  /** 2-bar heroic fanfare played once when the theme starts (built from the hook's call). */
+  sting?: N[];
   gritty: boolean;
   sections: SectionDef[];
-  /** Index to loop back to after the last section (skips the intro). */
+  /** Index to loop back to after the last section (skips the sting / intro). */
   loopFrom: number;
   /** One-bar riff; pitch is semitones above the bar's power-chord root (stick to 0/5/7/10/12 so it fits any chord). */
   riff?: N[];
@@ -133,6 +140,12 @@ export interface ThemeDef {
   arp?: number[];
   /** 0 dry .. 1 vast: pad attack/release, echo feedback and reverb send. */
   space: number;
+  /** Lead voice: overdriven guitar, choir-and-celesta, vibrato square synth, or detuned supersaw. */
+  voice: 'guitar' | 'choir' | 'synth' | 'supersaw';
+  /** Sidechain-style duck of pads/bass on every kick, 0..1 depth (the "pump"). */
+  pump: number;
+  /** Crashes are low thunder rolls instead of cymbals. */
+  thunder?: boolean;
 }
 
 const TITLE_FORM = (gritty: boolean): SectionDef[] => [
@@ -154,7 +167,7 @@ const TITLE_FORM = (gritty: boolean): SectionDef[] => [
   },
 ];
 
-// ---- Rustwater (desert-dusk): hard rock, E minor, 148 bpm. Riff-driven verse, soaring supersaw chorus. ----
+// ---- Rustwater (desert-dusk): hard rock, E minor, 152 bpm. Dry and guitar-driven: riff verse, guitar-lead chorus. ----
 // Em C G D | Em C Am B
 const CHORDS_RUST: ChordDef[] = [
   C(40, 55, 59, 64),
@@ -179,43 +192,61 @@ const RIFF_RUST: N[] = [
   [7, 3, 0.5, 1],
   [5, 3.5, 0.5],
 ];
-// Short-long cell (B-E, F#-G) stated twice, climbing to a Bmaj7-over-C peak, then a D#-B turn back home.
-const HOOK_RUST: N[] = [
+const RUST_CALL: N[] = [
+  // "B-D-E, E-D-E" pickup figure, then G falling home to C.
   [71, 0, 0.5],
-  [76, 0.5, 1],
-  [78, 1.5, 0.5],
-  [79, 2, 1.5],
-  [78, 3.5, 0.5],
-  [76, 4, 2],
-  [79, 6, 0.5],
-  [76, 6.5, 1.5],
-  [74, 8, 0.5],
-  [71, 8.5, 0.5],
-  [74, 9, 1],
-  [79, 10, 1],
-  [81, 11, 1],
-  [78, 12, 3, 1],
-  [74, 15, 0.5],
-  [76, 15.5, 0.5],
-  [71, 16, 0.5],
-  [76, 16.5, 1],
-  [78, 17.5, 0.5],
-  [79, 18, 1.5],
-  [81, 19.5, 0.5],
-  [83, 20, 1.5, 1],
-  [81, 21.5, 0.5],
-  [79, 22, 2],
-  [81, 24, 1],
-  [79, 25, 0.5],
-  [76, 25.5, 0.5],
-  [72, 26, 1],
+  [74, 0.5, 0.5],
+  [76, 1, 1, 1],
+  [76, 2, 0.5],
+  [74, 2.5, 0.5],
+  [76, 3, 1],
+  [79, 4, 1.5, 1],
+  [76, 5.5, 0.5],
+  [74, 6, 1],
+  [72, 7, 1],
+];
+const HOOK_RUST: N[] = [
+  ...RUST_CALL,
+  // answer 1: same pickup, leaps to G, hangs on F#
+  [71, 8, 0.5],
+  [74, 8.5, 0.5],
+  [76, 9, 1],
+  [76, 10, 0.5],
+  [74, 10.5, 0.5],
+  [79, 11, 1, 1],
+  [78, 12, 3],
+  [74, 15, 1],
+  ...RUST_CALL.map((n): N => [n[0], n[1] + 16, n[2], n[3]]),
+  // answer 2: climbs to A5 and lands on the B dominant to throw back into the call
+  [72, 24, 0.5],
+  [76, 24.5, 0.5],
+  [81, 25, 1.5, 1],
+  [79, 26.5, 0.5],
   [76, 27, 1],
   [75, 28, 1],
   [78, 29, 1],
-  [75, 30, 0.5],
-  [71, 30.5, 1.5],
+  [71, 30, 2],
+];
+const STING_RUST: N[] = [
+  [64, 0, 0.5, 1],
+  [71, 0.5, 0.5],
+  [76, 1, 1.5, 1],
+  [74, 2.5, 0.5],
+  [76, 3, 1],
+  [79, 4, 0.75, 1],
+  [78, 4.75, 0.75],
+  [76, 5.5, 2.5, 1],
 ];
 const ROCK_FORM: SectionDef[] = [
+  {
+    name: 'sting',
+    bars: 2,
+    drums: 'hits',
+    bass: 'drone',
+    gtr: 'power',
+    lead: 'sting',
+    crash: true,
+  },
   {
     name: 'intro',
     bars: 4,
@@ -225,7 +256,7 @@ const ROCK_FORM: SectionDef[] = [
     gtr: 'chug',
     riser: true,
   },
-  { name: 'riff', bars: 8, drums: 'drive', drumsMinI: 0.4, bass: 'riff', gtr: 'riff', pad: true },
+  { name: 'riff', bars: 8, drums: 'drive', drumsMinI: 0.4, bass: 'riff', gtr: 'riff' },
   {
     name: 'verse',
     bars: 8,
@@ -233,8 +264,18 @@ const ROCK_FORM: SectionDef[] = [
     drumsMinI: 0.4,
     bass: 'eighths',
     gtr: 'chug',
-    pad: true,
-    lead: 'solo',
+    lead: 'tease',
+  },
+  {
+    name: 'pre',
+    bars: 2,
+    minI: 0.75,
+    chordOffset: 6,
+    drums: 'build',
+    bass: 'eighths',
+    gtr: 'chug',
+    strings: true,
+    riser: true,
   },
   {
     name: 'chorus',
@@ -244,7 +285,6 @@ const ROCK_FORM: SectionDef[] = [
     bass: 'gallop',
     gtr: 'power',
     pad: true,
-    strings: true,
     lead: 'hook',
     crash: true,
   },
@@ -254,7 +294,7 @@ const ROCK_FORM: SectionDef[] = [
     minI: 0.75,
     chordOffset: 4,
     drums: 'roll',
-    bass: 'drone',
+    bass: 'riff',
     gtr: 'riff',
     choir: true,
     riser: true,
@@ -267,7 +307,6 @@ const ROCK_FORM: SectionDef[] = [
     bass: 'gallop',
     gtr: 'power',
     pad: true,
-    strings: true,
     brass: 'stabs',
     lead: 'hook',
     crash: true,
@@ -275,7 +314,7 @@ const ROCK_FORM: SectionDef[] = [
   },
 ];
 
-// ---- Thunderhead (storm): ambient, D minor, 76 bpm. Sparse bell melody in wide reverb; the storm breaks in combat. ----
+// ---- Thunderhead (storm): ambient, D minor, 76 bpm. Bells and choir in a vast hall; taiko and thunder in combat. ----
 // Dm Bb F C | Dm Gm Bb A
 const CHORDS_STORM: ChordDef[] = [
   C(38, 57, 62, 65),
@@ -287,46 +326,65 @@ const CHORDS_STORM: ChordDef[] = [
   C(34, 58, 62, 65),
   C(33, 57, 61, 64),
 ];
-// A rising fourth (A-D) answered by falling thirds; the second half reaches G5 and ends on a C#-E question.
-const HOOK_STORM: N[] = [
-  [69, 0, 1.5],
-  [74, 1.5, 2.5],
-  [77, 4, 1.5],
-  [76, 5.5, 0.5],
+const STORM_CALL: N[] = [
+  // "A-C-D ... F-D": a rising sigh, then a fall.
+  [69, 0, 1],
+  [72, 1, 1],
+  [74, 2, 2, 1],
+  [77, 4, 2, 1],
   [74, 6, 2],
-  [72, 8, 1.5],
-  [69, 9.5, 0.5],
-  [72, 10, 2],
+];
+const HOOK_STORM: N[] = [
+  ...STORM_CALL,
+  [72, 8, 1],
+  [74, 9, 1],
+  [72, 10, 1],
+  [69, 11, 1],
   [67, 12, 4],
-  [69, 16, 1.5],
-  [74, 17.5, 2.5],
-  [79, 20, 1.5, 1],
-  [77, 21.5, 0.5],
-  [74, 22, 2],
+  ...STORM_CALL.map((n): N => [n[0], n[1] + 16, n[2], n[3]]),
   [77, 24, 1],
-  [76, 25, 1],
-  [74, 26, 1],
-  [72, 27, 1],
+  [79, 25, 1, 1],
+  [77, 26, 1],
+  [74, 27, 1],
   [73, 28, 2],
-  [76, 30, 2],
+  [69, 30, 2],
+];
+const STING_STORM: N[] = [
+  [62, 0, 1, 1],
+  [69, 1, 1],
+  [74, 2, 2, 1],
+  [77, 4, 1],
+  [76, 5, 1],
+  [74, 6, 2, 1],
 ];
 const ARP_STORM = [0, -1, -1, 2, -1, -1, 4, -1, 5, -1, -1, 4, -1, -1, 2, -1];
 const STORM_FORM: SectionDef[] = [
+  {
+    name: 'sting',
+    bars: 2,
+    drums: 'hits',
+    bass: 'drone',
+    choir: true,
+    brass: 'stabs',
+    lead: 'sting',
+    crash: true,
+  },
   { name: 'calm', bars: 8, drums: 'none', bass: 'drone', pad: true, lead: 'bells' },
   {
     name: 'drift',
     bars: 8,
-    drums: 'half',
+    drums: 'taiko',
     drumsMinI: 0.4,
     bass: 'drone',
     pad: true,
     choir: true,
     arp: true,
+    lead: 'tease',
   },
   {
     name: 'gust',
     bars: 8,
-    drums: 'half',
+    drums: 'taiko',
     drumsMinI: 0.4,
     bass: 'eighths',
     pad: true,
@@ -335,20 +393,21 @@ const STORM_FORM: SectionDef[] = [
     lead: 'solo',
   },
   {
-    name: 'build',
-    bars: 4,
+    name: 'pre',
+    bars: 2,
     minI: 0.75,
-    drums: 'build',
-    bass: 'eighths',
+    chordOffset: 6,
+    drums: 'roll',
+    bass: 'drone',
     strings: true,
-    arp: true,
+    choir: true,
     riser: true,
   },
   {
     name: 'storm',
     bars: 8,
     minI: 0.75,
-    drums: 'half',
+    drums: 'taiko',
     bass: 'gallop',
     pad: true,
     strings: true,
@@ -363,7 +422,7 @@ const STORM_FORM: SectionDef[] = [
     bars: 4,
     minI: 0.75,
     chordOffset: 4,
-    drums: 'roll',
+    drums: 'none',
     bass: 'drone',
     choir: true,
     bells: true,
@@ -373,7 +432,7 @@ const STORM_FORM: SectionDef[] = [
     name: 'storm2',
     bars: 8,
     minI: 0.75,
-    drums: 'half',
+    drums: 'taiko',
     bass: 'gallop',
     pad: true,
     strings: true,
@@ -386,7 +445,7 @@ const STORM_FORM: SectionDef[] = [
   },
 ];
 
-// ---- Nebula Drift (space-nebula): spacey synth, A major / Lydian, 118 bpm. Arps through dotted echoes, airy pads. ----
+// ---- Nebula Drift (space-nebula): spacey synth, A major / Lydian, 120 bpm. Four-on-floor pump, arps, echo. ----
 // Amaj7 E F#m D(#11) | Amaj7 C#m D E(add9)
 const CHORDS_NEBULA: ChordDef[] = [
   C(45, 57, 61, 64, 68),
@@ -398,53 +457,86 @@ const CHORDS_NEBULA: ChordDef[] = [
   C(38, 57, 62, 66),
   C(40, 56, 59, 64, 66),
 ];
-// 3-3-2 rhythm cell (E-C#-B), a leap to G# on the dominant, a Lydian G# shimmer over D, and a rising close.
+const NEBULA_CALL: N[] = [
+  // "E-E-C#-E-G#": a stuttered call that jumps to the Lydian colour, then F#-E-B.
+  [76, 0, 0.75, 1],
+  [76, 0.75, 0.75],
+  [73, 1.5, 0.5],
+  [76, 2, 1],
+  [80, 3, 1, 1],
+  [78, 4, 1.5],
+  [76, 5.5, 0.5],
+  [71, 6, 2],
+];
 const HOOK_NEBULA: N[] = [
-  [76, 0, 1.5],
-  [73, 1.5, 1.5],
-  [71, 3, 1],
-  [76, 4, 1.5],
-  [80, 5.5, 2.5, 1],
-  [78, 8, 1.5],
-  [76, 9.5, 1.5],
-  [73, 11, 1],
-  [74, 12, 1.5],
-  [78, 13.5, 1],
-  [80, 14.5, 1.5],
-  [76, 16, 1.5],
-  [73, 17.5, 1.5],
-  [71, 19, 1],
-  [76, 20, 1.5],
-  [80, 21.5, 1],
-  [83, 22.5, 1.5, 1],
-  [81, 24, 1.5],
-  [78, 25.5, 1.5],
-  [74, 27, 1],
-  [76, 28, 1.5],
-  [78, 29.5, 1],
-  [80, 30.5, 1.5],
+  ...NEBULA_CALL,
+  [76, 8, 0.75, 1],
+  [76, 8.75, 0.75],
+  [73, 9.5, 0.5],
+  [76, 10, 1],
+  [81, 11, 1, 1],
+  [80, 12, 1.5],
+  [78, 13.5, 0.5],
+  [74, 14, 2],
+  ...NEBULA_CALL.map((n): N => [n[0], n[1] + 16, n[2], n[3]]),
+  [78, 24, 0.75, 1],
+  [78, 24.75, 0.75],
+  [80, 25.5, 0.5],
+  [81, 26, 2],
+  [83, 28, 1.5, 1],
+  [80, 29.5, 0.5],
+  [76, 30, 2],
+];
+const STING_NEBULA: N[] = [
+  [64, 0, 0.5],
+  [69, 0.5, 0.5],
+  [73, 1, 0.5],
+  [76, 1.5, 2.5, 1],
+  [80, 4, 1],
+  [78, 5, 1],
+  [81, 6, 2, 1],
 ];
 const ARP_NEBULA = [0, 1, 2, 3, 4, 2, 3, 5, 6, 5, 4, 2, 3, 1, 2, 4];
 const SPACE_FORM: SectionDef[] = [
-  { name: 'intro', bars: 4, drums: 'none', bass: 'none', pad: true, bells: true, riser: true },
+  {
+    name: 'sting',
+    bars: 2,
+    drums: 'hits',
+    bass: 'drone',
+    pad: true,
+    bells: true,
+    lead: 'sting',
+    crash: true,
+  },
   { name: 'orbit', bars: 8, drums: 'pulse', drumsMinI: 0.4, bass: 'drone', pad: true, arp: true },
   {
     name: 'signal',
     bars: 8,
     drums: 'pulse',
     drumsMinI: 0.4,
-    bass: 'eighths',
+    bass: 'octaves',
     pad: true,
     arp: true,
     bells: true,
-    lead: 'solo',
+    lead: 'tease',
+  },
+  {
+    name: 'pre',
+    bars: 2,
+    minI: 0.75,
+    chordOffset: 6,
+    drums: 'build',
+    bass: 'octaves',
+    pad: true,
+    arp: true,
+    riser: true,
   },
   {
     name: 'burn',
     bars: 8,
     minI: 0.75,
-    drums: 'drive',
-    bass: 'gallop',
+    drums: 'pulse',
+    bass: 'octaves',
     pad: true,
     choir: true,
     arp: true,
@@ -456,7 +548,7 @@ const SPACE_FORM: SectionDef[] = [
     bars: 4,
     minI: 0.75,
     chordOffset: 4,
-    drums: 'build',
+    drums: 'none',
     bass: 'drone',
     pad: true,
     choir: true,
@@ -467,11 +559,11 @@ const SPACE_FORM: SectionDef[] = [
     name: 'burn2',
     bars: 8,
     minI: 0.75,
-    drums: 'drive',
-    bass: 'gallop',
+    drums: 'pulse',
+    bass: 'octaves',
     pad: true,
-    strings: true,
     arp: true,
+    bells: true,
     lead: 'hook2x',
     crash: true,
     lift: 2,
@@ -488,6 +580,8 @@ export const THEMES: Record<string, ThemeDef> = {
     sections: TITLE_FORM(false),
     loopFrom: 1,
     space: 0.4,
+    voice: 'supersaw',
+    pump: 0,
   },
   'title-vex': {
     id: 'title-vex',
@@ -498,39 +592,51 @@ export const THEMES: Record<string, ThemeDef> = {
     sections: TITLE_FORM(true),
     loopFrom: 1,
     space: 0.4,
+    voice: 'supersaw',
+    pump: 0,
   },
   rustwater: {
     id: 'rustwater',
-    bpm: 148,
+    bpm: 152,
     chords: CHORDS_RUST,
     hook: HOOK_RUST,
+    sting: STING_RUST,
     riff: RIFF_RUST,
     gritty: true,
     sections: ROCK_FORM,
-    loopFrom: 1,
-    space: 0.2,
+    loopFrom: 2,
+    space: 0.15,
+    voice: 'guitar',
+    pump: 0.2,
   },
   thunderhead: {
     id: 'thunderhead',
     bpm: 76,
     chords: CHORDS_STORM,
     hook: HOOK_STORM,
+    sting: STING_STORM,
     arp: ARP_STORM,
     gritty: false,
     sections: STORM_FORM,
-    loopFrom: 0,
-    space: 0.9,
+    loopFrom: 1,
+    space: 0.95,
+    voice: 'choir',
+    pump: 0,
+    thunder: true,
   },
   'nebula-drift': {
     id: 'nebula-drift',
-    bpm: 118,
+    bpm: 120,
     chords: CHORDS_NEBULA,
     hook: HOOK_NEBULA,
+    sting: STING_NEBULA,
     arp: ARP_NEBULA,
     gritty: false,
     sections: SPACE_FORM,
     loopFrom: 1,
     space: 0.75,
+    voice: 'synth',
+    pump: 0.55,
   },
 };
 
