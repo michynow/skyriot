@@ -171,7 +171,11 @@ export function StructureMarkers() {
           chev.style.transform = offscreen
             ? `rotate(${(Math.atan2(dy, dx) * 180) / Math.PI + 90}deg)`
             : 'rotate(45deg)';
-          const text = `${structureName(st).toUpperCase()} ${d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d)} m`}`;
+          const hpEl = (el.children[1] as HTMLElement).firstElementChild as HTMLElement;
+          const frac = Math.max(0, st.hp / Math.max(1, st.maxHp));
+          hpEl.style.width = `${frac * 100}%`;
+          hpEl.style.background = frac < 0.3 ? '#ff3b3b' : frac < 0.6 ? '#ffb347' : '#ff6a6a';
+          const text = `${structureName(st).toUpperCase()} ${Math.ceil(frac * 100)}% · ${d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d)} m`}`;
           if (texts[n] !== text) {
             texts[n] = text;
             (el.lastElementChild as HTMLElement).textContent = text;
@@ -197,6 +201,9 @@ export function StructureMarkers() {
           style={{ display: 'none' }}
         >
           <i />
+          <b className="smk-hp">
+            <u />
+          </b>
           <span />
         </div>
       ))}

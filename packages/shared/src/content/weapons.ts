@@ -7,14 +7,14 @@ export const WEAPONS: Record<string, WeaponDef> = {
   }),
   'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 34, 0.11, 800, 950, 0.015),
   'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 48, 0.12, 750, 1000, 0.02),
-  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 300, 4, 200, 1500, 0, {
-    homingTurnRate: 1.7,
+  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 480, 1.6, 250, 1500, 0, {
+    homingTurnRate: 2.4,
     lockConeRad: 0.45,
     lockTimeSec: 1.2,
     splashRadius: 5,
   }),
-  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 200, 3.2, 190, 1300, 0, {
-    homingTurnRate: 1.8,
+  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 340, 1.6, 240, 1300, 0, {
+    homingTurnRate: 2.5,
     lockConeRad: 0.5,
     lockTimeSec: 1,
     splashRadius: 5,

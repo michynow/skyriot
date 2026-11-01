@@ -8,6 +8,7 @@ import { Floaters } from './Floaters';
 import { useSettings } from '../ui/settings';
 import { IconDefs, SkillIcon } from './icons';
 import { Incoming } from './Incoming';
+import { ThreatRing } from './ThreatRing';
 import { Radar } from './Radar';
 import { NATION_COLOR, Reticles } from './Reticles';
 import { EscMenu, openEscMenu } from '../ui/EscMenu';
@@ -552,6 +553,7 @@ export function Hud({ onLeave }: { onLeave(): void }) {
       <IconDefs />
       <TopBar />
       <Reticles />
+      <ThreatRing />
       <StructureMarkers />
       <FlightTapes />
       <Warnings />

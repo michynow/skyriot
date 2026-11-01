@@ -730,23 +730,34 @@
   left: 0;
   top: 0;
   font:
-    800 24px 'Orbitron',
+    900 34px 'Orbitron',
     sans-serif;
-  margin: -12px 0 0 -10px;
+  margin: -18px 0 0 -14px;
+  transform-origin: center;
+  white-space: nowrap;
+  -webkit-text-stroke: 1.5px #000;
   text-shadow:
-    0 0 5px #000,
-    0 0 2px #000;
+    0 0 8px #000,
+    0 2px 3px #000;
+}
+.fl.big {
+  font-size: 52px;
+  margin: -28px 0 0 -20px;
 }
 .fl.shield {
   color: #6fd6ff;
 }
 .fl.hp {
-  color: #ff9a4a;
+  color: #ffb02e;
 }
-.fl.defl {
-  color: #aab;
-  font-size: 13px;
-  letter-spacing: 0.1em;
+.fl.struct {
+  color: #ff5a3c;
+}
+.fl.defl,
+.fl.absorb {
+  color: #c8d0e0;
+  font-size: 18px;
+  letter-spacing: 0.12em;
 }
 @keyframes rise {
   from {
@@ -1638,6 +1649,27 @@
   text-shadow: 0 1px 3px #000;
 }
 .smk[data-off='1'] span {
+  top: 24px;
+}
+/* Structure health under the marker: a team has to grind it down. */
+.smk-hp {
+  position: absolute;
+  left: -36px;
+  top: 12px;
+  width: 72px;
+  height: 5px;
+  background: #0009;
+  border: 1px solid #ff6a6a88;
+}
+.smk-hp u {
+  display: block;
+  height: 100%;
+  transition: width 0.2s linear;
+}
+.smk span {
+  top: 20px;
+}
+.smk[data-off='1'] .smk-hp {
   top: 14px;
 }
 
@@ -2165,4 +2197,37 @@
   text-shadow:
     0 0 10px #ff8a1e,
     0 0 4px #000;
+}
+
+/* Threat ring: one red pip on a ring round the crosshair per enemy holding a missile lock on us. */
+.threat {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.threat svg {
+  position: absolute;
+  left: -120px;
+  top: -120px;
+  width: 240px;
+  height: 240px;
+  overflow: visible;
+}
+.threat circle {
+  fill: none;
+  stroke: #ff3b3b;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 6;
+  opacity: 0.55;
+}
+.threat .pip {
+  fill: #ff2a2a;
+  stroke: #fff;
+  stroke-width: 1;
+  filter: drop-shadow(0 0 6px #ff2a2a);
+  animation: lockpulse 0.3s infinite alternate;
+}
+.threat .pip.msl {
+  fill: #ffb347;
 }

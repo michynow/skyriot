@@ -83,4 +83,5 @@ export {
   CARPET_SPACING,
   GROUND_STRIKE_SPLASH_MUL,
   NOSE_OFFSET,
+  ROLL_DURATION_SEC,
 } from './constants';

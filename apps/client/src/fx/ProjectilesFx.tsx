@@ -27,6 +27,9 @@ const MAX_BUBBLES = 24;
 const MAX_ROLLS = 16;
 const TRAIL_SPACING = 0.6;
 const TRAIL_CULL_DIST = 1400;
+/** Guided missiles: body scale and exhaust streak length (m) so they read at combat range. */
+const MISSILE_BODY_SCALE = 2.2;
+const MISSILE_STREAK_M = 22;
 
 type RGB = [number, number, number];
 const TRACER: Record<NationId, RGB> = { concord: [0.35, 1.5, 2.4], vex: [2.6, 0.35, 0.22] };
@@ -809,7 +812,13 @@ function updateProjectiles(fx: Fx, dt: number) {
     const sm = k === 1 ? world.missiles.get(P.id[i]!) : undefined;
     if (k === 1 && age > 0.15 && !sm) {
       // missile homing: steer velocity direction toward the target, capped turn rate
-      const tgt = P.target[i] ? world.ships.get(P.target[i]!) : undefined;
+      const tid = P.target[i];
+      // Locked onto a Base structure: home on its body (a bit above the base point).
+      const st = tid && !world.ships.has(tid) ? world.structures.get(tid) : undefined;
+      const tgt = tid
+        ? (world.ships.get(tid) ??
+          (st ? { alive: st.alive, pos: [st.pos[0], st.pos[1] + 15, st.pos[2]] } : undefined))
+        : undefined;
       if (tgt && tgt.alive) {
         const sp = Math.hypot(f[o + 3]!, f[o + 4]!, f[o + 5]!) || 1;
         const tx = tgt.pos[0] - f[o]!,
@@ -987,7 +996,7 @@ function updateProjectiles(fx: Fx, dt: number) {
       wz = dx * uy - dy * ux;
     const dropping = (k === 1 || k === 2) && age < 0.15;
     if (dropping) y -= age * 14;
-    const big = style === 3 ? 2.4 : k === 2 ? 1.7 : k === 3 ? 1.35 : 1;
+    const big = style === 3 ? 2.4 : k === 2 ? 1.7 : k === 3 ? 1.35 : MISSILE_BODY_SCALE;
     const mine = k === 1 && !!P.target[i] && P.target[i] === world.ownId;
 
     if (style === 3) {
@@ -1197,6 +1206,18 @@ function updateProjectiles(fx: Fx, dt: number) {
           );
         }
       }
+    }
+    if (k === 1 && !dropping) {
+      // Readable at range: hot white-gold head flare, nation-tinted glow halo and a long exhaust streak.
+      const cr = f[o + 6]!,
+        cg = f[o + 7]!,
+        cb = f[o + 8]!;
+      const flick = 0.85 + 0.15 * Math.sin(fx.time * 40 + i * 1.7);
+      fx.additive.push(x, y, z, 2.6 * flick, 3.2, 2.6, 1.6, 1);
+      fx.additive.push(x, y, z, 7 * flick, cr * 0.9, cg * 0.9, cb * 0.9, 0.55);
+      const sc = MISSILE_STREAK_M / sp;
+      fx.streaks.push(x, y, z, 0.55, 3, 1.9, 0.7, 0.95, vx * sc, vy * sc, vz * sc);
+      fx.streaks.push(x, y, z, 1.4, cr, cg, cb, 0.4, vx * sc * 1.6, vy * sc * 1.6, vz * sc * 1.6);
     }
     if (k === 1) {
       // blinking beacon so a target can spot incoming missiles

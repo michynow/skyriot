@@ -104,7 +104,7 @@ export const MORTAR_LOFT_RAD = 0.6;
 export const MORTAR_GUIDE_TURN = 0.9;
 
 // Barrel Roll: displacement = rollImpulse * factor over ROLL_DURATION_SEC (half-sine velocity curve).
-export const ROLL_DURATION_SEC = 0.8;
+export const ROLL_DURATION_SEC = 1.1;
 export const ROLL_DISPLACEMENT_PER_IMPULSE = 0.25;
 
 // Frame core kits
@@ -122,8 +122,8 @@ export const PURGE_RADIUS = 120;
 export const NAV_MAX_LEAD_SEC = 5;
 export const WEAVE_PERIOD_MIN_SEC = 0.6;
 export const WEAVE_PERIOD_SPAN_SEC = 0.3;
-export const WEAVE_AMP_MIN_M = 6;
-export const WEAVE_AMP_SPAN_M = 4;
+export const WEAVE_AMP_MIN_M = 3;
+export const WEAVE_AMP_SPAN_M = 2;
 export const WEAVE_RAMP_SEC = 0.3;
 export const ROCKET_WOBBLE_AMP_M = 1.2;
 export const ROCKET_WOBBLE_PERIOD_SEC = 0.5;
@@ -133,8 +133,10 @@ export const ROCKET_WOBBLE_PERIOD_SEC = 0.5;
 export const SEEKER_CONE_RAD = 0.6;
 /** Guidance only while the motor burns; afterwards the missile flies on dumb until its range runs out. */
 export const MISSILE_MOTOR_SEC = 5;
+/** Proximity fuse: a guided missile still tracking detonates this close to its target's hull (direct hit). */
+export const MISSILE_FUSE_M = 8;
 /**
  * A target pulling at least this lateral acceleration (speed * turn rate, m/s^2) while the missile is in its
  * endgame out-turns it. Wasp manages it at cruise, Halo needs throttle, Anvil/Bulwark only while boosting.
  */
-export const BREAK_TURN_ACCEL = 180;
+export const BREAK_TURN_ACCEL = 230;
