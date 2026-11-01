@@ -41,7 +41,6 @@ import {
   PROJECTILE_RADIUS,
   RAY_QUERY_GROUPS,
   SPLASH_MIN_FRACTION,
-  WALL_RADIUS,
 } from './constants';
 import { breakCloak } from './buffs';
 import { hitShip } from './damage';
@@ -810,11 +809,6 @@ export function stepProjectiles(ctx: SimCtx): void {
           victim = o;
         }
       }
-      for (const w of ctx.walls) {
-        if (w.nation === p.nation) continue;
-        if (Math.hypot(x1 - w.x, y1 - w.y, z1 - w.z) < WALL_RADIUS && hitT === Infinity)
-          hitT = step;
-      }
       if (victim) structure = null;
       const domeT = domeEntry(ctx, p.nation, p.x, p.y, p.z, p.dx, p.dy, p.dz, step);
       if (domeT < hitT) {
@@ -845,6 +839,4 @@ export function stepProjectiles(ctx: SimCtx): void {
       recycle(ctx, i);
     }
   }
-  for (let i = ctx.walls.length - 1; i >= 0; i--)
-    if (ctx.walls[i]!.expireTick <= ctx.tick) ctx.walls.splice(i, 1);
 }

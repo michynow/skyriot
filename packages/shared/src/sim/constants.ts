@@ -47,23 +47,10 @@ export const SPLASH_MIN_FRACTION = 0.25;
 export const LAG_HISTORY_TICKS = 12;
 
 // Skills
-export const GHOST_DEFLECT_BONUS = 0.2;
-export const IRON_HIDE_DAMAGE_MUL = 0.6;
 export const REPAIR_KIT_FRACTION = 0.35;
 export const FLARE_COUNT = 2;
 export const FLARE_SPEED = 25;
 export const FLARE_RANGE = 120;
-export const CARPET_BOMBS = 5;
-export const CARPET_SPACING = 14;
-export const CARPET_DAMAGE_MUL = 0.45;
-export const CARPET_BOMB_WEAPON = 'brick-bomb';
-export const MEND_RANGE = 200;
-export const MEND_CONE_RAD = 0.5;
-export const MEND_HEAL_FRACTION = 0.3;
-export const AEGIS_RADIUS = 60;
-export const WALL_DISTANCE = 45;
-export const WALL_RADIUS = 14;
-export const WALL_MAX = 16;
 /** Pivot Flip: the steering aim is turned 180 degrees and turn rate is raised to this for the duration. */
 export const FLIP_TURN_RATE = 6.5;
 /** Backdraft: fly backwards at this fraction of boost speed, then resume at min speed. */

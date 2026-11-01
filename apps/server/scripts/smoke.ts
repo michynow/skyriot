@@ -330,26 +330,16 @@ function buffTests() {
       );
     }
   };
-  const ghostSlot = FRAMES.wasp.hotbar.indexOf('ghost-skin');
-  idle(1, { w: { hotbar: ghostSlot } });
-  const ghostOn = w.buffs.some((b) => b.skill === 'ghost-skin');
-  idle(149, { w: {} });
+  const hotSlot = FRAMES.wasp.hotbar.indexOf('hot-barrels');
+  idle(1, { w: { hotbar: hotSlot } });
+  const hotOn = w.buffs.some((b) => b.skill === 'hot-barrels');
+  idle(179, { w: {} });
   const stillOn = w.buffs.length === 1;
   idle(3, { w: {} });
   const expired = w.buffs.length === 0;
-  const cooldownDone = w.cooldowns[ghostSlot] === 0;
-  // Anvil: bulk-plating raises max HP, scales HP, and reverts on expiry.
+  const cooldownRunning = w.cooldowns[hotSlot]! > 0;
   sim2.addShip('a', spawn('anvil'), [300, 600, 0]);
   const a = sim2.getShip('a')!;
-  a.hp = a.maxHp / 2;
-  const base = a.maxHp;
-  const bulkSlot = FRAMES.anvil.hotbar.indexOf('bulk-plating');
-  idle(1, { a: { hotbar: bulkSlot } });
-  idle(1, { a: {} });
-  const raised = Math.abs(a.maxHp - base * 1.25) < 1e-6 && Math.abs(a.hp - a.maxHp / 2) < 1;
-  idle(3600, { a: {} });
-  const reverted =
-    a.buffs.length === 0 && Math.abs(a.maxHp - base) < 1e-6 && Math.abs(a.hp - base / 2) < 1;
   // Toggles + Air Barrage ammo.
   const defaultMode = a.toggles.bombing === 'air-barrage-mode';
   const before = a.ammo2;
@@ -382,12 +372,10 @@ function buffTests() {
     !!used.targets?.includes('f');
   sim3.dispose();
   return {
-    ghostOn,
+    hotOn,
     stillOn,
     expired,
-    cooldownDone,
-    raised,
-    reverted,
+    cooldownRunning,
     defaultMode,
     barrage,
     switched,

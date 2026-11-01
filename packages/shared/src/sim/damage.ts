@@ -38,7 +38,7 @@ export function damageShip(
   return amount;
 }
 
-/** Projectile damage: Deflect (capped, except Ghost Skin) and Iron Hide, then applies. */
+/** Projectile damage: Deflect (capped, buffs may add past the cap) and damage-taken buffs, then applies. */
 export function hitShip(
   ctx: SimCtx,
   rec: ShipRec,

@@ -5,9 +5,6 @@ import {
   AIR_BARRAGE_SPREAD_RAD,
   BOMB_DROP_SPEED,
   BOMB_GRAVITY,
-  CARPET_BOMB_WEAPON,
-  CARPET_BOMBS,
-  CARPET_SPACING,
   FRAMES,
   GROUND_STRIKE_SPLASH_MUL,
   NOSE_OFFSET,
@@ -29,10 +26,9 @@ import { isFlying } from '../hud/hudStore';
 
 const PATH_POINTS = 48;
 const PATHS = AIR_BARRAGE_COUNT;
-const RINGS = Math.max(CARPET_BOMBS, AIR_BARRAGE_COUNT) + 1;
+const RINGS = AIR_BARRAGE_COUNT + 1;
 const STEP_SEC = 0.1;
 const COLOR = '#ffb347';
-const CARPET_COLOR = '#ff6a3d';
 
 /** Integrate a projectile path (optional gravity) until terrain or range; writes points, returns count. */
 function trace(
@@ -77,7 +73,7 @@ function trace(
 }
 
 /**
- * Where the Secondary (and Carpet Drop) will land: a dashed trajectory and a splash ring on impact. Shown for
+ * Where the Secondary will land: a dashed trajectory and a splash ring on impact. Shown for
  * dumb ordnance only — homing missiles get the lock reticle instead.
  */
 export function AimPreview() {
@@ -220,22 +216,6 @@ export function AimPreview() {
         hit,
       );
       show(n, w.splashRadius, COLOR);
-    }
-
-    // Carpet Drop, when ready: a line of impact rings straight below.
-    const slot = fd.hotbar.indexOf('carpet-drop');
-    const bomb = WEAPONS[CARPET_BOMB_WEAPON];
-    const hf = world.heightfield;
-    if (slot >= 0 && !own.cooldowns[slot] && bomb && hf) {
-      const hl = Math.hypot(fx, fz) || 1;
-      for (let i = 0; i < CARPET_BOMBS && ringsUsed < RINGS; i++) {
-        const off = (i - (CARPET_BOMBS - 1) / 2) * CARPET_SPACING;
-        hit[0] = own.pos[0] + (fx / hl) * off;
-        hit[2] = own.pos[2] + (fz / hl) * off;
-        hit[1] = sampleHeight(hf, hit[0], hit[2]);
-        if (own.pos[1] - hit[1] > bomb.rangeM) continue;
-        ring(bomb.splashRadius, CARPET_COLOR);
-      }
     }
   });
 

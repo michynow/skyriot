@@ -39,10 +39,6 @@ function auraMat(col: [number, number, number], hex: boolean, strength: number) 
 }
 const AURA = {
   rally: auraMat([0.3, 2.2, 0.7], false, 0.35),
-  overcharge: auraMat([0.4, 0.9, 3.0], false, 0.35),
-  fortify: auraMat([0.9, 1.7, 2.6], true, 0.25),
-  iron: auraMat([1.6, 1.8, 2.2], true, 0.25),
-  aegis: auraMat([0.4, 1.4, 3.2], true, 0.3),
   renewal: auraMat([0.4, 2.6, 0.9], false, 0.4),
   ward: auraMat([0.6, 1.6, 3.0], true, 0.3),
   bastion: auraMat([0.5, 1.2, 2.8], true, 0.35),
@@ -54,8 +50,6 @@ const AURA = {
 /** Buff Skill -> aura shell and its scale (x hull radius). Debuffs show on the victim. */
 const BUFF_AURA: Record<string, [keyof typeof AURA, number]> = {
   'rally-field': ['rally', 1.15],
-  overcharge: ['overcharge', 1.22],
-  fortify: ['fortify', 1.08],
   'renewal-pulse': ['renewal', 1.3],
   'ward-lattice': ['ward', 1.36],
   'bastion-field': ['bastion', 1.42],
@@ -165,8 +159,7 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
     let overdrive = false,
       phantom = false,
       bulk = false,
-      calibr = false,
-      aegis = false;
+      calibr = false;
     const on = s.on;
     for (const k in on) on[k] = false;
     for (const b of ship.buffs) {
@@ -174,20 +167,17 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       if (a) on[a[0]] = true;
       if (FLAME_BUFFS.has(b.skill)) overdrive = true;
       switch (b.skill) {
-        case 'phantom-weave':
+        case 'servo-overclock':
           phantom = true;
           break;
-        case 'bulk-plating':
+        case 'ram-surge':
           bulk = true;
           break;
-        case 'barrage-calibration':
+        case 'shrapnel-ring':
           calibr = true;
           break;
       }
     }
-    const iron = ship.ironTicks > 0;
-    phantom = phantom || ship.ghostTicks > 0;
-    aegis = ship.toggles?.shield === 'aegis-bubble';
     const set = (k: string, on: boolean, sc: number) => {
       const m = auras.current[k];
       if (!m) return;
@@ -195,8 +185,6 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       if (on) m.scale.set(rad * sc, rad * sc * 0.72, len * sc * 1.15);
     };
     for (const [k, sc] of Object.values(BUFF_AURA)) set(k, !!on[k], sc);
-    set('iron', iron, 1.04);
-    set('aegis', aegis, 1.6);
 
     // Shroud Veil: the painted hull fades out, leaving only the shimmer and a ghost outline.
     const veiled = !!on.veil;
@@ -210,7 +198,7 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       });
     }
 
-    // Overdrive: extra red-orange flame sheath on every engine
+    // Speed buffs (FLAME_BUFFS): extra red-orange flame sheath on every engine
     s.od += ((overdrive ? 1 : 0) - s.od) * (1 - Math.exp(-6 * dt));
     for (let i = 0; i < data.engines.length; i++) {
       const m = od.current[i];
@@ -221,7 +209,7 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       m.scale.set(e.r * 1.5 * s.od, e.r * 1.5 * s.od, e.r * 9 * s.od * f);
     }
 
-    // Bulk plating: snap on with overshoot, off by scaling away
+    // Ram Surge: armour plating snaps on with overshoot, off by scaling away
     s.plate +=
       ((bulk ? 1 : 0) - s.plate) * (1 - Math.exp(-12 * dt)) +
       (bulk ? Math.min(dt * 3, 1 - s.plate) * 0.6 : 0);
@@ -243,7 +231,7 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       g.rotation.z = side * 1.25 * s.bay;
     }
 
-    // Barrage calibration: orbiting rings around the muzzle
+    // Shrapnel Ring: orbiting rings around the muzzle
     if (calib.current) {
       calib.current.visible = calibr;
       if (calibr) {
@@ -258,7 +246,7 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       }
     }
 
-    // Phantom afterimages: ghost copies at past transforms (relative to the live model root)
+    // Servo Overclock afterimages: ghost copies at past transforms (relative to the live model root)
     const root = plate.current?.parent;
     s.ghost += ((phantom ? 1 : 0) - s.ghost) * (1 - Math.exp(-8 * dt));
     if (root) {

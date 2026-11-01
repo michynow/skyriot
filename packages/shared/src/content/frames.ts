@@ -35,7 +35,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
       'shroud-veil',
       'snare-tag',
       'flares',
-      'ghost-skin',
+      'hot-barrels',
       'pivot-flip',
       'repair-kit',
       'shield-kit',
@@ -71,7 +71,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     hotbar: [
       'air-barrage-mode',
       'ground-strike-mode',
-      'bulk-plating',
+      'heavy-payload',
       'cinder-cloud',
       'ram-surge',
       'flares',
@@ -108,7 +108,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     primary: 'pulse-blaster',
     secondary: 'seeker-pod',
     hotbar: [
-      'mend-beam',
+      'ward-lattice',
       'renewal-pulse',
       'rally-field',
       'sapping-hex',
@@ -148,7 +148,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     secondary: 'mortar-battery',
     hotbar: [
       'siege-anchor',
-      'fortify',
+      'bastion-field',
       'quake-round',
       'shrapnel-ring',
       'flares',

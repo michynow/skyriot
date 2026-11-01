@@ -45,21 +45,6 @@ export const SKILLS: Record<string, SkillDef> = {
       speedMul: 1.12,
     },
   ),
-  'phantom-weave': b(
-    'phantom-weave',
-    'Phantom Weave',
-    'Evasion: +20% Deflect (beyond cap), +10% turn rate.',
-    ['wasp'],
-    240,
-    90,
-    {
-      deflectAdd: 0.2,
-      turnRateMul: 1.1,
-    },
-  ),
-  'hunter-sight': b('hunter-sight', 'Hunter Sight', 'Missile lock time -40%.', ['wasp'], 180, 60, {
-    lockTimeMul: 0.6,
-  }),
   'air-barrage-mode': t(
     'air-barrage-mode',
     'Air Barrage Mode',
@@ -74,15 +59,6 @@ export const SKILLS: Record<string, SkillDef> = {
     ['anvil'],
     'bombing',
   ),
-  'bulk-plating': b(
-    'bulk-plating',
-    'Bulk Plating',
-    '+25% max HP, -10% speed.',
-    ['anvil'],
-    240,
-    120,
-    { maxHpMul: 1.25, speedMul: 0.9 },
-  ),
   'rally-field': b(
     'rally-field',
     'Rally Field',
@@ -93,19 +69,6 @@ export const SKILLS: Record<string, SkillDef> = {
     { damageMul: 1.15 },
     150,
   ),
-  overcharge: b(
-    'overcharge',
-    'Overcharge',
-    'Allies within 150 m: shield and fuel regen x2.',
-    ['halo'],
-    200,
-    90,
-    {
-      shieldRegenMul: 2,
-      fuelRegenMul: 2,
-    },
-    150,
-  ),
   purge: s(
     'purge',
     'Purge',
@@ -114,23 +77,6 @@ export const SKILLS: Record<string, SkillDef> = {
     45,
     0.5,
   ),
-  fortify: b('fortify', 'Fortify', 'Take 30% less damage, -15% turn rate.', ['bulwark'], 240, 120, {
-    damageTakenMul: 0.7,
-    turnRateMul: 0.85,
-  }),
-  'barrage-calibration': b(
-    'barrage-calibration',
-    'Barrage Calibration',
-    'All weapons +25% damage, +30% splash.',
-    ['bulwark'],
-    200,
-    90,
-    {
-      damageMul: 1.25,
-      splashMul: 1.3,
-    },
-  ),
-
   flares: s(
     'flares',
     'Flares',
@@ -147,42 +93,6 @@ export const SKILLS: Record<string, SkillDef> = {
     10,
     1.5,
   ),
-  'ghost-skin': b(
-    'ghost-skin',
-    'Ghost Skin',
-    '+20% Deflect (ignores cap) for a few seconds.',
-    ['wasp'],
-    5,
-    5,
-    { deflectAdd: 0.2 },
-  ),
-  'carpet-drop': s(
-    'carpet-drop',
-    'Carpet Drop',
-    'Release a line of bombs below you.',
-    ['anvil'],
-    25,
-    2,
-  ),
-  'iron-hide': b('iron-hide', 'Iron Hide', 'Take 40% less damage.', ['anvil'], 6, 6, {
-    damageTakenMul: 0.6,
-  }),
-  'mend-beam': s(
-    'mend-beam',
-    'Mend Beam',
-    'Heal the nearest ally in front of you over time.',
-    ['halo'],
-    12,
-    4,
-  ),
-  'aegis-bubble': s(
-    'aegis-bubble',
-    'Aegis Bubble',
-    'Shield all allies within 60 m.',
-    ['halo'],
-    40,
-    6,
-  ),
   'siege-anchor': s(
     'siege-anchor',
     'Siege Anchor',
@@ -190,14 +100,6 @@ export const SKILLS: Record<string, SkillDef> = {
     ['bulwark'],
     1,
     0,
-  ),
-  'scrap-wall': s(
-    'scrap-wall',
-    'Scrap Wall',
-    'Deploy a barrier that eats Projectiles.',
-    ['bulwark'],
-    30,
-    8,
   ),
   'pivot-flip': s(
     'pivot-flip',

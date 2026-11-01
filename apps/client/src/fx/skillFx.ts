@@ -217,32 +217,6 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
       ring(fx, P, C.overdrive, R * 7, 0.6);
       break;
     }
-    case 'phantom-weave':
-      burst(fx, P, C.phantom, 40, R * 8, 0.8, 1.0);
-      ring(fx, P, C.phantom, R * 5, 0.7);
-      break;
-    case 'hunter-sight':
-      // three gold scan rings sweeping forward
-      for (let i = 0; i < 3; i++)
-        fx.ringP.emit(
-          P[0]! + fx0 * R * i,
-          P[1]! + fy0 * R * i,
-          P[2]! + fz0 * R * i,
-          fx0 * 260 + s.vel[0],
-          fy0 * 260 + s.vel[1],
-          fz0 * 260 + s.vel[2],
-          0.9 - i * 0.1,
-          R * 0.8,
-          R * (5 + i * 2),
-          ...C.gold,
-          0.9,
-          0,
-          0,
-          1.2,
-          0.8,
-          0.15,
-        );
-      break;
     case 'air-barrage-mode':
     case 'ground-strike-mode': {
       const col = e.skill === 'air-barrage-mode' ? C.air : C.ground;
@@ -251,13 +225,8 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
       fx.sph.follow(e.id, col, 1.2, 0.5);
       break;
     }
-    case 'bulk-plating':
-      burst(fx, P, C.silver, 40, R * 7, 0.5, 0.8, 18);
-      ring(fx, P, C.silver, R * 3.5, 0.35);
-      break;
-    case 'rally-field':
-    case 'overcharge': {
-      const col = e.skill === 'rally-field' ? C.rally : C.charge;
+    case 'rally-field': {
+      const col = C.rally;
       const rad = SKILLS[e.skill]?.auraRadiusM ?? 150;
       ring(fx, P, col, rad / 0.78, 0.9, [0, 0, 0], 4);
       flatRing(fx, P, col, rad / 0.78, 1.0);
@@ -270,16 +239,6 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
       ring(fx, P, C.white, 170, 0.6);
       burst(fx, P, C.white, 40, 60, 0.6, 1.4);
       break;
-    case 'fortify':
-      fx.hex.follow(e.id, ncol, 2.2, 1.0, 1.5);
-      burst(fx, P, ncol, 24, R * 4, 0.6, 0.9);
-      break;
-    case 'barrage-calibration': {
-      v.set(0, 1.6 * MODEL_SCALE, -4.1 * MODEL_SCALE).applyQuaternion(q);
-      fx.glow.emit(P[0]! + v.x, P[1]! + v.y, P[2]! + v.z, 0, 0, 0, 0.4, 8, 1, ...C.ground, 1);
-      ring(fx, [P[0]! + v.x, P[1]! + v.y, P[2]! + v.z], C.ground, R * 3, 0.7);
-      break;
-    }
     case 'afterburn-dash':
       burst(fx, P, ncol, 30, 40, 0.5, 1.2);
       ring(fx, [P[0]! - fx0 * R, P[1]! - fy0 * R, P[2]! - fz0 * R], ncol, R * 4, 0.4);
@@ -321,22 +280,6 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
         );
       burst(fx, P, C.yellow, 16, 30, 0.5, 1.2);
       break;
-    case 'ghost-skin':
-      burst(fx, P, C.violet, 32, R * 6, 0.7, 1.0);
-      ring(fx, P, C.violet, R * 4.5, 0.6);
-      break;
-    case 'iron-hide':
-      fx.hex.follow(e.id, C.silver, 2.0, 0.9, 1.45);
-      burst(fx, P, C.silver, 28, R * 5, 0.5, 0.8, 14);
-      break;
-    case 'mend-beam':
-      for (const t of targetsOf(e)) beam(fx, e.id, t, C.green, 2.0);
-      burst(fx, P, C.green, 14, R * 3, 0.6, 0.9);
-      break;
-    case 'aegis-bubble':
-      fx.hex.follow(e.id, C.blue, 2.4, 1.6, 2.8);
-      ring(fx, P, C.blue, R * 7, 0.7);
-      break;
     case 'siege-anchor':
       flatRing(fx, P, C.ground, R * 8, 0.8);
       for (let i = 0; i < 18; i++) {
@@ -360,10 +303,6 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
           -0.3,
         );
       }
-      break;
-    case 'scrap-wall':
-      ring(fx, P, C.silver, R * 5, 0.5);
-      burst(fx, P, C.silver, 22, R * 5, 0.5, 0.9, 12);
       break;
     case 'repair-kit':
       sparkle(fx, s, C.green);
@@ -508,7 +447,7 @@ function updateLingering(fx: Fx, dt: number) {
   }
 }
 
-/** Draw and expire energy beams between ships (rally/overcharge allies, mend beam). */
+/** Draw and expire energy beams between ships (aura allies, debuff victims). */
 export function updateBeams(fx: Fx, dt: number) {
   updateLingering(fx, dt);
   for (let i = 0; i < fx.bn;) {

@@ -1,13 +1,8 @@
-import { SKILLS, WEAPONS } from '../content/weapons';
+import { SKILLS } from '../content/weapons';
 import { TICK_HZ, type NationId, type ShipId, type SkillId } from '../types';
 import type { ShipRec, SimCtx } from './ctx';
 import {
-  AEGIS_RADIUS,
   PURGE_RADIUS,
-  CARPET_BOMBS,
-  CARPET_BOMB_WEAPON,
-  CARPET_DAMAGE_MUL,
-  CARPET_SPACING,
   CINDER_DPS,
   CINDER_MAX,
   CINDER_RADIUS,
@@ -15,9 +10,6 @@ import {
   FLARE_COUNT,
   FLARE_RANGE,
   FLARE_SPEED,
-  MEND_CONE_RAD,
-  MEND_HEAL_FRACTION,
-  MEND_RANGE,
   QUAKE_DAMAGE,
   QUAKE_DISTANCE,
   QUAKE_RADIUS,
@@ -25,8 +17,6 @@ import {
   SAP_RADIUS,
   SNARE_CONE_RAD,
   SNARE_RANGE,
-  WALL_DISTANCE,
-  WALL_MAX,
 } from './constants';
 import { applyBuff, tickBuffs } from './buffs';
 import { toggleSiege } from './flight';
@@ -202,56 +192,8 @@ export function castSkill(
     case 'siege-anchor':
       toggleSiege(rec);
       break;
-    case 'carpet-drop': {
-      const w = WEAPONS[CARPET_BOMB_WEAPON]!;
-      for (let i = 0; i < CARPET_BOMBS; i++) {
-        const off = (i - (CARPET_BOMBS - 1) / 2) * CARPET_SPACING;
-        spawnProjectile(
-          ctx,
-          rec,
-          w.kind,
-          w.id,
-          w.damage * CARPET_DAMAGE_MUL,
-          w.splashRadius,
-          w.speed,
-          w.rangeM,
-          0,
-          null,
-          s.pos[0] + _f[0]! * off,
-          s.pos[1] - 3,
-          s.pos[2] + _f[2]! * off,
-          0,
-          -1,
-          0,
-          0,
-        );
-      }
-      break;
-    }
-    case 'mend-beam': {
-      const ally = nearestInFront(ctx, rec, true, MEND_RANGE, MEND_CONE_RAD);
-      if (ally)
-        ally.state.hp = Math.min(
-          ally.state.maxHp,
-          ally.state.hp + ally.state.maxHp * MEND_HEAL_FRACTION,
-        );
-      break;
-    }
-    case 'aegis-bubble':
-      for (const o of ctx.recList) {
-        const os = o.state;
-        if (
-          os.alive &&
-          os.nation === s.nation &&
-          Math.hypot(os.pos[0] - s.pos[0], os.pos[1] - s.pos[1], os.pos[2] - s.pos[2]) <=
-            AEGIS_RADIUS
-        ) {
-          os.shield = os.maxShield;
-        }
-      }
-      break;
     case 'snare-tag': {
-      const foe = nearestInFront(ctx, rec, false, SNARE_RANGE, SNARE_CONE_RAD);
+      const foe = nearestEnemyInFront(ctx, rec, SNARE_RANGE, SNARE_CONE_RAD);
       if (foe) {
         applyBuff(foe.state, id, s.id, ticks);
         targets = [foe.state.id];
@@ -292,16 +234,6 @@ export function castSkill(
         dps: CINDER_DPS * rec.mods.damageMul,
         nation: s.nation,
         owner: s.id,
-        expireTick: ctx.tick + ticks,
-      });
-      break;
-    case 'scrap-wall':
-      if (ctx.walls.length >= WALL_MAX) ctx.walls.shift();
-      ctx.walls.push({
-        x: s.pos[0] + _f[0]! * WALL_DISTANCE,
-        y: s.pos[1] + _f[1]! * WALL_DISTANCE,
-        z: s.pos[2] + _f[2]! * WALL_DISTANCE,
-        nation: s.nation,
         expireTick: ctx.tick + ticks,
       });
       break;
@@ -386,11 +318,10 @@ function debuffEnemiesNear(
   return hit;
 }
 
-/** Nearest live ally (or enemy) inside a cone off the nose. Needs `_f` = the caster's forward. */
-function nearestInFront(
+/** Nearest live enemy inside a cone off the nose. Needs `_f` = the caster's forward. */
+function nearestEnemyInFront(
   ctx: SimCtx,
   rec: ShipRec,
-  ally: boolean,
   range: number,
   cone: number,
 ): ShipRec | null {
@@ -400,8 +331,7 @@ function nearestInFront(
   let bestD = range;
   for (const o of ctx.recList) {
     const os = o.state;
-    if (o === rec || !os.alive || os.launchPhase !== 'none' || (os.nation === s.nation) !== ally)
-      continue;
+    if (!os.alive || os.launchPhase !== 'none' || os.nation === s.nation) continue;
     const dx = os.pos[0] - s.pos[0],
       dy = os.pos[1] - s.pos[1],
       dz = os.pos[2] - s.pos[2];

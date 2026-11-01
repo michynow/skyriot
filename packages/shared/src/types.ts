@@ -116,8 +116,6 @@ export interface ShipState {
   /** Brake was held last tick (Siege Mode toggles on the rising edge). */
   brakeHeld: boolean;
   dashTicks: number;
-  ghostTicks: number;
-  ironTicks: number;
   flareTicks: number;
   /** Ticks spent docked (resupply fires at DECK.resupplySec). */
   dockTicks: number;

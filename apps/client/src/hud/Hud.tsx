@@ -466,7 +466,7 @@ function Warnings() {
   );
 }
 
-/** Halted mid-air: read-only Loadout (engine, weapons, hotbar, reserve kit). Swapping parts arrives with inventory (M2). */
+/** Halted mid-air: read-only Loadout (engine, weapons, hotbar). Swapping parts arrives with inventory (M2). */
 function Loadout() {
   const frame = useHud((h) => h.frame);
   if (!frame) return null;
@@ -509,23 +509,6 @@ function Loadout() {
               </div>
             ),
         )}
-      </section>
-      <h4>RESERVE KIT</h4>
-      <section className="lo-skills">
-        {Object.values(SKILLS)
-          .filter(
-            (k) =>
-              k.kind !== 'consumable' &&
-              k.frames !== 'all' &&
-              k.frames.includes(frame) &&
-              !fd.hotbar.includes(k.id),
-          )
-          .map((k) => (
-            <div key={k.id} title={k.description}>
-              <SkillIcon id={k.id} />
-              <small>{k.name}</small>
-            </div>
-          ))}
       </section>
       <footer>
         <kbd>B</kbd> or <kbd>W</kbd> to resume

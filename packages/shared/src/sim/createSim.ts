@@ -103,7 +103,6 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     recList: [],
     projectiles: [],
     pool: [],
-    walls: [],
     zones: [],
     nextProjectileId: 1,
     events: [],
@@ -179,7 +178,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.dockTicks = 0;
     s.brakeHeld = false;
     s.angVel[0] = s.angVel[1] = s.angVel[2] = 0;
-    s.dashTicks = s.ghostTicks = s.ironTicks = s.flareTicks = s.flipTicks = s.reverseTicks = 0;
+    s.dashTicks = s.flareTicks = s.flipTicks = s.reverseTicks = 0;
     s.halted = false;
     rec.lockCand = null;
     rec.lockTime = 0;
@@ -241,8 +240,6 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       angVel: [0, 0, 0],
       brakeHeld: false,
       dashTicks: 0,
-      ghostTicks: 0,
-      ironTicks: 0,
       flareTicks: 0,
       dockTicks: 0,
       siegePending: false,

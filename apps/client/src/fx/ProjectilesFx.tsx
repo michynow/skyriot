@@ -1490,7 +1490,7 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
             1,
             5,
           );
-      } else if (bf.skill === 'phantom-weave' && rnd() < dt * 25) {
+      } else if (bf.skill === 'servo-overclock' && rnd() < dt * 25) {
         v.set(
           (rnd() - 0.5) * FRAMES[s.frame].radius * 2,
           rnd() - 0.5,

@@ -48,7 +48,7 @@ function skillSfx(id: string): SfxName {
   if (def.kind === 'buff') return 'skill-buff';
   if (def.kind === 'toggle') return 'skill-toggle';
   if (id === 'purge') return 'skill-purge';
-  if (def.kind === 'consumable' || id === 'mend-beam' || id === 'aegis-bubble') return 'skill-heal';
+  if (def.kind === 'consumable') return 'skill-heal';
   return 'skill-generic';
 }
 

@@ -86,14 +86,6 @@ export interface Projectile {
   weaveAmp: number;
 }
 
-export interface Wall {
-  x: number;
-  y: number;
-  z: number;
-  nation: NationId;
-  expireTick: number;
-}
-
 /** Static damage area (Cinder Cloud): hurts enemies of `nation` inside `radius` until `expireTick`. */
 export interface Zone {
   x: number;
@@ -137,7 +129,6 @@ export interface SimCtx {
   recList: ShipRec[];
   projectiles: Projectile[];
   pool: Projectile[];
-  walls: Wall[];
   zones: Zone[];
   nextProjectileId: number;
   events: SimEvent[];

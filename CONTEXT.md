@@ -42,7 +42,7 @@ An active ability on the hotbar with a cooldown, specific to a Frame (Flares is 
 _Avoid_: ability, spell, power
 
 **Skill Kit**:
-Every Skill one Frame can use (Frame-specific plus shared ones like Flares). The Hotbar holds up to 10 of them; the rest wait in reserve.
+Every Skill one Frame can use (Frame-specific plus shared ones like Flares). The Hotbar holds up to 10 of them.
 
 **Debuff**:
 A timed effect a Skill puts on enemy Ships (slow, weaken), shown and resolved like a buff on the victim.

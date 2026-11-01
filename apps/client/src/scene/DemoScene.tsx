@@ -62,8 +62,6 @@ function mk(
     angVel: [0, 0, 0],
     brakeHeld: false,
     dashTicks: 0,
-    ghostTicks: 0,
-    ironTicks: 0,
     flareTicks: 0,
     dockTicks: 0,
     grounded: false,
@@ -224,8 +222,6 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
           caster.buffs.push({ skill: id, source: caster.id, ticksLeft: 150 });
         if (def.kind === 'toggle')
           caster.toggles = { ...caster.toggles, [def.toggleGroup ?? 'g']: id };
-        if (id === 'iron-hide') caster.ironTicks = 150;
-        if (id === 'ghost-skin') caster.ghostTicks = 150;
         const allies = list
           .filter((x) => x.nation === caster.nation && x.id !== caster.id)
           .map((x) => x.id);
