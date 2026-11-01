@@ -43,7 +43,29 @@ const AURA = {
   fortify: auraMat([0.9, 1.7, 2.6], true, 0.25),
   iron: auraMat([1.6, 1.8, 2.2], true, 0.25),
   aegis: auraMat([0.4, 1.4, 3.2], true, 0.3),
+  renewal: auraMat([0.4, 2.6, 0.9], false, 0.4),
+  ward: auraMat([0.6, 1.6, 3.0], true, 0.3),
+  bastion: auraMat([0.5, 1.2, 2.8], true, 0.35),
+  sap: auraMat([1.4, 0.5, 2.2], false, 0.45),
+  snare: auraMat([2.8, 2.2, 0.3], true, 0.35),
+  quake: auraMat([2.4, 1.2, 0.3], false, 0.4),
+  veil: auraMat([1.2, 0.8, 2.6], false, 0.25),
 };
+/** Buff Skill -> aura shell and its scale (x hull radius). Debuffs show on the victim. */
+const BUFF_AURA: Record<string, [keyof typeof AURA, number]> = {
+  'rally-field': ['rally', 1.15],
+  overcharge: ['overcharge', 1.22],
+  fortify: ['fortify', 1.08],
+  'renewal-pulse': ['renewal', 1.3],
+  'ward-lattice': ['ward', 1.36],
+  'bastion-field': ['bastion', 1.42],
+  'sapping-hex': ['sap', 1.12],
+  'snare-tag': ['snare', 1.18],
+  'quake-round': ['quake', 1.25],
+  'shroud-veil': ['veil', 1.05],
+};
+/** Buffs that also light the extra engine flame sheath. */
+const FLAME_BUFFS = new Set(['overdrive', 'ram-surge', 'servo-overclock', 'hot-barrels']);
 const odMat = new THREE.MeshBasicMaterial({
   color: new THREE.Color(3.2, 0.7, 0.15),
   transparent: true,
@@ -129,6 +151,8 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
     ht: 0,
     ghost: 0,
     t: 0,
+    on: {} as Record<string, boolean>,
+    veiled: false,
   });
   const inv = useMemo(() => new THREE.Matrix4(), []);
 
@@ -138,28 +162,18 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
     time.value = s.t;
     const ship = world.ships.get(shipId);
     if (!ship) return;
-    let rally = false,
-      charge = false,
-      fort = false,
-      overdrive = false,
+    let overdrive = false,
       phantom = false,
       bulk = false,
       calibr = false,
       aegis = false;
+    const on = s.on;
+    for (const k in on) on[k] = false;
     for (const b of ship.buffs) {
+      const a = BUFF_AURA[b.skill];
+      if (a) on[a[0]] = true;
+      if (FLAME_BUFFS.has(b.skill)) overdrive = true;
       switch (b.skill) {
-        case 'rally-field':
-          rally = true;
-          break;
-        case 'overcharge':
-          charge = true;
-          break;
-        case 'fortify':
-          fort = true;
-          break;
-        case 'overdrive':
-          overdrive = true;
-          break;
         case 'phantom-weave':
           phantom = true;
           break;
@@ -180,11 +194,21 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       m.visible = on;
       if (on) m.scale.set(rad * sc, rad * sc * 0.72, len * sc * 1.15);
     };
-    set('rally', rally, 1.15);
-    set('overcharge', charge, 1.22);
-    set('fortify', fort, 1.08);
+    for (const [k, sc] of Object.values(BUFF_AURA)) set(k, !!on[k], sc);
     set('iron', iron, 1.04);
     set('aegis', aegis, 1.6);
+
+    // Shroud Veil: the painted hull fades out, leaving only the shimmer and a ghost outline.
+    const veiled = !!on.veil;
+    const hull = plate.current?.parent;
+    if (hull && veiled !== s.veiled) {
+      s.veiled = veiled;
+      const hullMats = new Set<THREE.Material>(Object.values(mats));
+      hull.traverse((o) => {
+        if (o instanceof THREE.Mesh && hullMats.has(o.material as THREE.Material))
+          o.visible = !veiled;
+      });
+    }
 
     // Overdrive: extra red-orange flame sheath on every engine
     s.od += ((overdrive ? 1 : 0) - s.od) * (1 - Math.exp(-6 * dt));
@@ -253,17 +277,15 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
         const idx = s.hn - 3 * (k + 1);
         g.visible = phantom && idx >= 0;
         if (g.visible) g.matrix.multiplyMatrices(inv, s.hist[((idx % 16) + 16) % 16]!);
+        else if (k === 0 && veiled) {
+          g.visible = true;
+          g.matrix.identity();
+        }
       }
     }
   });
 
-  const keys: [string, THREE.ShaderMaterial][] = [
-    ['rally', AURA.rally],
-    ['overcharge', AURA.overcharge],
-    ['fortify', AURA.fortify],
-    ['iron', AURA.iron],
-    ['aegis', AURA.aegis],
-  ];
+  const keys = Object.entries(AURA);
   return (
     <>
       {keys.map(([k, m]) => (
