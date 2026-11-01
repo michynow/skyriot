@@ -1,4 +1,4 @@
-import { RESPAWN_SEC } from '../content/frames';
+import { LAUNCH } from '../content/bases';
 import { TICK_HZ, type ShipId } from '../types';
 import type { SimCtx, ShipRec } from './ctx';
 import { DEFLECT_CAP, DEFLECT_DAMAGE_MUL } from './constants';
@@ -12,6 +12,7 @@ export function damageShip(
 ): number {
   const s = rec.state;
   if (!s.alive || amount <= 0 || s.rollTicks > 0 || ctx.tuning.god.has(s.id)) return 0;
+  if (s.launchPhase !== 'none') return 0;
   rec.shieldDelay = ctx.frames[s.frame].shieldRegenDelaySec;
   let remaining = amount;
   const absorbed = Math.min(s.shield, remaining);
@@ -26,7 +27,7 @@ export function damageShip(
     rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;
     s.lockTarget = null;
     s.buffs.length = 0;
-    s.respawnAtTick = ctx.tick + Math.ceil(RESPAWN_SEC * TICK_HZ);
+    s.respawnAtTick = ctx.tick + Math.ceil(LAUNCH.respawnSec * TICK_HZ);
     ctx.events.push({
       type: 'shipDestroyed',
       victim: s.id,
@@ -49,7 +50,7 @@ export function hitShip(
   z: number,
 ): void {
   const s = rec.state;
-  if (!s.alive || s.rollTicks > 0) return;
+  if (!s.alive || s.rollTicks > 0 || s.launchPhase !== 'none') return;
   const chance = Math.min(ctx.frames[s.frame].deflectChance, DEFLECT_CAP) + rec.mods.deflectAdd;
   const deflected = ctx.rng() < chance;
   let dmg = base;

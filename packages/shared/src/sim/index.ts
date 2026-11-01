@@ -1,4 +1,16 @@
-import type { MapDef, PilotInput, ShipId, ShipSpawn, ShipState, SimEvent, Vec3 } from '../types';
+import type {
+  MapDef,
+  MatchState,
+  NationId,
+  PilotInput,
+  ShipId,
+  ShipSpawn,
+  ShipState,
+  SimEvent,
+  StructureKind,
+  StructureState,
+  Vec3,
+} from '../types';
 
 // Contract for the shared simulation (docs/ARCHITECTURE.md §2.1). Implementation owned by the sim agent.
 
@@ -29,6 +41,16 @@ export interface Sim {
   teleport(id: ShipId, pos: Vec3): void;
   /** Live missiles with server-side path (for snapshots). `target` is the Ship each homes on. */
   missiles(): MissileView[];
+  /** All Base structures (both Nations), live objects. */
+  structures(): StructureState[];
+  /** Battle state and Launch Queues (queues are only kept by the authoritative sim). */
+  match(): MatchState;
+  /** Client: mirror server structures so colliders and shield domes match the server. */
+  setStructures(list: readonly StructureState[]): void;
+  /** Dev: destroy every live structure of a kind in a Nation's Base. Returns how many. */
+  destroyStructures(nation: NationId, kind: StructureKind): number;
+  /** Dev: end the Battle now with `winner`; Bases rebuild after the usual delay. */
+  endBattle(winner: NationId): void;
   /** Static-world collider wireframe for the dev debug view: flat [x,y,z,...] line segments. */
   debugLines(): Float32Array;
   dispose(): void;

@@ -34,11 +34,32 @@ export function generateHeightfield(map: MapDef): Heightfield {
       h /= 1.9375;
       const terraced = Math.floor(h * 6) / 6;
       h = h * 0.55 + terraced * 0.45;
-      heights[iz * n + ix] = h * map.maxHeight;
+      heights[iz * n + ix] = flattenForBases(
+        map,
+        (u - 0.5) * map.size,
+        (v - 0.5) * map.size,
+        h * map.maxHeight,
+      );
     }
   }
   return { resolution: n, size: map.size, heights };
 }
+
+/** Base plateau: flat at the Core's height within plateauRadius, smoothstep back to terrain over the next 30%. */
+function flattenForBases(map: MapDef, x: number, z: number, h: number): number {
+  for (const nation of ['concord', 'vex'] as const) {
+    const base = map.bases[nation];
+    const r = base.plateauRadius;
+    const d = Math.hypot(x - base.core[0], z - base.core[2]);
+    if (d >= r * PLATEAU_BLEND) continue;
+    const t = Math.max(d - r, 0) / (r * (PLATEAU_BLEND - 1));
+    const k = t * t * (3 - 2 * t);
+    return base.core[1] * (1 - k) + h * k;
+  }
+  return h;
+}
+
+const PLATEAU_BLEND = 1.3;
 
 /** Bilinear height at world x/z. Terrain spans [-size/2, size/2]. */
 export function sampleHeight(hf: Heightfield, x: number, z: number): number {

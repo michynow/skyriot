@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { FRAMES } from '@skyriot/shared';
 import { world } from '../state/world';
 import { inputState } from '../input/input';
+import { NATION_COLOR } from './Reticles';
+import { ownShip } from './hudStore';
 
 const SIZE = 220;
 const R = SIZE / 2 - 8;
@@ -42,7 +44,7 @@ export function Radar() {
       g.lineTo(c, c + R);
       g.stroke();
 
-      const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+      const own = ownShip();
       if (!own) return;
       const range = FRAMES[own.frame].radarRangeM;
       const [qx, qy, qz, qw] = own.rot;
@@ -68,7 +70,12 @@ export function Radar() {
         g.lineWidth = 3;
         g.setLineDash([8, 6]);
         g.beginPath();
-        [[-half, -half], [half, -half], [half, half], [-half, half]].forEach(([wx, wz], i) => {
+        [
+          [-half, -half],
+          [half, -half],
+          [half, half],
+          [-half, half],
+        ].forEach(([wx, wz], i) => {
           const s = toScreen(wx! - own.pos[0], wz! - own.pos[2]);
           if (i === 0) g.moveTo(c + s.x * R, c + s.y * R);
           else g.lineTo(c + s.x * R, c + s.y * R);
@@ -78,32 +85,65 @@ export function Radar() {
         g.restore();
       }
 
-      // Launch Deck icons for the own nation; bearing arrow at the edge when out of range.
-      for (const deck of world.map?.launchDecks?.[own.nation] ?? []) {
-        const s = toScreen(deck.pos[0] - own.pos[0], deck.pos[2] - own.pos[2]);
+      /** Icon at a world XZ, clamped to the radar rim as a bearing arrow when out of range. */
+      const edgeIcon = (
+        wx: number,
+        wz: number,
+        color: string,
+        draw: (x: number, y: number) => void,
+      ) => {
+        const s = toScreen(wx - own.pos[0], wz - own.pos[2]);
         const len = Math.hypot(s.x, s.y);
         const k = len > 1 ? 1 / len : 1;
         const x = c + s.x * k * R;
         const y = c + s.y * k * R;
-        g.fillStyle = '#5fe3ff';
-        g.strokeStyle = '#5fe3ff';
+        g.fillStyle = color;
+        g.strokeStyle = color;
         g.lineWidth = 2;
-        if (len <= 1) {
+        if (len <= 1) return draw(x, y);
+        g.save();
+        g.translate(x, y);
+        g.rotate(Math.atan2(s.y, s.x));
+        g.beginPath();
+        g.moveTo(7, 0);
+        g.lineTo(-5, 6);
+        g.lineTo(-5, -6);
+        g.closePath();
+        g.fill();
+        g.restore();
+      };
+      for (const deck of world.map?.launchDecks?.[own.nation] ?? [])
+        edgeIcon(deck.pos[0], deck.pos[2], '#5fe3ff', (x, y) => {
           g.fillRect(x - 5, y - 5, 10, 10);
           g.fillStyle = '#04101a';
           g.fillRect(x - 2, y - 2, 4, 4);
-        } else {
-          g.save();
-          g.translate(x, y);
-          g.rotate(Math.atan2(s.y, s.x));
+        });
+      // Both Cores as nation-coloured hexes (bearing arrows when out of range); live Shield Stations as small squares.
+      for (const n of ['concord', 'vex'] as const) {
+        const def = world.map?.bases?.[n];
+        if (!def) continue;
+        const col = NATION_COLOR[n];
+        edgeIcon(def.core[0], def.core[2], col, (x, y) => {
           g.beginPath();
-          g.moveTo(7, 0);
-          g.lineTo(-5, 6);
-          g.lineTo(-5, -6);
+          for (let i = 0; i < 6; i++)
+            g.lineTo(x + 7 * Math.cos((i * Math.PI) / 3), y + 7 * Math.sin((i * Math.PI) / 3));
           g.closePath();
-          g.fill();
-          g.restore();
-        }
+          g.stroke();
+        });
+        def.shieldStations.forEach((pos, i) => {
+          const live = [...world.structures.values()].find(
+            (st) =>
+              st.kind === 'shieldStation' &&
+              st.nation === n &&
+              Math.hypot(st.pos[0] - pos[0], st.pos[2] - pos[2]) < 5,
+          );
+          if (live && !live.alive) return;
+          const s = toScreen(pos[0] - own.pos[0], pos[2] - own.pos[2]);
+          if (Math.hypot(s.x, s.y) > 1) return;
+          g.fillStyle = col;
+          g.fillRect(c + s.x * R - 3, c + s.y * R - 3, 6, 6);
+          void i;
+        });
       }
 
       for (const s of world.ships.values()) {

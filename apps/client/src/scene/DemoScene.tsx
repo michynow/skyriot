@@ -23,6 +23,7 @@ function mk(id: string, frame: FrameId, nation: NationId, tier: number, upgrade:
     fuel: 1, speed: 100, alive: true, respawnAtTick: 0, rollTicks: 0, rollCooldownTicks: 0, sieged: false, cooldowns: [], lockTarget: null, ammo1: 100, ammo2: 4, docked: false,
     angVel: [0, 0, 0], brakeHeld: false, dashTicks: 0, ghostTicks: 0, ironTicks: 0, flareTicks: 0, dockTicks: 0, grounded: false, buffs: [], toggles: {}, rollPhase: -1, rollDir: 1, outOfBounds: false,
     siegePending: false, incomingDist: -1, incomingTti: -1, canLock: false, lockProgress: 0,
+    launchPhase: 'none', queuePos: -1, tunnel: -1, launchTicks: 0, stalled: false,
   };
 }
 

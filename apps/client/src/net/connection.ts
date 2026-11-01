@@ -90,8 +90,23 @@ function parseSnapshot(m: unknown): Snapshot | null {
         (x): x is Snapshot['missiles'][number] => isObj(x) && isNum(x.id) && isVec3(x.pos) && isVec3(x.vel),
       )
     : [];
-  return { tick: m.tick, serverTimeMs: m.serverTimeMs, ack: isNum(m.ack) ? m.ack : -1, ships, missiles };
+  const structures = Array.isArray(m.structures)
+    ? m.structures.filter(
+        (x): x is Snapshot['structures'][number] =>
+          isObj(x) && typeof x.id === 'string' && isVec3(x.pos) && isNum(x.hp),
+      )
+    : [];
+  const match = isObj(m.match) ? (m.match as unknown as Snapshot['match']) : NO_MATCH;
+  return { tick: m.tick, serverTimeMs: m.serverTimeMs, ack: isNum(m.ack) ? m.ack : -1, ships, missiles, structures, match };
 }
+
+const NO_MATCH: Snapshot['match'] = {
+  phase: 'battle',
+  winner: null,
+  restartAtTick: 0,
+  shielded: { concord: false, vex: false },
+  queues: { concord: [], vex: [] },
+};
 
 function parseEvents(m: unknown): SimEvent[] {
   if (!Array.isArray(m)) return [];

@@ -15,6 +15,7 @@ import {
   CEILING_PUSH_SPEED,
   CEILING_SOFT_M,
   BRAKE_DECEL_MUL,
+  CLIMB_SPEED_SHIFT,
   DECK_APPROACH_MUL,
   DOCK_CLEARANCE,
   DOCK_TOUCH_MARGIN,
@@ -39,6 +40,13 @@ import {
   SHIP_QUERY_GROUPS,
   SIEGE_LOCK_CONE_MUL,
   STALL_FALL_SECONDS,
+  STALL_NOSE_DROP,
+  STALL_DIVE_GAIN,
+  STALL_GROUND_FADE_M,
+  STALL_RECOVER_MUL,
+  STALL_THRUST_MUL,
+  STALL_TURN_MUL,
+  THROTTLE_DECEL_MUL,
   TURN_GAIN,
   TURN_TAU_SEC,
 } from './constants';
@@ -220,6 +228,13 @@ export function stepFlight(
   const grounded = s.grounded;
   const sieged = s.sieged;
 
+  // ---- stall: hysteresis on last tick's speed; Bulwark hovers and the deck approach is exempt ----
+  const winged = !space && !fd.canHover;
+  const nearDeck = winged && ownDeck(ctx, s, LANDING_ASSIST_HEIGHT, DECK_APPROACH_MUL) !== null;
+  if (!winged || s.docked || nearDeck || env.stallSpeed <= 0) s.stalled = false;
+  else if (s.speed < env.stallSpeed) s.stalled = true;
+  else if (s.speed > env.stallSpeed * STALL_RECOVER_MUL) s.stalled = false;
+
   // ---- orientation: ease the nose toward aim (angular velocity with time constant) ----
   forwardOf(s.rot, _f0);
   let ax = input.aim[0],
@@ -240,6 +255,14 @@ export function stepFlight(
     }
     const ceilK = clamp((s.pos[1] - (ctx.map.ceiling - CEILING_SOFT_M)) / CEILING_SOFT_M, 0, 1);
     if (ceilK > 0) ay = ay * (1 - ceilK) - ceilK * CEILING_PITCH_DOWN;
+    if (s.stalled) {
+      // Near the ground the nose stays up (belly-flop, thrust can still recover) instead of digging in.
+      const agl = s.pos[1] - sampleHeight(ctx.hf, s.pos[0], s.pos[2]) - fd.radius;
+      const drop = STALL_NOSE_DROP * clamp(agl / STALL_GROUND_FADE_M, 0, 1);
+      ax *= 1 - drop;
+      az *= 1 - drop;
+      ay = ay * (1 - drop) - drop;
+    }
   }
   if (s.docked || grounded) {
     ay = 0;
@@ -263,7 +286,11 @@ export function stepFlight(
     ay = _f0[1]!;
     az = _f0[2]!;
   }
-  const maxRate = fd.turnRate * rec.mods.turnRateMul * (sieged ? siegeMods(s).turnRateMul : 1);
+  const maxRate =
+    fd.turnRate *
+    rec.mods.turnRateMul *
+    (sieged ? siegeMods(s).turnRateMul : 1) *
+    (s.stalled ? STALL_TURN_MUL : 1);
   const cosA = clamp(_f0[0]! * ax + _f0[1]! * ay + _f0[2]! * az, -1, 1);
   const angle = Math.acos(cosA);
   let cx = _f0[1]! * az - _f0[2]! * ay;
@@ -489,9 +516,7 @@ export function stepFlight(
   if (sieged) {
     target = 0;
   } else if (input.brake || s.siegePending) {
-    target = space || fd.canHover ? 0 : fd.minSpeed;
-    if (!space && !fd.canHover && ownDeck(ctx, s, LANDING_ASSIST_HEIGHT, DECK_APPROACH_MUL))
-      target = 0;
+    target = winged && !nearDeck ? fd.minSpeed : 0;
   } else {
     target =
       input.throttle >= 0
@@ -505,14 +530,24 @@ export function stepFlight(
     }
     target *= rec.mods.speedMul;
   }
+  if (winged && !nearDeck) target = Math.max(target - _f1[1]! * CLIMB_SPEED_SHIFT, 0);
   s.fuel = clamp(
     s.fuel + (boosting ? -fd.fuelBurnPerSec : fd.fuelRegenPerSec * rec.mods.fuelRegenMul) * dt,
     0,
     1,
   );
   const delta = target - s.speed;
-  const rate2 = (delta < 0 ? BRAKE_DECEL_MUL : 1) * accel;
-  s.speed += clamp(delta, -rate2, rate2);
+  const rate2 =
+    (delta >= 0
+      ? 1
+      : input.brake || s.siegePending || sieged
+        ? BRAKE_DECEL_MUL
+        : THROTTLE_DECEL_MUL) * accel;
+  if (s.stalled) {
+    // No lift: the engine barely helps, only diving (gravity along the nose) builds speed back.
+    s.speed += clamp(delta, -rate2, rate2) * STALL_THRUST_MUL;
+    s.speed = Math.max(s.speed - _f1[1]! * env.gravity * STALL_DIVE_GAIN * dt, 0);
+  } else s.speed += clamp(delta, -rate2, rate2);
 
   // ---- lateral / vertical velocity ----
   const hrx = -_f1[2]!,

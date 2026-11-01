@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { button, Leva, useControls } from 'leva';
-import { FRAMES, type FrameId } from '@skyriot/shared';
+import { FRAMES, type FrameId, type LaunchPhase } from '@skyriot/shared';
 import { inputSettings, saveInputSettings } from '../input/input';
 import { lag } from '../net/lagSim';
 import { session } from '../net/session';
 import { audioStats } from '../audio/engine';
 import { useSettings, type Quality } from '../ui/settings';
 import { addConsoleLine, useHud } from '../hud/hudStore';
+import { hudMock, mockEvent, type MockBattle, type MockScenario } from './hudMock';
 
 /** Latest slider values per Frame, for "Export tuning JSON". */
 const exported: Record<string, Record<string, number>> = {};
@@ -71,24 +72,6 @@ function Controls() {
         saveInputSettings();
       },
     },
-    deadzone: {
-      value: inputSettings.deadzone,
-      min: 0,
-      max: 0.3,
-      step: 0.01,
-      onChange: (v: number) => {
-        inputSettings.deadzone = v;
-        saveInputSettings();
-      },
-    },
-    recenter: {
-      value: inputSettings.recenter,
-      label: 'soft recentre',
-      onChange: (v: boolean) => {
-        inputSettings.recenter = v;
-        saveInputSettings();
-      },
-    },
   });
   const a = useSettings();
   useControls('Audio', {
@@ -107,6 +90,27 @@ function Controls() {
     'send /bots': button((get) => send(`/bots ${get('Server commands.bots')}`)),
     timescale: { value: 1, min: 0.1, max: 3, step: 0.1 },
     'send /timescale': button((get) => send(`/timescale ${get('Server commands.timescale')}`)),
+  });
+  // Fakes Bases / Battle / Launch Queue / stall until the server sends them; see dev/hudMock.ts.
+  useControls('HUD mock', {
+    scenario: {
+      value: hudMock.scenario,
+      options: ['off', 'intact', 'enemyStationDown', 'enemyShieldDown', 'ourShieldDown', 'coreCritical', 'bothExposed'],
+      onChange: (v: MockScenario) => (hudMock.scenario = v),
+    },
+    battle: { value: hudMock.battle, options: ['battle', 'victory', 'defeat'], onChange: (v: MockBattle) => (hudMock.battle = v) },
+    launchPhase: { value: hudMock.launchPhase, options: ['none', 'hangar', 'staging', 'ready', 'catapult'], onChange: (v: LaunchPhase) => (hudMock.launchPhase = v) },
+    queuePos: { value: hudMock.queuePos, min: 0, max: 9, step: 1, onChange: (v: number) => (hudMock.queuePos = v) },
+    tunnel: { value: hudMock.tunnel, min: 0, max: 2, step: 1, onChange: (v: number) => (hudMock.tunnel = v) },
+    stalled: { value: false, onChange: (v: boolean) => (hudMock.stalled = v) },
+    speed: { value: -1, min: -1, max: 200, step: 1, label: 'speed (-1 = real)', onChange: (v: number) => (hudMock.speed = v) },
+    'enemy shield down': button(() => mockEvent('enemyShieldDown')),
+    'our shield down': button(() => mockEvent('ourShieldDown')),
+    'enemy station destroyed': button(() => mockEvent('enemyStationDestroyed')),
+    'our station destroyed': button(() => mockEvent('ourStationDestroyed')),
+    'our station hit': button(() => mockEvent('ourStationHit')),
+    'battle begins': button(() => mockEvent('battleStarted')),
+    catapult: button(() => mockEvent('catapult')),
   });
   return frame ? <Tuning frame={frame} /> : null;
 }
@@ -159,7 +163,7 @@ export default function DevPanel() {
   return (
     <>
       <div data-ui>
-        <Leva collapsed titleBar={{ title: 'SKYRIOT DEV', position: { x: -50, y: 0 } }} />
+        <Leva collapsed titleBar={{ title: 'SKYRIOT DEV', position: { x: -50, y: 48 } }} />
       </div>
       <Controls />
       <Console />

@@ -8,10 +8,12 @@ import {
   WEAPONS,
   sampleHeight,
   type FrameId,
+  type LaunchPhase,
   type NationId,
   type ShipState,
   type SimEvent,
   type SkillId,
+  type StructureState,
 } from '@skyriot/shared';
 import { world } from '../state/world';
 import { session } from '../net/session';
@@ -45,6 +47,21 @@ export interface ChatLine {
   id: number;
   text: string;
   kind: 'chat' | 'sys';
+}
+/** One Base as the objectives panel shows it. */
+export interface BaseView {
+  shield: boolean;
+  stations: boolean[];
+  coreHp: number;
+  coreMax: number;
+  turretsAlive: number;
+  turretsTotal: number;
+}
+export interface Banner {
+  nonce: number;
+  text: string;
+  sub: string;
+  kind: 'good' | 'bad' | 'neutral';
 }
 
 export interface HudState {
@@ -99,7 +116,27 @@ export interface HudState {
   chat: ChatLine[];
   chatOpen: boolean;
   consoleLines: string[];
+  stalled: boolean;
+  launchPhase: LaunchPhase;
+  queuePos: number;
+  tunnel: number;
+  launchSec: number;
+  /** Names of the Ships ahead of us in the Launch Queue. */
+  queueAhead: string[];
+  launchFlashNonce: number;
+  /** performance.now() of our last death; the hangar overlay fades in from the death tint. */
+  diedAtMs: number;
+  battlePhase: 'battle' | 'ended';
+  winner: NationId | null;
+  restartIn: number;
+  bases: Record<NationId, BaseView>;
+  objective: string;
+  /** Transient defensive warning (our structure under fire) shown in place of the objective. */
+  defenseWarn: string;
+  banner: Banner | null;
 }
+
+const EMPTY_BASE: BaseView = { shield: true, stations: [true, true], coreHp: 1, coreMax: 1, turretsAlive: 0, turretsTotal: 0 };
 
 export const useHud = create<HudState>(() => ({
   status: 'connecting',
@@ -151,9 +188,39 @@ export const useHud = create<HudState>(() => ({
   chat: [],
   chatOpen: false,
   consoleLines: [],
+  stalled: false,
+  launchPhase: 'none',
+  queuePos: -1,
+  tunnel: -1,
+  launchSec: 0,
+  queueAhead: [],
+  launchFlashNonce: 0,
+  diedAtMs: -Infinity,
+  battlePhase: 'battle',
+  winner: null,
+  restartIn: 0,
+  bases: { concord: EMPTY_BASE, vex: EMPTY_BASE },
+  objective: '',
+  defenseWarn: '',
+  banner: null,
 }));
 
 export const isGrounded = (s: ShipState): boolean => s.grounded === true;
+/** Flying (or being catapulted): reticles, tapes and markers make sense. Hangar/tunnel phases hide them. */
+export const isFlying = (s: ShipState): boolean =>
+  s.alive && (s.launchPhase === 'none' || s.launchPhase === 'catapult');
+
+/** Dev-only seam: the HUD mock (dev/hudMock.ts) installs an override of the own Ship and world. */
+export const devHooks: { ownShip: ((own: ShipState) => ShipState) | null } = { ownShip: null };
+
+/** The own Ship as the HUD should see it. Every HUD reader goes through here. */
+export function ownShip(): ShipState | undefined {
+  const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+  return import.meta.env.DEV && own && devHooks.ownShip ? devHooks.ownShip(own) : own;
+}
+
+export const NATION_NAME: Record<NationId, string> = { concord: 'Aurelian Concord', vex: 'Vex Freehold' };
+export const enemyOf = (n: NationId): NationId => (n === 'concord' ? 'vex' : 'concord');
 
 /**
  * Homing missiles aimed at the own Ship, derived from projectileSpawned events (until the server sends an
@@ -183,6 +250,53 @@ export function addConsoleLine(text: string): void {
 }
 
 const _d = new Vector3();
+const STRUCTURE_NAME = { core: 'Core', shieldStation: 'Shield Station', turret: 'Turret' } as const;
+let defenseTimer: ReturnType<typeof setTimeout> | undefined;
+
+export function showBanner(text: string, sub: string, kind: Banner['kind']): void {
+  useHud.setState((s) => ({ banner: { nonce: (s.banner?.nonce ?? 0) + 1, text, sub, kind } }));
+}
+
+/** Both Bases from the latest snapshot; with no structures sent yet everything counts as intact. */
+function baseViews(): Record<NationId, BaseView> {
+  const out = { concord: { ...EMPTY_BASE }, vex: { ...EMPTY_BASE } };
+  const bases = world.map?.bases;
+  for (const n of ['concord', 'vex'] as const) {
+    const def = bases?.[n];
+    out[n].stations = def ? def.shieldStations.map(() => true) : [true, true];
+    out[n].turretsTotal = out[n].turretsAlive = def?.turrets.length ?? 0;
+  }
+  if (world.structures.size === 0) return out;
+  const stationIdx: Record<NationId, number> = { concord: 0, vex: 0 };
+  for (const n of ['concord', 'vex'] as const) {
+    out[n].turretsAlive = 0;
+    out[n].stations = [];
+  }
+  const sorted = [...world.structures.values()].sort((a, b) => (a.id < b.id ? -1 : 1));
+  for (const st of sorted) {
+    const b = out[st.nation];
+    if (st.kind === 'core') {
+      b.coreHp = st.hp;
+      b.coreMax = st.maxHp;
+    } else if (st.kind === 'shieldStation') b.stations[stationIdx[st.nation]++] = st.alive;
+    else if (st.alive) b.turretsAlive++;
+  }
+  for (const n of ['concord', 'vex'] as const)
+    out[n].shield = world.match ? world.match.shielded[n] : out[n].stations.some(Boolean);
+  return out;
+}
+
+function objectiveLine(me: NationId, bases: Record<NationId, BaseView>): string {
+  const ours = bases[me];
+  const theirs = bases[enemyOf(me)];
+  if (!theirs.shield && !ours.shield) return 'Both Cores exposed — strike first!';
+  if (!theirs.shield) return 'Enemy Core exposed — attack!';
+  if (!ours.shield) return 'Our shield is down — defend the Core!';
+  if (ours.stations.some((s) => !s)) return 'One Shield Station lost — hold the other!';
+  return 'Destroy the enemy Shield Stations';
+}
+
+export const structureName = (st: StructureState): string => STRUCTURE_NAME[st.kind];
 
 /** Route sim events the HUD cares about (killfeed, hit markers, damage numbers, impacts, deck). */
 export function handleHudEvent(ev: SimEvent): void {
@@ -246,6 +360,45 @@ export function handleHudEvent(ev: SimEvent): void {
       at: performance.now(),
     };
     useHud.setState((s) => ({ killfeed: [...s.killfeed.slice(-4), entry] }));
+    if (ev.victim === ownId) useHud.setState({ diedAtMs: performance.now() });
+  } else if (ev.type === 'structureDestroyed') {
+    const st = world.structures.get(ev.structure);
+    const k = ev.killer ? world.ships.get(ev.killer) : undefined;
+    const me = ownShip()?.nation;
+    if (st && k) {
+      const entry: KillEntry = {
+        id: nextId++,
+        killer: k.name,
+        killerNation: k.nation,
+        victim: STRUCTURE_NAME[st.kind],
+        victimNation: st.nation,
+        at: performance.now(),
+      };
+      useHud.setState((s) => ({ killfeed: [...s.killfeed.slice(-4), entry] }));
+    }
+    if (st?.kind === 'shieldStation' && me) {
+      const ours = st.nation === me;
+      const left = [...world.structures.values()].filter((x) => x.kind === 'shieldStation' && x.nation === st.nation && x.alive && x.id !== st.id).length;
+      showBanner(ours ? 'SHIELD STATION LOST' : 'SHIELD STATION DESTROYED', left > 0 ? `${left} remaining` : ours ? 'Our Core is exposed' : 'Enemy Core exposed', ours ? 'bad' : 'good');
+    }
+  } else if (ev.type === 'shieldDown') {
+    const me = ownShip()?.nation;
+    if (me) {
+      const ours = ev.nation === me;
+      showBanner(ours ? 'SHIELD DOWN' : 'ENEMY SHIELD DOWN', ours ? 'Defend the Core!' : 'Core exposed — attack!', ours ? 'bad' : 'good');
+    }
+  } else if (ev.type === 'structureHit' && !ev.shielded) {
+    const st = world.structures.get(ev.structure);
+    const me = ownShip()?.nation;
+    if (st && st.nation === me) {
+      useHud.setState({ defenseWarn: `${STRUCTURE_NAME[st.kind]} under attack` });
+      clearTimeout(defenseTimer);
+      defenseTimer = setTimeout(() => useHud.setState({ defenseWarn: '' }), 4000);
+    }
+  } else if (ev.type === 'matchStarted') {
+    showBanner('BATTLE BEGINS', 'Destroy the enemy Shield Stations', 'neutral');
+  } else if (ev.type === 'catapult' && ev.id === ownId) {
+    useHud.setState((s) => ({ launchFlashNonce: s.launchFlashNonce + 1 }));
   } else if (ev.type === 'terrainImpact' && ev.id === ownId) {
     if (ev.bounced) {
       world.shake = 1;
@@ -260,7 +413,7 @@ export function handleHudEvent(ev: SimEvent): void {
 export function startHudFeed(): () => void {
   const timer = setInterval(() => {
     const now = performance.now();
-    const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+    const own = ownShip();
     const patch: Partial<HudState> = { pingMs: Math.round(session.conn?.rtt ?? 0) };
     const feed = useHud.getState().killfeed;
     if (feed.some((k) => now - k.at > KILLFEED_MS)) patch.killfeed = feed.filter((k) => now - k.at <= KILLFEED_MS);
@@ -312,7 +465,24 @@ export function startHudFeed(): () => void {
         hotbar,
         cooldownFrac: cd.map((c, i) => Math.min(1, c / total[i]!)),
         cooldownSec: cd.map((c) => c / TICK_HZ),
+        stalled: own.stalled === true && own.alive,
+        launchPhase: own.launchPhase ?? 'none',
+        queuePos: own.queuePos ?? -1,
+        tunnel: own.tunnel ?? -1,
+        launchSec: (own.launchTicks ?? 0) / TICK_HZ,
       });
+      const queue = world.match?.queues[own.nation] ?? [];
+      const ahead = queue.slice(0, Math.max(0, queue.indexOf(own.id))).map((id) => world.ships.get(id)?.name ?? 'Pilot');
+      const prev = useHud.getState();
+      if (ahead.length !== prev.queueAhead.length || ahead.some((n, i) => n !== prev.queueAhead[i])) patch.queueAhead = ahead;
+      const bases = baseViews();
+      const m = world.match;
+      // Structures change rarely; only re-render the objectives panel when something actually did.
+      if (JSON.stringify(bases) !== JSON.stringify(prev.bases)) patch.bases = bases;
+      patch.battlePhase = m?.phase ?? 'battle';
+      patch.winner = m?.winner ?? null;
+      patch.restartIn = m?.phase === 'ended' ? Math.max(0, (m.restartAtTick - tick) / TICK_HZ) : 0;
+      patch.objective = objectiveLine(own.nation, bases);
     }
     useHud.setState(patch);
   }, 100);
