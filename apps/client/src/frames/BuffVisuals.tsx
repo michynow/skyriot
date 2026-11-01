@@ -13,7 +13,10 @@ const time = { value: 0 };
 
 function auraMat(col: [number, number, number], hex: boolean, strength: number) {
   return new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    fog: false,
     uniforms: { uCol: { value: new THREE.Vector3(...col) }, uTime: time, uK: { value: strength } },
     vertexShader: `varying vec3 vN; varying vec3 vV; varying vec3 vP;
       void main(){ vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vP = position; gl_Position = projectionMatrix * mv; }`,
@@ -21,9 +24,13 @@ function auraMat(col: [number, number, number], hex: boolean, strength: number) 
       void main(){
         float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), 2.0);
         float m = 1.0;
-        ${hex ? `vec3 p = normalize(vP) * 6.0;
+        ${
+          hex
+            ? `vec3 p = normalize(vP) * 6.0;
         float d = min(min(abs(fract(p.x) - 0.5), abs(fract(dot(p, vec3(-0.5, 0.866, 0.0))) - 0.5)), min(abs(fract(dot(p, vec3(-0.5, -0.866, 0.0)) + p.z * 0.5) - 0.5), abs(fract(p.z * 0.9) - 0.5)));
-        m = 0.25 + 1.5 * smoothstep(0.07, 0.0, d);` : `m = 0.8 + 0.2 * sin(uTime * 3.0 + vP.y * 6.0);`}
+        m = 0.25 + 1.5 * smoothstep(0.07, 0.0, d);`
+            : `m = 0.8 + 0.2 * sin(uTime * 3.0 + vP.y * 6.0);`
+        }
         gl_FragColor = vec4(uCol * f * m * uK, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -37,11 +44,33 @@ const AURA = {
   iron: auraMat([1.6, 1.8, 2.2], true, 0.25),
   aegis: auraMat([0.4, 1.4, 3.2], true, 0.3),
 };
-const odMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 0.7, 0.15), transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false });
-const flameGeo = new THREE.ConeGeometry(1, 1, 10, 1, true).translate(0, 0.5, 0).rotateX(Math.PI / 2);
-const ghostMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.3, 1.6, 2.4), transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false });
+const odMat = new THREE.MeshBasicMaterial({
+  color: new THREE.Color(3.2, 0.7, 0.15),
+  transparent: true,
+  opacity: 0.7,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  toneMapped: false,
+  fog: false,
+});
+const flameGeo = new THREE.ConeGeometry(1, 1, 10, 1, true)
+  .translate(0, 0.5, 0)
+  .rotateX(Math.PI / 2);
+const ghostMat = new THREE.MeshBasicMaterial({
+  color: new THREE.Color(0.3, 1.6, 2.4),
+  transparent: true,
+  opacity: 0.22,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  toneMapped: false,
+  fog: false,
+});
 const ringGeo = new THREE.TorusGeometry(1, 0.05, 6, 40);
-const ringMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 1.6, 0.3), toneMapped: false, fog: false });
+const ringMat = new THREE.MeshBasicMaterial({
+  color: new THREE.Color(3, 1.6, 0.3),
+  toneMapped: false,
+  fog: false,
+});
 const orbGeo = new THREE.SphereGeometry(1, 12, 8);
 
 const platingCache = new Map<FrameId, Partial<Record<Slot, THREE.BufferGeometry>>>();
@@ -50,7 +79,8 @@ function platingGeos(frame: FrameId) {
   let g = platingCache.get(frame);
   if (!g) {
     const d = FRAMES[frame];
-    const w = (d.radius / MODEL_SCALE_LOCAL) * 0.62, L = (d.halfLength / MODEL_SCALE_LOCAL) * 0.9;
+    const w = (d.radius / MODEL_SCALE_LOCAL) * 0.62,
+      L = (d.halfLength / MODEL_SCALE_LOCAL) * 0.9;
     const b = new Bricks();
     for (const s of [-1, 1]) {
       b.box('dark', [0.22, w * 0.5, L * 1.1], [s * (w + 0.1), 0, L * 0.1], { studs: false });
@@ -67,13 +97,20 @@ const MODEL_SCALE_LOCAL = 2; // matches models.MODEL_SCALE (kept local to avoid 
 
 const easeOutBack = (x: number) => 1 + 2.7 * Math.pow(x - 1, 3) + 1.7 * Math.pow(x - 1, 2);
 
-interface Props { shipId: ShipId; frame: FrameId; nation: NationId; upgrade: number; data: FrameModelData }
+interface Props {
+  shipId: ShipId;
+  frame: FrameId;
+  nation: NationId;
+  upgrade: number;
+  data: FrameModelData;
+}
 
 /** Persistent skill/buff visuals driven by ShipState each frame. Shared materials, pooled (always-mounted) meshes. */
 export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
   const mats = useMemo(() => getMaterials(nation, upgrade), [nation, upgrade]);
   const def = FRAMES[frame];
-  const rad = def.radius / MODEL_SCALE_LOCAL, len = def.halfLength / MODEL_SCALE_LOCAL;
+  const rad = def.radius / MODEL_SCALE_LOCAL,
+    len = def.halfLength / MODEL_SCALE_LOCAL;
   const plating = useMemo(() => platingGeos(frame), [frame]);
 
   const auras = useRef<Record<string, THREE.Mesh | null>>({});
@@ -83,7 +120,16 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
   const calib = useRef<THREE.Group>(null);
   const doors = useRef<(THREE.Group | null)[]>([]);
   const rings = useRef<(THREE.Mesh | null)[]>([]);
-  const st = useRef({ plate: 0, od: 0, bay: 0, hist: Array.from({ length: 16 }, () => new THREE.Matrix4()), hn: 0, ht: 0, ghost: 0, t: 0 });
+  const st = useRef({
+    plate: 0,
+    od: 0,
+    bay: 0,
+    hist: Array.from({ length: 16 }, () => new THREE.Matrix4()),
+    hn: 0,
+    ht: 0,
+    ghost: 0,
+    t: 0,
+  });
   const inv = useMemo(() => new THREE.Matrix4(), []);
 
   useFrame((_, dt) => {
@@ -92,16 +138,37 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
     time.value = s.t;
     const ship = world.ships.get(shipId);
     if (!ship) return;
-    let rally = false, charge = false, fort = false, overdrive = false, phantom = false, bulk = false, calibr = false, aegis = false;
+    let rally = false,
+      charge = false,
+      fort = false,
+      overdrive = false,
+      phantom = false,
+      bulk = false,
+      calibr = false,
+      aegis = false;
     for (const b of ship.buffs) {
       switch (b.skill) {
-        case 'rally-field': rally = true; break;
-        case 'overcharge': charge = true; break;
-        case 'fortify': fort = true; break;
-        case 'overdrive': overdrive = true; break;
-        case 'phantom-weave': phantom = true; break;
-        case 'bulk-plating': bulk = true; break;
-        case 'barrage-calibration': calibr = true; break;
+        case 'rally-field':
+          rally = true;
+          break;
+        case 'overcharge':
+          charge = true;
+          break;
+        case 'fortify':
+          fort = true;
+          break;
+        case 'overdrive':
+          overdrive = true;
+          break;
+        case 'phantom-weave':
+          phantom = true;
+          break;
+        case 'bulk-plating':
+          bulk = true;
+          break;
+        case 'barrage-calibration':
+          calibr = true;
+          break;
       }
     }
     const iron = ship.ironTicks > 0;
@@ -131,7 +198,9 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
     }
 
     // Bulk plating: snap on with overshoot, off by scaling away
-    s.plate += ((bulk ? 1 : 0) - s.plate) * (1 - Math.exp(-12 * dt)) + (bulk ? Math.min(dt * 3, 1 - s.plate) * 0.6 : 0);
+    s.plate +=
+      ((bulk ? 1 : 0) - s.plate) * (1 - Math.exp(-12 * dt)) +
+      (bulk ? Math.min(dt * 3, 1 - s.plate) * 0.6 : 0);
     s.plate = Math.min(1, Math.max(0, s.plate));
     if (plate.current) {
       plate.current.visible = s.plate > 0.02;
@@ -156,7 +225,11 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       if (calibr) {
         for (let i = 0; i < 2; i++) {
           const r = rings.current[i];
-          if (r) { r.rotation.x = s.t * (2.2 + i) + i; r.rotation.y = s.t * (1.4 - i * 0.6); r.position.z = Math.sin(s.t * 3 + i * 3) * 0.5; }
+          if (r) {
+            r.rotation.x = s.t * (2.2 + i) + i;
+            r.rotation.y = s.t * (1.4 - i * 0.6);
+            r.position.z = Math.sin(s.t * 3 + i * 3) * 0.5;
+          }
         }
       }
     }
@@ -184,15 +257,34 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
     }
   });
 
-  const keys: [string, THREE.ShaderMaterial][] = [['rally', AURA.rally], ['overcharge', AURA.overcharge], ['fortify', AURA.fortify], ['iron', AURA.iron], ['aegis', AURA.aegis]];
+  const keys: [string, THREE.ShaderMaterial][] = [
+    ['rally', AURA.rally],
+    ['overcharge', AURA.overcharge],
+    ['fortify', AURA.fortify],
+    ['iron', AURA.iron],
+    ['aegis', AURA.aegis],
+  ];
   return (
     <>
       {keys.map(([k, m]) => (
-        <mesh key={k} ref={(el) => void (auras.current[k] = el)} geometry={sphere} material={m} visible={false} renderOrder={9} />
+        <mesh
+          key={k}
+          ref={(el) => void (auras.current[k] = el)}
+          geometry={sphere}
+          material={m}
+          visible={false}
+          renderOrder={9}
+        />
       ))}
       {data.engines.map((e, i) => (
         <group key={i} position={e.pos}>
-          <mesh ref={(el) => void (od.current[i] = el)} geometry={flameGeo} material={odMat} visible={false} renderOrder={7} />
+          <mesh
+            ref={(el) => void (od.current[i] = el)}
+            geometry={flameGeo}
+            material={odMat}
+            visible={false}
+            renderOrder={7}
+          />
         </group>
       ))}
       <group ref={plate} visible={false}>
@@ -202,7 +294,14 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
         })}
       </group>
       {[0, 1, 2].map((k) => (
-        <group key={k} ref={(el) => { ghosts.current[k] = el; if (el) el.matrixAutoUpdate = false; }} visible={false}>
+        <group
+          key={k}
+          ref={(el) => {
+            ghosts.current[k] = el;
+            if (el) el.matrixAutoUpdate = false;
+          }}
+          visible={false}
+        >
           {SLOTS.map((slot) => {
             const g = data.body[slot];
             return g ? <mesh key={slot} geometry={g} material={ghostMat} renderOrder={8} /> : null;
@@ -212,13 +311,28 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       {frame === 'bulwark' && (
         <group ref={calib} position={[0, 1.6, -4.1]} visible={false}>
           <mesh geometry={orbGeo} material={ringMat} scale={0.35} />
-          <mesh ref={(el) => void (rings.current[0] = el)} geometry={ringGeo} material={ringMat} scale={0.9} />
-          <mesh ref={(el) => void (rings.current[1] = el)} geometry={ringGeo} material={ringMat} scale={1.3} />
+          <mesh
+            ref={(el) => void (rings.current[0] = el)}
+            geometry={ringGeo}
+            material={ringMat}
+            scale={0.9}
+          />
+          <mesh
+            ref={(el) => void (rings.current[1] = el)}
+            geometry={ringGeo}
+            material={ringMat}
+            scale={1.3}
+          />
         </group>
       )}
       {frame === 'anvil' &&
         [1, -1].map((side, i) => (
-          <group key={side} position={[side * 0.8, -1.03, 0.9]} ref={(el) => void (doors.current[i] = el)} scale={[-side, 1, 1]}>
+          <group
+            key={side}
+            position={[side * 0.8, -1.03, 0.9]}
+            ref={(el) => void (doors.current[i] = el)}
+            scale={[-side, 1, 1]}
+          >
             <mesh material={mats.secondary} castShadow position={[0.4, 0, 0]}>
               <boxGeometry args={[0.8, 0.06, 3.3]} />
             </mesh>

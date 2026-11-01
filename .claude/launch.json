@@ -1,7 +1,17 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "server", "runtimeExecutable": "pnpm", "runtimeArgs": ["--filter", "@skyriot/server", "dev"], "port": 2567 },
-    { "name": "client", "runtimeExecutable": "pnpm", "runtimeArgs": ["--filter", "@skyriot/client", "dev"], "port": 5173 }
+    {
+      "name": "server",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@skyriot/server", "dev"],
+      "port": 2567
+    },
+    {
+      "name": "client",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@skyriot/client", "dev"],
+      "port": 5173
+    }
   ]
 }

@@ -1,7 +1,15 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { FRAMES, WEAPONS, sampleHeight, type NationId, type ProjectileKind, type ShipId, type SimEvent } from '@skyriot/shared';
+import {
+  FRAMES,
+  WEAPONS,
+  sampleHeight,
+  type NationId,
+  type ProjectileKind,
+  type ShipId,
+  type SimEvent,
+} from '@skyriot/shared';
 import { PALETTES } from '../frames/palette';
 import { MODEL_SCALE, getModel } from '../frames/models';
 import { camSnap } from '../scene/ChaseCamera';
@@ -24,11 +32,22 @@ type RGB = [number, number, number];
 const TRACER: Record<NationId, RGB> = { concord: [0.35, 1.5, 2.4], vex: [2.6, 0.35, 0.22] };
 const ACCENT: Record<NationId, RGB> = { concord: [0.2, 1.1, 1.8], vex: [1.8, 0.6, 0.14] };
 
-const KIND_ID: Record<ProjectileKind, number> = { tracer: 0, missile: 1, rocket: 2, shell: 3, flare: 4 };
+const KIND_ID: Record<ProjectileKind, number> = {
+  tracer: 0,
+  missile: 1,
+  rocket: 2,
+  shell: 3,
+  flare: 4,
+};
 const rnd = Math.random;
 const rr = (a: number, b: number) => a + (b - a) * rnd();
 
-interface Trail { x: number; y: number; z: number; has: boolean }
+interface Trail {
+  x: number;
+  y: number;
+  z: number;
+  has: boolean;
+}
 
 // ---- projectile pool (struct of arrays) -------------------------------------------------
 class Projectiles {
@@ -47,21 +66,39 @@ class Projectiles {
 
   add(e: Extract<SimEvent, { type: 'projectileSpawned' }>, col: RGB) {
     if (this.n >= MAX_PROJ) return;
-    const i = this.n++, o = i * PS, f = this.f;
+    const i = this.n++,
+      o = i * PS,
+      f = this.f;
     const w = WEAPONS[e.weapon];
     this.id[i] = e.id;
     this.kind[i] = KIND_ID[e.kind];
-    f[o] = e.origin[0]; f[o + 1] = e.origin[1]; f[o + 2] = e.origin[2];
-    f[o + 3] = e.dir[0] * e.speed; f[o + 4] = e.dir[1] * e.speed; f[o + 5] = e.dir[2] * e.speed;
-    f[o + 6] = col[0]; f[o + 7] = col[1]; f[o + 8] = col[2];
+    f[o] = e.origin[0];
+    f[o + 1] = e.origin[1];
+    f[o + 2] = e.origin[2];
+    f[o + 3] = e.dir[0] * e.speed;
+    f[o + 4] = e.dir[1] * e.speed;
+    f[o + 5] = e.dir[2] * e.speed;
+    f[o + 6] = col[0];
+    f[o + 7] = col[1];
+    f[o + 8] = col[2];
     f[o + 9] = e.kind === 'flare' ? 4.5 : (w?.rangeM ?? 1000);
     f[o + 10] = 0;
     f[o + 11] = w?.splashRadius ?? 0;
     f[o + 12] = w?.homingTurnRate ?? 0;
     this.target[i] = e.target;
-    this.evaded[i] = 0; this.hasSnap[i] = 0;
-    f[o + 13] = 0; f[o + 14] = rnd() * 6.28; f[o + 15] = 0;
-    this.style[i] = e.weapon === 'seeker-pod' ? 1 : e.kind === 'rocket' && e.dir[1] < -0.6 ? 3 : e.kind === 'rocket' || e.kind === 'shell' ? 2 : 0;
+    this.evaded[i] = 0;
+    this.hasSnap[i] = 0;
+    f[o + 13] = 0;
+    f[o + 14] = rnd() * 6.28;
+    f[o + 15] = 0;
+    this.style[i] =
+      e.weapon === 'seeker-pod'
+        ? 1
+        : e.kind === 'rocket' && e.dir[1] < -0.6
+          ? 3
+          : e.kind === 'rocket' || e.kind === 'shell'
+            ? 2
+            : 0;
   }
   find(id: number) {
     for (let i = 0; i < this.n; i++) if (this.id[i] === id) return i;
@@ -70,7 +107,13 @@ class Projectiles {
   remove(i: number) {
     const l = --this.n;
     if (i !== l) {
-      this.id[i] = this.id[l]!; this.kind[i] = this.kind[l]!; this.evaded[i] = this.evaded[l]!; this.hasSnap[i] = this.hasSnap[l]!; for (let m = 0; m < 4; m++) this.snap[i * 4 + m] = this.snap[l * 4 + m]!; this.style[i] = this.style[l]!; this.target[i] = this.target[l]!;
+      this.id[i] = this.id[l]!;
+      this.kind[i] = this.kind[l]!;
+      this.evaded[i] = this.evaded[l]!;
+      this.hasSnap[i] = this.hasSnap[l]!;
+      for (let m = 0; m < 4; m++) this.snap[i * 4 + m] = this.snap[l * 4 + m]!;
+      this.style[i] = this.style[l]!;
+      this.target[i] = this.target[l]!;
       for (let k = 0; k < PS; k++) this.f[i * PS + k] = this.f[l * PS + k]!;
     }
     this.target[l] = null;
@@ -86,7 +129,18 @@ export function ProjectilesFx() {
   (window as unknown as { __fx: unknown }).__fx = fx;
 
   useEffect(() => {
-    const objs = [fx.additive.mesh, fx.smoke.mesh, fx.streaks.mesh, fx.rings.mesh, fx.ringsFlat.mesh, fx.boomLight, fx.bodies, fx.debris, fx.sph.mesh, fx.hex.mesh];
+    const objs = [
+      fx.additive.mesh,
+      fx.smoke.mesh,
+      fx.streaks.mesh,
+      fx.rings.mesh,
+      fx.ringsFlat.mesh,
+      fx.boomLight,
+      fx.bodies,
+      fx.debris,
+      fx.sph.mesh,
+      fx.hex.mesh,
+    ];
     objs.forEach((o) => scene.add(o));
     return () => objs.forEach((o) => scene.remove(o));
   }, [scene, fx]);
@@ -120,76 +174,107 @@ export function ProjectilesFx() {
 export type Fx = ReturnType<typeof makeFx>;
 
 function makeFx() {
-    const additive = new SpriteBatch(26000, true); // glow, sparks, fire, trails
-    const smoke = new SpriteBatch(9000, false);
-    const rings = new SpriteBatch(400, true, 'ring');
-    const ringsFlat = new SpriteBatch(200, true, 'ringFlat');
-    const ringP = new ParticlePool(400);
-    const ringFlatP = new ParticlePool(200);
-    const boomLight = new THREE.PointLight('#ffa050', 0, 160, 2);
-    const streaks = new SpriteBatch(1100, true); // tracer streaks
-    const glow = new ParticlePool(24000);
-    const puffs = new ParticlePool(9000);
+  const additive = new SpriteBatch(26000, true); // glow, sparks, fire, trails
+  const smoke = new SpriteBatch(9000, false);
+  const rings = new SpriteBatch(400, true, 'ring');
+  const ringsFlat = new SpriteBatch(200, true, 'ringFlat');
+  const ringP = new ParticlePool(400);
+  const ringFlatP = new ParticlePool(200);
+  const boomLight = new THREE.PointLight('#ffa050', 0, 160, 2);
+  const streaks = new SpriteBatch(1100, true); // tracer streaks
+  const glow = new ParticlePool(24000);
+  const puffs = new ParticlePool(9000);
 
-    // missile / rocket / shell bodies
-    const body = new THREE.CylinderGeometry(0.1, 0.12, 1.1, 8).rotateX(Math.PI / 2);
-    const nose = new THREE.ConeGeometry(0.1, 0.4, 8).rotateX(-Math.PI / 2).translate(0, 0, -0.75);
-    const bodies = new THREE.InstancedMesh(
-      mergeSimple(body, nose),
-      new THREE.MeshStandardMaterial({ color: '#d8d4cc', roughness: 0.4, metalness: 0.5, emissive: '#331a08', emissiveIntensity: 1 }),
-      160,
-    );
-    bodies.count = 0; bodies.frustumCulled = false; bodies.castShadow = false;
+  // missile / rocket / shell bodies
+  const body = new THREE.CylinderGeometry(0.1, 0.12, 1.1, 8).rotateX(Math.PI / 2);
+  const nose = new THREE.ConeGeometry(0.1, 0.4, 8).rotateX(-Math.PI / 2).translate(0, 0, -0.75);
+  const bodies = new THREE.InstancedMesh(
+    mergeSimple(body, nose),
+    new THREE.MeshStandardMaterial({
+      color: '#d8d4cc',
+      roughness: 0.4,
+      metalness: 0.5,
+      emissive: '#331a08',
+      emissiveIntensity: 1,
+    }),
+    160,
+  );
+  bodies.count = 0;
+  bodies.frustumCulled = false;
+  bodies.castShadow = false;
 
-    // debris bricks
-    const debris = new THREE.InstancedMesh(
-      new THREE.BoxGeometry(1, 0.6, 1),
-      new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.1, emissive: '#5a3a24', emissiveIntensity: 0.9 }),
-      MAX_DEBRIS,
-    );
-    debris.count = 0; debris.frustumCulled = false; debris.castShadow = true;
-    debris.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_DEBRIS * 3), 3);
+  // debris bricks
+  const debris = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 0.6, 1),
+    new THREE.MeshStandardMaterial({
+      roughness: 0.6,
+      metalness: 0.1,
+      emissive: '#5a3a24',
+      emissiveIntensity: 0.9,
+    }),
+    MAX_DEBRIS,
+  );
+  debris.count = 0;
+  debris.frustumCulled = false;
+  debris.castShadow = true;
+  debris.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_DEBRIS * 3), 3);
 
-    const o = new THREE.Object3D();
-    const sph = new ShellSet(MAX_BUBBLES, false, o);
-    const hex = new ShellSet(16, true, o);
-    return {
-      additive, smoke, streaks, glow, puffs, rings, ringsFlat, ringP, ringFlatP, boomLight, bodies, debris, sph, hex,
-      proj: new Projectiles(),
-      // debris state
-      dN: 0,
-      dp: new Float32Array(MAX_DEBRIS * 3),
-      dv: new Float32Array(MAX_DEBRIS * 3),
-      dr: new Float32Array(MAX_DEBRIS * 3),
-      ds: new Float32Array(MAX_DEBRIS * 3),
-      dl: new Float32Array(MAX_DEBRIS * 3), // life, maxLife, smoke timer
-      dsc: new Float32Array(MAX_DEBRIS * 3),
-      rolls: Array.from({ length: MAX_ROLLS }, () => ({ id: '', t: 0, dir: 1 })),
-      rN: 0,
-      trails: new Map<ShipId, Trail[]>(),
-      o,
-      q: new THREE.Quaternion(),
-      v: new THREE.Vector3(),
-      v2: new THREE.Vector3(),
-      fwd: new THREE.Vector3(0, 0, -1),
-      c: new THREE.Color(),
-      time: 0,
-      camPos: new THREE.Vector3(),
-      beams: Array.from({ length: 48 }, () => ({ src: '', dst: '', t: 0, T: 1, r: 0, g: 0, b: 0 })),
-      bn: 0,
-      cu: new THREE.Vector3(),
-      cw: new THREE.Vector3(),
-      boomT: new Map<ShipId, number>(),
-    };
+  const o = new THREE.Object3D();
+  const sph = new ShellSet(MAX_BUBBLES, false, o);
+  const hex = new ShellSet(16, true, o);
+  return {
+    additive,
+    smoke,
+    streaks,
+    glow,
+    puffs,
+    rings,
+    ringsFlat,
+    ringP,
+    ringFlatP,
+    boomLight,
+    bodies,
+    debris,
+    sph,
+    hex,
+    proj: new Projectiles(),
+    // debris state
+    dN: 0,
+    dp: new Float32Array(MAX_DEBRIS * 3),
+    dv: new Float32Array(MAX_DEBRIS * 3),
+    dr: new Float32Array(MAX_DEBRIS * 3),
+    ds: new Float32Array(MAX_DEBRIS * 3),
+    dl: new Float32Array(MAX_DEBRIS * 3), // life, maxLife, smoke timer
+    dsc: new Float32Array(MAX_DEBRIS * 3),
+    rolls: Array.from({ length: MAX_ROLLS }, () => ({ id: '', t: 0, dir: 1 })),
+    rN: 0,
+    trails: new Map<ShipId, Trail[]>(),
+    o,
+    q: new THREE.Quaternion(),
+    v: new THREE.Vector3(),
+    v2: new THREE.Vector3(),
+    fwd: new THREE.Vector3(0, 0, -1),
+    c: new THREE.Color(),
+    time: 0,
+    camPos: new THREE.Vector3(),
+    beams: Array.from({ length: 48 }, () => ({ src: '', dst: '', t: 0, T: 1, r: 0, g: 0, b: 0 })),
+    bn: 0,
+    cu: new THREE.Vector3(),
+    cw: new THREE.Vector3(),
+    boomT: new Map<ShipId, number>(),
+  };
 }
 
 function mergeSimple(a: THREE.BufferGeometry, b: THREE.BufferGeometry) {
-  const A = a.toNonIndexed(), B = b.toNonIndexed();
+  const A = a.toNonIndexed(),
+    B = b.toNonIndexed();
   const g = new THREE.BufferGeometry();
   for (const k of ['position', 'normal']) {
-    const x = A.getAttribute(k).array as Float32Array, y = B.getAttribute(k).array as Float32Array;
+    const x = A.getAttribute(k).array as Float32Array,
+      y = B.getAttribute(k).array as Float32Array;
     const m = new Float32Array(x.length + y.length);
-    m.set(x); m.set(y, x.length);
+    m.set(x);
+    m.set(y, x.length);
     g.setAttribute(k, new THREE.BufferAttribute(m, 3));
   }
   return g;
@@ -202,13 +287,22 @@ function handleEvents(fx: Fx, _dt: number) {
   const events = q.splice(0, q.length);
   for (const e of events) {
     // missileEvaded is added to the contract by the sim agent; handled structurally until then
-    const loose = e as unknown as { type: string; projectile?: number; id?: number; pos?: [number, number, number] };
+    const loose = e as unknown as {
+      type: string;
+      projectile?: number;
+      id?: number;
+      pos?: [number, number, number];
+    };
     if (loose.type === 'missileEvaded') {
       const i = fx.proj.find(loose.projectile ?? loose.id ?? -1);
       if (i >= 0) {
         fx.proj.evaded[i] = 1;
         fx.proj.target[i] = null; // stops homing: it overshoots
-        const p: [number, number, number] = loose.pos ?? [fx.proj.f[i * PS]!, fx.proj.f[i * PS + 1]!, fx.proj.f[i * PS + 2]!];
+        const p: [number, number, number] = loose.pos ?? [
+          fx.proj.f[i * PS]!,
+          fx.proj.f[i * PS + 1]!,
+          fx.proj.f[i * PS + 2]!,
+        ];
         sparks(fx, p, 40, false);
         fx.glow.emit(p[0], p[1], p[2], 0, 0, 0, 0.3, 8, 1, 1.4, 2.2, 3, 0.9);
         fx.ringP.emit(p[0], p[1], p[2], 0, 0, 0, 0.5, 2, 18, 1.2, 2.0, 3.0, 0.9);
@@ -221,26 +315,64 @@ function handleEvents(fx: Fx, _dt: number) {
         fx.proj.add(e, TRACER[nation]);
         // muzzle flash
         const [c0, c1, c2] = TRACER[nation];
-        fx.glow.emit(e.origin[0], e.origin[1], e.origin[2], 0, 0, 0, 0.07, e.kind === 'tracer' ? 1.4 : 3, 0.4, c0 * 1.5, c1 * 1.5, c2 * 1.5, 1);
+        fx.glow.emit(
+          e.origin[0],
+          e.origin[1],
+          e.origin[2],
+          0,
+          0,
+          0,
+          0.07,
+          e.kind === 'tracer' ? 1.4 : 3,
+          0.4,
+          c0 * 1.5,
+          c1 * 1.5,
+          c2 * 1.5,
+          1,
+        );
         break;
       }
       case 'projectileExpired': {
         const i = fx.proj.find(e.id);
         if (i >= 0) {
           const k = fx.proj.kind[i]!;
-          const splash = fx.proj.f[i * PS + 11]!, st = fx.proj.style[i]!;
+          const splash = fx.proj.f[i * PS + 11]!,
+            st = fx.proj.style[i]!;
           fx.proj.remove(i);
-          if (k === 1 || k === 2 || k === 3) explosion(fx, e.pos, Math.max(0.5, splash / 8) * (st === 3 ? 2.6 : k > 1 ? 1.7 : 1), false, undefined, k > 1);
+          if (k === 1 || k === 2 || k === 3)
+            explosion(
+              fx,
+              e.pos,
+              Math.max(0.5, splash / 8) * (st === 3 ? 2.6 : k > 1 ? 1.7 : 1),
+              false,
+              undefined,
+              k > 1,
+            );
         }
         break;
       }
       case 'hit': {
         const i = fx.proj.find(e.projectile);
-        let splash = 0, k = 0, st = 0;
-        if (i >= 0) { splash = fx.proj.f[i * PS + 11]!; k = fx.proj.kind[i]!; st = fx.proj.style[i]!; fx.proj.remove(i); }
+        let splash = 0,
+          k = 0,
+          st = 0;
+        if (i >= 0) {
+          splash = fx.proj.f[i * PS + 11]!;
+          k = fx.proj.kind[i]!;
+          st = fx.proj.style[i]!;
+          fx.proj.remove(i);
+        }
         const victim = world.ships.get(e.victim);
         sparks(fx, e.pos, e.deflected ? 12 : 8, e.deflected);
-        if (k === 1 || k === 2 || k === 3) explosion(fx, e.pos, Math.max(0.5, splash / 8) * (st === 3 ? 2.6 : k > 1 ? 1.7 : 1), false, undefined, k > 1);
+        if (k === 1 || k === 2 || k === 3)
+          explosion(
+            fx,
+            e.pos,
+            Math.max(0.5, splash / 8) * (st === 3 ? 2.6 : k > 1 ? 1.7 : 1),
+            false,
+            undefined,
+            k > 1,
+          );
         if (victim && (e.deflected || victim.shield > 0)) {
           const col = e.deflected ? ([1.6, 1.8, 2.4] as RGB) : ACCENT[victim.nation];
           bubble(fx, e.victim, col, e.deflected ? 0.6 : 1);
@@ -258,7 +390,22 @@ function handleEvents(fx: Fx, _dt: number) {
         const [r, g, b] = ACCENT[n];
         for (let i = 0; i < 24; i++) {
           const a = (i / 24) * Math.PI * 2;
-          fx.glow.emit(e.pos[0], e.pos[1], e.pos[2], Math.cos(a) * 30, rr(-3, 3), Math.sin(a) * 30, 0.6, 1.5, 0.3, r * 1.5, g * 1.5, b * 1.5, 1, 3);
+          fx.glow.emit(
+            e.pos[0],
+            e.pos[1],
+            e.pos[2],
+            Math.cos(a) * 30,
+            rr(-3, 3),
+            Math.sin(a) * 30,
+            0.6,
+            1.5,
+            0.3,
+            r * 1.5,
+            g * 1.5,
+            b * 1.5,
+            1,
+            3,
+          );
         }
         fx.glow.emit(e.pos[0], e.pos[1], e.pos[2], 0, 0, 0, 0.35, 4, 18, r, g, b, 0.8);
         break;
@@ -266,7 +413,9 @@ function handleEvents(fx: Fx, _dt: number) {
       case 'barrelRoll': {
         if (fx.rN < MAX_ROLLS) {
           const r = fx.rolls[fx.rN++]!;
-          r.id = e.id; r.t = 0.8; r.dir = e.dir;
+          r.id = e.id;
+          r.t = 0.8;
+          r.dir = e.dir;
           rollDirs.set(e.id, e.dir);
         }
         break;
@@ -287,18 +436,67 @@ function handleEvents(fx: Fx, _dt: number) {
         if (!s) break;
         const [r, g, b] = ACCENT[s.nation];
         for (let i = 0; i < 40; i++) {
-          const a = rnd() * 6.28, sp = rr(4, 26);
-          fx.glow.emit(s.pos[0], s.pos[1] - 1, s.pos[2], Math.cos(a) * sp, rr(-30, -8), Math.sin(a) * sp, rr(0.3, 0.8), 2.2, 0.4, r * 2, g * 2, b * 2, 0.9, 1.5);
+          const a = rnd() * 6.28,
+            sp = rr(4, 26);
+          fx.glow.emit(
+            s.pos[0],
+            s.pos[1] - 1,
+            s.pos[2],
+            Math.cos(a) * sp,
+            rr(-30, -8),
+            Math.sin(a) * sp,
+            rr(0.3, 0.8),
+            2.2,
+            0.4,
+            r * 2,
+            g * 2,
+            b * 2,
+            0.9,
+            1.5,
+          );
         }
-        for (let i = 0; i < 14; i++) fx.puffs.emit(s.pos[0], s.pos[1] - 2, s.pos[2], rr(-12, 12), rr(-4, 2), rr(-12, 12), rr(1, 2), 3, 10, 0.7, 0.62, 0.55, 0.4, 1.4);
+        for (let i = 0; i < 14; i++)
+          fx.puffs.emit(
+            s.pos[0],
+            s.pos[1] - 2,
+            s.pos[2],
+            rr(-12, 12),
+            rr(-4, 2),
+            rr(-12, 12),
+            rr(1, 2),
+            3,
+            10,
+            0.7,
+            0.62,
+            0.55,
+            0.4,
+            1.4,
+          );
         break;
       }
       case 'resupplied': {
         const s = world.ships.get(e.id);
         if (!s) break;
         for (let i = 0; i < 20; i++) {
-          const a = rnd() * 6.28, rad = FRAMES[s.frame].radius * rr(0.6, 1.4);
-          fx.glow.emit(s.pos[0] + Math.cos(a) * rad, s.pos[1] + rr(-1, 1), s.pos[2] + Math.sin(a) * rad, 0, rr(3, 7), 0, rr(0.6, 1.1), 0.5, 0.1, 0.5, 2.2, 0.9, 0.9, 0.5, -1);
+          const a = rnd() * 6.28,
+            rad = FRAMES[s.frame].radius * rr(0.6, 1.4);
+          fx.glow.emit(
+            s.pos[0] + Math.cos(a) * rad,
+            s.pos[1] + rr(-1, 1),
+            s.pos[2] + Math.sin(a) * rad,
+            0,
+            rr(3, 7),
+            0,
+            rr(0.6, 1.1),
+            0.5,
+            0.1,
+            0.5,
+            2.2,
+            0.9,
+            0.9,
+            0.5,
+            -1,
+          );
         }
         break;
       }
@@ -325,42 +523,119 @@ function boomOnce(fx: Fx, id: ShipId) {
 function sparks(fx: Fx, p: [number, number, number], n: number, blue: boolean) {
   for (let i = 0; i < n; i++) {
     const s = rr(15, 60);
-    const x = rnd() - 0.5, y = rnd() - 0.2, z = rnd() - 0.5;
+    const x = rnd() - 0.5,
+      y = rnd() - 0.2,
+      z = rnd() - 0.5;
     const l = 1 / Math.hypot(x, y, z);
-    fx.glow.emit(p[0], p[1], p[2], x * l * s, y * l * s, z * l * s, rr(0.15, 0.45), 0.45, 0.08,
-      blue ? 1.2 : 2.6, blue ? 1.8 : 1.5, blue ? 2.6 : 0.5, 1, 2, 18);
+    fx.glow.emit(
+      p[0],
+      p[1],
+      p[2],
+      x * l * s,
+      y * l * s,
+      z * l * s,
+      rr(0.15, 0.45),
+      0.45,
+      0.08,
+      blue ? 1.2 : 2.6,
+      blue ? 1.8 : 1.5,
+      blue ? 2.6 : 0.5,
+      1,
+      2,
+      18,
+    );
   }
   fx.glow.emit(p[0], p[1], p[2], 0, 0, 0, 0.1, 2.6, 0.5, 3, 2.6, 2, 1);
 }
 
 function dust(fx: Fx, p: [number, number, number], k: number) {
   for (let i = 0; i < 16; i++) {
-    const a = rnd() * 6.28, s = rr(4, 22) * k;
-    fx.puffs.emit(p[0], p[1] + 1, p[2], Math.cos(a) * s, rr(4, 14) * k, Math.sin(a) * s, rr(1.2, 2.4), 3 * k, 14 * k,
-      0.55, 0.38, 0.26, 0.5, 1.5, -1);
+    const a = rnd() * 6.28,
+      s = rr(4, 22) * k;
+    fx.puffs.emit(
+      p[0],
+      p[1] + 1,
+      p[2],
+      Math.cos(a) * s,
+      rr(4, 14) * k,
+      Math.sin(a) * s,
+      rr(1.2, 2.4),
+      3 * k,
+      14 * k,
+      0.55,
+      0.38,
+      0.26,
+      0.5,
+      1.5,
+      -1,
+    );
   }
   for (let i = 0; i < 6; i++) spawnDebris(fx, p, [0.4, 0.26, 0.16], rr(8, 30), 0.5 + rnd() * 0.7);
 }
 
-function explosion(fx: Fx, p: [number, number, number], k: number, big: boolean, nation?: NationId, heavy = false) {
+function explosion(
+  fx: Fx,
+  p: [number, number, number],
+  k: number,
+  big: boolean,
+  nation?: NationId,
+  heavy = false,
+) {
   const [x, y, z] = p;
   shockwave(fx, p, k, heavy);
   fx.glow.emit(x, y, z, 0, 0, 0, 0.14, 10 * k, 22 * k, 3, 2.3, 1.4, 1);
   const n = big ? 26 : 12;
   for (let i = 0; i < n; i++) {
-    const dx = rnd() - 0.5, dy = rnd() - 0.4, dz = rnd() - 0.5;
+    const dx = rnd() - 0.5,
+      dy = rnd() - 0.4,
+      dz = rnd() - 0.5;
     const l = (1 / Math.hypot(dx, dy, dz)) * rr(3, 15) * k;
-    fx.glow.emit(x, y, z, dx * l, dy * l, dz * l, rr(0.35, big ? 1.1 : 0.7), 3.2 * k, 8 * k, 2.4, rr(0.7, 1.2), 0.2, 0.9, 2.2);
+    fx.glow.emit(
+      x,
+      y,
+      z,
+      dx * l,
+      dy * l,
+      dz * l,
+      rr(0.35, big ? 1.1 : 0.7),
+      3.2 * k,
+      8 * k,
+      2.4,
+      rr(0.7, 1.2),
+      0.2,
+      0.9,
+      2.2,
+    );
   }
   for (let i = 0; i < n / 2; i++) {
-    const dx = rnd() - 0.5, dy = rnd() - 0.5, dz = rnd() - 0.5;
+    const dx = rnd() - 0.5,
+      dy = rnd() - 0.5,
+      dz = rnd() - 0.5;
     const l = (1 / Math.hypot(dx, dy, dz)) * rr(1, 6) * k;
     fx.glow.emit(x, y, z, dx * l, dy * l, dz * l, rr(0.2, 0.5), 2.2 * k, 5 * k, 3, 2.6, 1.6, 1, 2);
   }
   for (let i = 0; i < (big ? 18 : 8); i++) {
-    const dx = rnd() - 0.5, dy = rnd() - 0.2, dz = rnd() - 0.5;
+    const dx = rnd() - 0.5,
+      dy = rnd() - 0.2,
+      dz = rnd() - 0.5;
     const l = (1 / Math.hypot(dx, dy, dz)) * rr(2, 9) * k;
-    fx.puffs.emit(x, y, z, dx * l, dy * l, dz * l, rr(1.4, big ? 3.2 : 2), 4 * k, 15 * k, 0.16, 0.14, 0.13, 0.6, 1.2, -1.5);
+    fx.puffs.emit(
+      x,
+      y,
+      z,
+      dx * l,
+      dy * l,
+      dz * l,
+      rr(1.4, big ? 3.2 : 2),
+      4 * k,
+      15 * k,
+      0.16,
+      0.14,
+      0.13,
+      0.6,
+      1.2,
+      -1.5,
+    );
   }
   sparks(fx, p, big ? 36 : 14, false);
   if (big) {
@@ -368,7 +643,13 @@ function explosion(fx: Fx, p: [number, number, number], k: number, big: boolean,
     const cols = [pal.primary, pal.secondary, pal.dark, pal.accent];
     for (let i = 0; i < 26; i++) {
       fx.c.set(cols[i % cols.length]!);
-      spawnDebris(fx, p, [fx.c.r, fx.c.g, fx.c.b], rr(10, 55) * Math.min(1.5, k), rr(0.5, 1.6) * Math.min(1.8, k));
+      spawnDebris(
+        fx,
+        p,
+        [fx.c.r, fx.c.g, fx.c.b],
+        rr(10, 55) * Math.min(1.5, k),
+        rr(0.5, 1.6) * Math.min(1.8, k),
+      );
     }
   }
 }
@@ -376,22 +657,98 @@ function explosion(fx: Fx, p: [number, number, number], k: number, big: boolean,
 /** Billboard shock ring, flat ground ring near terrain, point-light flash, lingering smoke, and shake for heavy booms. */
 function shockwave(fx: Fx, p: [number, number, number], k: number, heavy: boolean) {
   const [x, y, z] = p;
-  fx.ringP.emit(x, y, z, 0, 0, 0, heavy ? 0.7 : 0.45, 2 * k, (heavy ? 44 : 28) * k, 2.4, 1.7, 1.0, 0.9, 0, 0, 0.5, 0.25, 0.12);
+  fx.ringP.emit(
+    x,
+    y,
+    z,
+    0,
+    0,
+    0,
+    heavy ? 0.7 : 0.45,
+    2 * k,
+    (heavy ? 44 : 28) * k,
+    2.4,
+    1.7,
+    1.0,
+    0.9,
+    0,
+    0,
+    0.5,
+    0.25,
+    0.12,
+  );
   const hf = world.heightfield;
   if (hf) {
     const gy = sampleHeight(hf, x, z);
     if (y - gy < 45 * k) {
-      fx.ringFlatP.emit(x, gy + 0.8, z, 0, 0, 0, heavy ? 0.9 : 0.6, 3 * k, (heavy ? 60 : 36) * k, 2.0, 1.5, 1.0, 0.8, 0, 0, 0.4, 0.22, 0.12);
+      fx.ringFlatP.emit(
+        x,
+        gy + 0.8,
+        z,
+        0,
+        0,
+        0,
+        heavy ? 0.9 : 0.6,
+        3 * k,
+        (heavy ? 60 : 36) * k,
+        2.0,
+        1.5,
+        1.0,
+        0.8,
+        0,
+        0,
+        0.4,
+        0.22,
+        0.12,
+      );
       for (let i = 0; i < (heavy ? 14 : 8); i++) {
-        const a = rnd() * 6.28, sp = rr(8, 26) * k;
-        fx.puffs.emit(x, gy + 1, z, Math.cos(a) * sp, rr(1, 4), Math.sin(a) * sp, rr(1.6, 2.8), 3 * k, 12 * k, 0.6, 0.45, 0.32, 0.45, 1.2, -0.3);
+        const a = rnd() * 6.28,
+          sp = rr(8, 26) * k;
+        fx.puffs.emit(
+          x,
+          gy + 1,
+          z,
+          Math.cos(a) * sp,
+          rr(1, 4),
+          Math.sin(a) * sp,
+          rr(1.6, 2.8),
+          3 * k,
+          12 * k,
+          0.6,
+          0.45,
+          0.32,
+          0.45,
+          1.2,
+          -0.3,
+        );
       }
     }
   }
   for (let i = 0; i < (heavy ? 14 : 6); i++) {
-    const dx = rnd() - 0.5, dy = rnd() - 0.2, dz = rnd() - 0.5;
+    const dx = rnd() - 0.5,
+      dy = rnd() - 0.2,
+      dz = rnd() - 0.5;
     const l = (1 / Math.hypot(dx, dy, dz)) * rr(1, 5) * k;
-    fx.puffs.emit(x, y, z, dx * l, dy * l, dz * l, rr(2.5, heavy ? 5 : 4), 5 * k, 20 * k, 0.5, 0.45, 0.42, 0.4, 0.9, -0.5, 0.26, 0.25, 0.25);
+    fx.puffs.emit(
+      x,
+      y,
+      z,
+      dx * l,
+      dy * l,
+      dz * l,
+      rr(2.5, heavy ? 5 : 4),
+      5 * k,
+      20 * k,
+      0.5,
+      0.45,
+      0.42,
+      0.4,
+      0.9,
+      -0.5,
+      0.26,
+      0.25,
+      0.25,
+    );
   }
   fx.boomLight.position.set(x, y, z);
   fx.boomLight.intensity = Math.max(fx.boomLight.intensity, 1400 * Math.min(k, 3));
@@ -404,15 +761,30 @@ function shockwave(fx: Fx, p: [number, number, number], k: number, heavy: boolea
 
 function spawnDebris(fx: Fx, p: [number, number, number], col: RGB, speed: number, size: number) {
   if (fx.dN >= MAX_DEBRIS) return;
-  const i = fx.dN++, o = i * 3;
-  const dx = rnd() - 0.5, dy = rnd() - 0.1, dz = rnd() - 0.5;
+  const i = fx.dN++,
+    o = i * 3;
+  const dx = rnd() - 0.5,
+    dy = rnd() - 0.1,
+    dz = rnd() - 0.5;
   const l = (1 / Math.hypot(dx, dy, dz)) * speed;
-  fx.dp[o] = p[0]; fx.dp[o + 1] = p[1]; fx.dp[o + 2] = p[2];
-  fx.dv[o] = dx * l; fx.dv[o + 1] = dy * l; fx.dv[o + 2] = dz * l;
-  fx.dr[o] = rnd() * 6; fx.dr[o + 1] = rnd() * 6; fx.dr[o + 2] = rnd() * 6;
-  fx.ds[o] = rr(-9, 9); fx.ds[o + 1] = rr(-9, 9); fx.ds[o + 2] = rr(-9, 9);
-  fx.dl[o] = rr(2.5, 5); fx.dl[o + 1] = fx.dl[o]!; fx.dl[o + 2] = 0;
-  fx.dsc[o] = size * rr(0.8, 1.6); fx.dsc[o + 1] = size * rr(0.5, 1); fx.dsc[o + 2] = size * rr(0.8, 1.6);
+  fx.dp[o] = p[0];
+  fx.dp[o + 1] = p[1];
+  fx.dp[o + 2] = p[2];
+  fx.dv[o] = dx * l;
+  fx.dv[o + 1] = dy * l;
+  fx.dv[o + 2] = dz * l;
+  fx.dr[o] = rnd() * 6;
+  fx.dr[o + 1] = rnd() * 6;
+  fx.dr[o + 2] = rnd() * 6;
+  fx.ds[o] = rr(-9, 9);
+  fx.ds[o + 1] = rr(-9, 9);
+  fx.ds[o + 2] = rr(-9, 9);
+  fx.dl[o] = rr(2.5, 5);
+  fx.dl[o + 1] = fx.dl[o]!;
+  fx.dl[o + 2] = 0;
+  fx.dsc[o] = size * rr(0.8, 1.6);
+  fx.dsc[o + 1] = size * rr(0.5, 1);
+  fx.dsc[o + 2] = size * rr(0.8, 1.6);
   const ca = fx.debris.instanceColor!;
   ca.setXYZ(i, col[0], col[1], col[2]);
 }
@@ -423,10 +795,14 @@ function bubble(fx: Fx, victim: ShipId, col: RGB, power: number) {
 
 // ---- per-frame sims ---------------------------------------------------------------------
 function updateProjectiles(fx: Fx, dt: number) {
-  const P = fx.proj, f = P.f, hf = world.heightfield;
+  const P = fx.proj,
+    f = P.f,
+    hf = world.heightfield;
   let bodyN = 0;
-  for (let i = 0; i < P.n; ) {
-    const o = i * PS, k = P.kind[i]!, style = P.style[i]!;
+  for (let i = 0; i < P.n;) {
+    const o = i * PS,
+      k = P.kind[i]!,
+      style = P.style[i]!;
     f[o + 13]! += dt;
     const age = f[o + 13]!;
     let dead = false;
@@ -436,20 +812,28 @@ function updateProjectiles(fx: Fx, dt: number) {
       const tgt = P.target[i] ? world.ships.get(P.target[i]!) : undefined;
       if (tgt && tgt.alive) {
         const sp = Math.hypot(f[o + 3]!, f[o + 4]!, f[o + 5]!) || 1;
-        const tx = tgt.pos[0] - f[o]!, ty = tgt.pos[1] - f[o + 1]!, tz = tgt.pos[2] - f[o + 2]!;
+        const tx = tgt.pos[0] - f[o]!,
+          ty = tgt.pos[1] - f[o + 1]!,
+          tz = tgt.pos[2] - f[o + 2]!;
         const tl = Math.hypot(tx, ty, tz) || 1;
         const turn = Math.min(1, (f[o + 12]! || 2) * dt * 1.4);
         let nx = f[o + 3]! / sp + (tx / tl - f[o + 3]! / sp) * turn;
         let ny = f[o + 4]! / sp + (ty / tl - f[o + 4]! / sp) * turn;
         let nz = f[o + 5]! / sp + (tz / tl - f[o + 5]! / sp) * turn;
         const nl = Math.hypot(nx, ny, nz) || 1;
-        nx /= nl; ny /= nl; nz /= nl;
-        f[o + 3] = nx * sp; f[o + 4] = ny * sp; f[o + 5] = nz * sp;
+        nx /= nl;
+        ny /= nl;
+        nz /= nl;
+        f[o + 3] = nx * sp;
+        f[o + 4] = ny * sp;
+        f[o + 5] = nz * sp;
       }
     }
     if (k === 4) {
       const d = Math.max(0, 1 - 1.6 * dt);
-      f[o + 3]! *= d; f[o + 5]! *= d; f[o + 4] = f[o + 4]! * d - 16 * dt;
+      f[o + 3]! *= d;
+      f[o + 5]! *= d;
+      f[o + 4] = f[o + 4]! * d - 16 * dt;
       f[o + 9]! -= dt;
     } else if (k === 3) {
       f[o + 4]! -= 9.8 * dt * 0.6;
@@ -457,12 +841,22 @@ function updateProjectiles(fx: Fx, dt: number) {
     } else {
       f[o + 9]! -= Math.hypot(f[o + 3]!, f[o + 4]!, f[o + 5]!) * dt;
     }
-    f[o]! += f[o + 3]! * dt; f[o + 1]! += f[o + 4]! * dt; f[o + 2]! += f[o + 5]! * dt;
+    f[o]! += f[o + 3]! * dt;
+    f[o + 1]! += f[o + 4]! * dt;
+    f[o + 2]! += f[o + 5]! * dt;
     if (sm) {
       // authoritative guided path: render ~100 ms behind the latest snapshot, extrapolating with its velocity
       const si = i * 4;
-      if (!P.hasSnap[i] || P.snap[si] !== sm.pos[0] || P.snap[si + 1] !== sm.pos[1] || P.snap[si + 2] !== sm.pos[2]) {
-        P.snap[si] = sm.pos[0]; P.snap[si + 1] = sm.pos[1]; P.snap[si + 2] = sm.pos[2]; P.snap[si + 3] = fx.time;
+      if (
+        !P.hasSnap[i] ||
+        P.snap[si] !== sm.pos[0] ||
+        P.snap[si + 1] !== sm.pos[1] ||
+        P.snap[si + 2] !== sm.pos[2]
+      ) {
+        P.snap[si] = sm.pos[0];
+        P.snap[si + 1] = sm.pos[1];
+        P.snap[si + 2] = sm.pos[2];
+        P.snap[si + 3] = fx.time;
         P.hasSnap[i] = 1;
       }
       const dtS = fx.time - P.snap[si + 3]! - 0.1;
@@ -470,22 +864,45 @@ function updateProjectiles(fx: Fx, dt: number) {
       f[o] = f[o]! + (sm.pos[0] + sm.vel[0] * dtS - f[o]!) * k2;
       f[o + 1] = f[o + 1]! + (sm.pos[1] + sm.vel[1] * dtS - f[o + 1]!) * k2;
       f[o + 2] = f[o + 2]! + (sm.pos[2] + sm.vel[2] * dtS - f[o + 2]!) * k2;
-      f[o + 3] = sm.vel[0]; f[o + 4] = sm.vel[1]; f[o + 5] = sm.vel[2];
+      f[o + 3] = sm.vel[0];
+      f[o + 4] = sm.vel[1];
+      f[o + 5] = sm.vel[2];
     }
     if (f[o + 9]! <= 0) dead = true;
     else if (hf && f[o + 1]! < sampleHeight(hf, f[o]!, f[o + 2]!)) {
       dead = true;
       const pos: [number, number, number] = [f[o]!, f[o + 1]!, f[o + 2]!];
       if (k === 0) sparks(fx, pos, 4, false);
-      else if (k !== 4) { explosion(fx, pos, Math.max(0.6, f[o + 11]! / 8) * (style === 3 ? 2.6 : style === 2 ? 1.7 : 1), false, undefined, style >= 2); dust(fx, pos, style === 3 ? 2 : 0.8); }
+      else if (k !== 4) {
+        explosion(
+          fx,
+          pos,
+          Math.max(0.6, f[o + 11]! / 8) * (style === 3 ? 2.6 : style === 2 ? 1.7 : 1),
+          false,
+          undefined,
+          style >= 2,
+        );
+        dust(fx, pos, style === 3 ? 2 : 0.8);
+      }
     }
-    if (dead) { P.remove(i); continue; }
+    if (dead) {
+      P.remove(i);
+      continue;
+    }
 
-    let x = f[o]!, y = f[o + 1]!, z = f[o + 2]!;
-    const vx = f[o + 3]!, vy = f[o + 4]!, vz = f[o + 5]!;
+    let x = f[o]!,
+      y = f[o + 1]!,
+      z = f[o + 2]!;
+    const vx = f[o + 3]!,
+      vy = f[o + 4]!,
+      vz = f[o + 5]!;
     const sp = Math.hypot(vx, vy, vz) || 1;
-    const dx = vx / sp, dy = vy / sp, dz = vz / sp;
-    const r = f[o + 6]!, g = f[o + 7]!, b = f[o + 8]!;
+    const dx = vx / sp,
+      dy = vy / sp,
+      dz = vz / sp;
+    const r = f[o + 6]!,
+      g = f[o + 7]!,
+      b = f[o + 8]!;
     if (k === 0) {
       const len = Math.min(26, Math.max(7, sp * 0.03));
       const s = len / sp;
@@ -502,23 +919,72 @@ function updateProjectiles(fx: Fx, dt: number) {
       f[o + 10]! += dt;
       while (f[o + 10]! > 0.012) {
         f[o + 10]! -= 0.012;
-        fx.glow.emit(x, y, z, rr(-1, 1), rr(0, 2), rr(-1, 1), 0.55, 1.5, 0.2, 3, 2.4, 1.4, 0.9, 1, 4, 1.3, 0.3, 0.05);
+        fx.glow.emit(
+          x,
+          y,
+          z,
+          rr(-1, 1),
+          rr(0, 2),
+          rr(-1, 1),
+          0.55,
+          1.5,
+          0.2,
+          3,
+          2.4,
+          1.4,
+          0.9,
+          1,
+          4,
+          1.3,
+          0.3,
+          0.05,
+        );
       }
       f[o + 15]! += dt;
       while (f[o + 15]! > 0.05) {
         f[o + 15]! -= 0.05;
-        fx.puffs.emit(x, y, z, rr(-1, 1), rr(-1, 1), rr(-1, 1), 2.2, 1, 4, 0.95, 0.9, 0.85, 0.4, 0.8, -0.4, 0.4, 0.38, 0.37);
+        fx.puffs.emit(
+          x,
+          y,
+          z,
+          rr(-1, 1),
+          rr(-1, 1),
+          rr(-1, 1),
+          2.2,
+          1,
+          4,
+          0.95,
+          0.9,
+          0.85,
+          0.4,
+          0.8,
+          -0.4,
+          0.4,
+          0.38,
+          0.37,
+        );
       }
       i++;
       continue;
     }
 
     // missile / rocket / shell: perpendicular basis for spiral + wobble
-    let ux = dz, uy = 0, uz = -dx;
+    let ux = dz,
+      uy = 0,
+      uz = -dx;
     let ul = Math.hypot(ux, uz);
-    if (ul < 0.05) { ux = 0; uy = dz; uz = -dy; ul = Math.hypot(uy, uz) || 1; }
-    ux /= ul; uy /= ul; uz /= ul;
-    const wx = dy * uz - dz * uy, wy = dz * ux - dx * uz, wz = dx * uy - dy * ux;
+    if (ul < 0.05) {
+      ux = 0;
+      uy = dz;
+      uz = -dy;
+      ul = Math.hypot(uy, uz) || 1;
+    }
+    ux /= ul;
+    uy /= ul;
+    uz /= ul;
+    const wx = dy * uz - dz * uy,
+      wy = dz * ux - dx * uz,
+      wz = dx * uy - dy * ux;
     const dropping = (k === 1 || k === 2) && age < 0.15;
     if (dropping) y -= age * 14;
     const big = style === 3 ? 2.4 : k === 2 ? 1.7 : k === 3 ? 1.35 : 1;
@@ -528,17 +994,68 @@ function updateProjectiles(fx: Fx, dt: number) {
       // heavy ground-strike bomb: falling whistle trail (long thin streak + shed ring puffs), no flame
       const sc = 14 / sp;
       fx.streaks.push(x, y, z, 0.22, 2.6, 2.6, 2.8, 0.7, vx * sc, vy * sc, vz * sc);
-      fx.streaks.push(x, y, z, 0.7, 1.6, 1.1, 0.6, 0.35, vx * sc * 2.5, vy * sc * 2.5, vz * sc * 2.5);
+      fx.streaks.push(
+        x,
+        y,
+        z,
+        0.7,
+        1.6,
+        1.1,
+        0.6,
+        0.35,
+        vx * sc * 2.5,
+        vy * sc * 2.5,
+        vz * sc * 2.5,
+      );
       f[o + 10]! += dt;
       while (f[o + 10]! > 0.016) {
         f[o + 10]! -= 0.016;
-        fx.puffs.emit(x - dx * (2 + f[o + 10]! * sp), y - dy * (2 + f[o + 10]! * sp), z - dz * (2 + f[o + 10]! * sp), rr(-2, 2), rr(-1, 1), rr(-2, 2), rr(1.2, 2), 0.9, 4, 0.85, 0.85, 0.9, 0.25, 0.6, 0, 0.45, 0.45, 0.48);
+        fx.puffs.emit(
+          x - dx * (2 + f[o + 10]! * sp),
+          y - dy * (2 + f[o + 10]! * sp),
+          z - dz * (2 + f[o + 10]! * sp),
+          rr(-2, 2),
+          rr(-1, 1),
+          rr(-2, 2),
+          rr(1.2, 2),
+          0.9,
+          4,
+          0.85,
+          0.85,
+          0.9,
+          0.25,
+          0.6,
+          0,
+          0.45,
+          0.45,
+          0.48,
+        );
       }
     } else if (!dropping) {
       if (age - dt < 0.15 && (k === 1 || k === 2)) {
         // ignition: flash + smoke puff
         fx.glow.emit(x, y, z, 0, 0, 0, 0.18, 7 * big, 1, 3, 2.2, 1.2, 1);
-        for (let n = 0; n < 8; n++) fx.puffs.emit(x, y, z, rr(-4, 4), rr(-3, 3), rr(-4, 4), rr(1.4, 2.2), 1.5, 6, 0.95, 0.9, 0.85, 0.6, 1, -0.2, 0.4, 0.38, 0.37);
+        for (let n = 0; n < 8; n++)
+          fx.puffs.emit(
+            x,
+            y,
+            z,
+            rr(-4, 4),
+            rr(-3, 3),
+            rr(-4, 4),
+            rr(1.4, 2.2),
+            1.5,
+            6,
+            0.95,
+            0.9,
+            0.85,
+            0.6,
+            1,
+            -0.2,
+            0.4,
+            0.38,
+            0.37,
+          );
       }
       if (style === 1) {
         // seeker pod: cyan plasma orb with a double-helix ribbon trail
@@ -549,18 +1066,56 @@ function updateProjectiles(fx: Fx, dt: number) {
         let n = 0;
         while (f[o + 10]! > 0.0035) {
           f[o + 10]! -= 0.0035;
-          const back = f[o + 10]! * sp, ph = age * 26 - n++ * 0.4;
-          const c1 = Math.cos(ph) * 0.55, s1 = Math.sin(ph) * 0.55;
+          const back = f[o + 10]! * sp,
+            ph = age * 26 - n++ * 0.4;
+          const c1 = Math.cos(ph) * 0.55,
+            s1 = Math.sin(ph) * 0.55;
           for (const sgn of [1, -1]) {
-            fx.glow.emit(x - dx * back + (ux * c1 + wx * s1) * sgn, y - dy * back + (uy * c1 + wy * s1) * sgn, z - dz * back + (uz * c1 + wz * s1) * sgn,
-              0, 0, 0, 0.5, 1.2, 0.1, 0.7, 2.2, 3.2, 0.45, 0, 0, 0.1, 0.4, 1.4);
+            fx.glow.emit(
+              x - dx * back + (ux * c1 + wx * s1) * sgn,
+              y - dy * back + (uy * c1 + wy * s1) * sgn,
+              z - dz * back + (uz * c1 + wz * s1) * sgn,
+              0,
+              0,
+              0,
+              0.5,
+              1.2,
+              0.1,
+              0.7,
+              2.2,
+              3.2,
+              0.45,
+              0,
+              0,
+              0.1,
+              0.4,
+              1.4,
+            );
           }
         }
       } else {
         // exhaust core: flickering white-hot centre inside an orange sheath
         const t = (mine ? 1.3 : 1) * big;
-        fx.additive.push(x - dx * 0.8, y - dy * 0.8, z - dz * 0.8, 1.3 * t * (0.7 + 0.6 * rnd()), 3.5, 3, 1.8, 1);
-        fx.additive.push(x - dx * 1.2, y - dy * 1.2, z - dz * 1.2, 3.4 * t * (0.8 + 0.4 * rnd()), 2.4, 0.9, 0.2, 0.55);
+        fx.additive.push(
+          x - dx * 0.8,
+          y - dy * 0.8,
+          z - dz * 0.8,
+          1.3 * t * (0.7 + 0.6 * rnd()),
+          3.5,
+          3,
+          1.8,
+          1,
+        );
+        fx.additive.push(
+          x - dx * 1.2,
+          y - dy * 1.2,
+          z - dz * 1.2,
+          3.4 * t * (0.8 + 0.4 * rnd()),
+          2.4,
+          0.9,
+          0.2,
+          0.55,
+        );
         const sc = (big * 6) / sp;
         fx.streaks.push(x, y, z, 0.5 * big, 2.4, 1.3, 0.4, 0.9, vx * sc, vy * sc, vz * sc);
         f[o + 10]! += dt;
@@ -569,29 +1124,104 @@ function updateProjectiles(fx: Fx, dt: number) {
         while (f[o + 10]! > step) {
           f[o + 10]! -= step;
           const back = 0.9 + f[o + 10]! * sp;
-          const ph = age * 22 - n++ * 0.55, rad = (style === 2 ? 0.35 : 0.65) * big;
-          const c1 = Math.cos(ph) * rad, s1 = Math.sin(ph) * rad;
-          const px = x - dx * back + ux * c1 + wx * s1, py = y - dy * back + uy * c1 + wy * s1, pz = z - dz * back + uz * c1 + wz * s1;
+          const ph = age * 22 - n++ * 0.55,
+            rad = (style === 2 ? 0.35 : 0.65) * big;
+          const c1 = Math.cos(ph) * rad,
+            s1 = Math.sin(ph) * rad;
+          const px = x - dx * back + ux * c1 + wx * s1,
+            py = y - dy * back + uy * c1 + wy * s1,
+            pz = z - dz * back + uz * c1 + wz * s1;
           // lingering smoke: pale -> grey, curls via the spiral spawn offset
-          fx.puffs.emit(px, py, pz, rr(-1.2, 1.2), rr(-1.2, 1.2), rr(-1.2, 1.2), rr(1.8, 3.0), 1.0 * big, 4.6 * big * (mine ? 1.3 : 1),
-            0.85, 0.8, 0.75, mine ? 0.5 : 0.28, 0.4, -0.3, 0.38, 0.36, 0.35);
+          fx.puffs.emit(
+            px,
+            py,
+            pz,
+            rr(-1.2, 1.2),
+            rr(-1.2, 1.2),
+            rr(-1.2, 1.2),
+            rr(1.8, 3.0),
+            1.0 * big,
+            4.6 * big * (mine ? 1.3 : 1),
+            0.85,
+            0.8,
+            0.75,
+            mine ? 0.5 : 0.28,
+            0.4,
+            -0.3,
+            0.38,
+            0.36,
+            0.35,
+          );
           // hot flame core: white -> orange
-          fx.glow.emit(px, py, pz, 0, 0, 0, 0.32, 1.3 * big, 0.3, 3, 2.3, 1.3, 0.75, 0, 0, 1.3, 0.35, 0.05);
+          fx.glow.emit(
+            px,
+            py,
+            pz,
+            0,
+            0,
+            0,
+            0.32,
+            1.3 * big,
+            0.3,
+            3,
+            2.3,
+            1.3,
+            0.75,
+            0,
+            0,
+            1.3,
+            0.35,
+            0.05,
+          );
         }
         // bright sparkle embers shed from the trail
         f[o + 15]! += dt;
         while (f[o + 15]! > 0.03) {
           f[o + 15]! -= 0.03;
-          fx.glow.emit(x - dx * 1.5, y - dy * 1.5, z - dz * 1.5, rr(-5, 5), rr(-3, 6), rr(-5, 5), rr(0.6, 1.3), 0.4, 0.1, 3, 2.2, 0.8, 1, 0.6, 9);
+          fx.glow.emit(
+            x - dx * 1.5,
+            y - dy * 1.5,
+            z - dz * 1.5,
+            rr(-5, 5),
+            rr(-3, 6),
+            rr(-5, 5),
+            rr(0.6, 1.3),
+            0.4,
+            0.1,
+            3,
+            2.2,
+            0.8,
+            1,
+            0.6,
+            9,
+          );
         }
       }
     }
     if (k === 1) {
       // blinking beacon so a target can spot incoming missiles
       const blink = Math.sin(fx.time * (mine ? 16 : 9) + i) > 0.2 ? 1 : 0.15;
-      if (!dropping) fx.additive.push(x, y + 0.4, z, (mine ? 7 : 3.5) * blink, 3.5, 0.25, 0.2, 0.9 * blink);
+      if (!dropping)
+        fx.additive.push(x, y + 0.4, z, (mine ? 7 : 3.5) * blink, 3.5, 0.25, 0.2, 0.9 * blink);
       if (P.evaded[i]) {
-        for (let n = 0; n < 3; n++) fx.glow.emit(x, y, z, rr(-10, 10), rr(-10, 10), rr(-10, 10), rr(0.5, 1.1), 0.7, 0.1, 3, 1.6, 0.4, 1, 1, 12);
+        for (let n = 0; n < 3; n++)
+          fx.glow.emit(
+            x,
+            y,
+            z,
+            rr(-10, 10),
+            rr(-10, 10),
+            rr(-10, 10),
+            rr(0.5, 1.1),
+            0.7,
+            0.1,
+            3,
+            1.6,
+            0.4,
+            1,
+            1,
+            12,
+          );
         fx.additive.push(x, y, z, 6, 3, 1.2, 0.3, 0.8);
       }
     }
@@ -612,16 +1242,22 @@ function updateProjectiles(fx: Fx, dt: number) {
 }
 
 function updateDebris(fx: Fx, dt: number) {
-  const hf = world.heightfield, O = fx.o;
-  for (let i = 0; i < fx.dN; ) {
+  const hf = world.heightfield,
+    O = fx.o;
+  for (let i = 0; i < fx.dN;) {
     const o = i * 3;
     fx.dl[o]! -= dt;
     if (fx.dl[o]! <= 0 || (hf && fx.dp[o + 1]! < sampleHeight(hf, fx.dp[o]!, fx.dp[o + 2]!))) {
-      const l = --fx.dN, lo = l * 3;
+      const l = --fx.dN,
+        lo = l * 3;
       if (l !== i) {
         for (let k = 0; k < 3; k++) {
-          fx.dp[o + k] = fx.dp[lo + k]!; fx.dv[o + k] = fx.dv[lo + k]!; fx.dr[o + k] = fx.dr[lo + k]!;
-          fx.ds[o + k] = fx.ds[lo + k]!; fx.dl[o + k] = fx.dl[lo + k]!; fx.dsc[o + k] = fx.dsc[lo + k]!;
+          fx.dp[o + k] = fx.dp[lo + k]!;
+          fx.dv[o + k] = fx.dv[lo + k]!;
+          fx.dr[o + k] = fx.dr[lo + k]!;
+          fx.ds[o + k] = fx.ds[lo + k]!;
+          fx.dl[o + k] = fx.dl[lo + k]!;
+          fx.dsc[o + k] = fx.dsc[lo + k]!;
         }
         const ca = fx.debris.instanceColor!;
         ca.setXYZ(i, ca.getX(l), ca.getY(l), ca.getZ(l));
@@ -641,8 +1277,38 @@ function updateDebris(fx: Fx, dt: number) {
       fx.dl[o + 2]! += dt;
       if (fx.dl[o + 2]! > 0.05) {
         fx.dl[o + 2] = 0;
-        fx.puffs.emit(fx.dp[o]!, fx.dp[o + 1]!, fx.dp[o + 2]!, 0, 1, 0, 1, 0.8, 3, 0.2, 0.18, 0.17, 0.5, 0.5, -0.5);
-        fx.glow.emit(fx.dp[o]!, fx.dp[o + 1]!, fx.dp[o + 2]!, 0, 0, 0, 0.25, 1.2, 0.2, 2.2, 0.9, 0.25, 0.8);
+        fx.puffs.emit(
+          fx.dp[o]!,
+          fx.dp[o + 1]!,
+          fx.dp[o + 2]!,
+          0,
+          1,
+          0,
+          1,
+          0.8,
+          3,
+          0.2,
+          0.18,
+          0.17,
+          0.5,
+          0.5,
+          -0.5,
+        );
+        fx.glow.emit(
+          fx.dp[o]!,
+          fx.dp[o + 1]!,
+          fx.dp[o + 2]!,
+          0,
+          0,
+          0,
+          0.25,
+          1.2,
+          0.2,
+          2.2,
+          0.9,
+          0.25,
+          0.8,
+        );
       }
     }
     const sc = Math.min(1, life * 4);
@@ -661,10 +1327,13 @@ function updateDebris(fx: Fx, dt: number) {
 
 /** Engine trails, barrel-roll swooshes, damage smoke. */
 function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
-  const v = fx.v, q = fx.q;
+  const v = fx.v,
+    q = fx.q;
   for (const s of world.ships.values()) {
     if (!s.alive) continue;
-    const dx = s.pos[0] - cam.x, dy = s.pos[1] - cam.y, dz = s.pos[2] - cam.z;
+    const dx = s.pos[0] - cam.x,
+      dy = s.pos[1] - cam.y,
+      dz = s.pos[2] - cam.z;
     if (dx * dx + dy * dy + dz * dz > TRAIL_CULL_DIST * TRAIL_CULL_DIST) continue;
     const engines = getModel(s.frame, s.tier, s.upgrade).engines;
     let tr = fx.trails.get(s.id);
@@ -680,10 +1349,16 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
       const e = engines[i]!;
       const t = tr[i];
       if (!t) continue;
-      v.set(e.pos[0], e.pos[1], e.pos[2] + 0.4).multiplyScalar(MODEL_SCALE).applyQuaternion(q);
-      const x = s.pos[0] + v.x, y = s.pos[1] + v.y, z = s.pos[2] + v.z;
+      v.set(e.pos[0], e.pos[1], e.pos[2] + 0.4)
+        .multiplyScalar(MODEL_SCALE)
+        .applyQuaternion(q);
+      const x = s.pos[0] + v.x,
+        y = s.pos[1] + v.y,
+        z = s.pos[2] + v.z;
       if (t.has) {
-        const mx = x - t.x, my = y - t.y, mz = z - t.z;
+        const mx = x - t.x,
+          my = y - t.y,
+          mz = z - t.z;
         const d = Math.hypot(mx, my, mz);
         if (d < 80) {
           const n = Math.min(24, Math.floor(d / sp));
@@ -691,61 +1366,252 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
             const u = k / (n + 1);
             const life = boost ? 0.65 : 0.4;
             const sz = e.r * MODEL_SCALE * (boost ? 3.4 : 2.4);
-            if (boost && k % 3 === 0) fx.puffs.emit(t.x + mx * u, t.y + my * u, t.z + mz * u, rr(-1, 1), rr(0.5, 2), rr(-1, 1), 0.7, sz * 1.5, sz * 5, 1.0, 0.85, 0.65, 0.05, 0.6);
-            if (boost) fx.glow.emit(t.x + mx * u, t.y + my * u, t.z + mz * u, 0, 0, 0, life, sz, sz * 0.25, 2.6, 1.7, 0.8, 0.14);
-            else fx.glow.emit(t.x + mx * u, t.y + my * u, t.z + mz * u, 0, 0, 0, life, sz, sz * 0.3, ar * 1.3, ag * 1.3, ab * 1.3, 0.16);
+            if (boost && k % 3 === 0)
+              fx.puffs.emit(
+                t.x + mx * u,
+                t.y + my * u,
+                t.z + mz * u,
+                rr(-1, 1),
+                rr(0.5, 2),
+                rr(-1, 1),
+                0.7,
+                sz * 1.5,
+                sz * 5,
+                1.0,
+                0.85,
+                0.65,
+                0.05,
+                0.6,
+              );
+            if (boost)
+              fx.glow.emit(
+                t.x + mx * u,
+                t.y + my * u,
+                t.z + mz * u,
+                0,
+                0,
+                0,
+                life,
+                sz,
+                sz * 0.25,
+                2.6,
+                1.7,
+                0.8,
+                0.14,
+              );
+            else
+              fx.glow.emit(
+                t.x + mx * u,
+                t.y + my * u,
+                t.z + mz * u,
+                0,
+                0,
+                0,
+                life,
+                sz,
+                sz * 0.3,
+                ar * 1.3,
+                ag * 1.3,
+                ab * 1.3,
+                0.16,
+              );
           }
-          if (n > 0) { t.x += (mx / d) * n * sp; t.y += (my / d) * n * sp; t.z += (mz / d) * n * sp; }
+          if (n > 0) {
+            t.x += (mx / d) * n * sp;
+            t.y += (my / d) * n * sp;
+            t.z += (mz / d) * n * sp;
+          }
           continue;
         }
       }
-      t.x = x; t.y = y; t.z = z; t.has = true;
+      t.x = x;
+      t.y = y;
+      t.z = z;
+      t.has = true;
     }
     for (const bf of s.buffs) {
       if (bf.skill === 'overdrive' && rnd() < dt * 50) {
         // heat haze + ember shed behind the engines
         const hl = FRAMES[s.frame].halfLength;
         v.set((rnd() - 0.5) * FRAMES[s.frame].radius, 0, hl * 1.1).applyQuaternion(q);
-        fx.puffs.emit(s.pos[0] + v.x, s.pos[1] + v.y, s.pos[2] + v.z, rr(-1, 1), rr(1, 3), rr(-1, 1), 1.0, 2, 7, 1.0, 0.7, 0.45, 0.06, 0.6, -0.8);
-        if (rnd() < 0.4) fx.glow.emit(s.pos[0] + v.x, s.pos[1] + v.y, s.pos[2] + v.z, rr(-3, 3), rr(-1, 3), rr(-3, 3), 0.6, 0.5, 0.1, 3, 0.9, 0.2, 1, 1, 5);
+        fx.puffs.emit(
+          s.pos[0] + v.x,
+          s.pos[1] + v.y,
+          s.pos[2] + v.z,
+          rr(-1, 1),
+          rr(1, 3),
+          rr(-1, 1),
+          1.0,
+          2,
+          7,
+          1.0,
+          0.7,
+          0.45,
+          0.06,
+          0.6,
+          -0.8,
+        );
+        if (rnd() < 0.4)
+          fx.glow.emit(
+            s.pos[0] + v.x,
+            s.pos[1] + v.y,
+            s.pos[2] + v.z,
+            rr(-3, 3),
+            rr(-1, 3),
+            rr(-3, 3),
+            0.6,
+            0.5,
+            0.1,
+            3,
+            0.9,
+            0.2,
+            1,
+            1,
+            5,
+          );
       } else if (bf.skill === 'phantom-weave' && rnd() < dt * 25) {
-        v.set((rnd() - 0.5) * FRAMES[s.frame].radius * 2, (rnd() - 0.5), (rnd() - 0.5) * FRAMES[s.frame].halfLength).applyQuaternion(q);
-        fx.glow.emit(s.pos[0] + v.x, s.pos[1] + v.y, s.pos[2] + v.z, 0, 0, 0, 0.5, 0.8, 0.1, 0.4, 2, 3, 0.8);
+        v.set(
+          (rnd() - 0.5) * FRAMES[s.frame].radius * 2,
+          rnd() - 0.5,
+          (rnd() - 0.5) * FRAMES[s.frame].halfLength,
+        ).applyQuaternion(q);
+        fx.glow.emit(
+          s.pos[0] + v.x,
+          s.pos[1] + v.y,
+          s.pos[2] + v.z,
+          0,
+          0,
+          0,
+          0.5,
+          0.8,
+          0.1,
+          0.4,
+          2,
+          3,
+          0.8,
+        );
       }
     }
-    if ((s as { grounded?: boolean }).grounded && Math.hypot(s.vel[0], s.vel[2]) > 3 && rnd() < dt * 50) {
+    if (
+      (s as { grounded?: boolean }).grounded &&
+      Math.hypot(s.vel[0], s.vel[2]) > 3 &&
+      rnd() < dt * 50
+    ) {
       const r = FRAMES[s.frame].radius;
       v.set((rnd() - 0.5) * r * 2, -1, r * 1.2).applyQuaternion(q);
-      fx.puffs.emit(s.pos[0] + v.x, s.pos[1] + v.y, s.pos[2] + v.z, -s.vel[0] * 0.15 + rr(-2, 2), rr(1, 3), -s.vel[2] * 0.15 + rr(-2, 2), rr(0.8, 1.6), 1.2, 5, 0.55, 0.4, 0.28, 0.45, 1, -0.6);
+      fx.puffs.emit(
+        s.pos[0] + v.x,
+        s.pos[1] + v.y,
+        s.pos[2] + v.z,
+        -s.vel[0] * 0.15 + rr(-2, 2),
+        rr(1, 3),
+        -s.vel[2] * 0.15 + rr(-2, 2),
+        rr(0.8, 1.6),
+        1.2,
+        5,
+        0.55,
+        0.4,
+        0.28,
+        0.45,
+        1,
+        -0.6,
+      );
     }
     if (s.hp < s.maxHp * 0.35 && rnd() < dt * 40) {
       v.set(0, 0, 1).applyQuaternion(q);
-      fx.puffs.emit(s.pos[0] + v.x, s.pos[1] + v.y, s.pos[2] + v.z, rr(-1, 1), rr(1, 3), rr(-1, 1), 1.8, 1.4, 6, 0.08, 0.075, 0.07, 0.7, 0.5, -1);
-      if (rnd() < 0.3) fx.glow.emit(s.pos[0] + v.x, s.pos[1] + v.y, s.pos[2] + v.z, 0, 1, 0, 0.3, 2, 0.5, 2.4, 0.9, 0.2, 0.7);
+      fx.puffs.emit(
+        s.pos[0] + v.x,
+        s.pos[1] + v.y,
+        s.pos[2] + v.z,
+        rr(-1, 1),
+        rr(1, 3),
+        rr(-1, 1),
+        1.8,
+        1.4,
+        6,
+        0.08,
+        0.075,
+        0.07,
+        0.7,
+        0.5,
+        -1,
+      );
+      if (rnd() < 0.3)
+        fx.glow.emit(
+          s.pos[0] + v.x,
+          s.pos[1] + v.y,
+          s.pos[2] + v.z,
+          0,
+          1,
+          0,
+          0.3,
+          2,
+          0.5,
+          2.4,
+          0.9,
+          0.2,
+          0.7,
+        );
     }
   }
   // barrel-roll swoosh: light ribbons off both wingtips
-  for (let i = 0; i < fx.rN; ) {
+  for (let i = 0; i < fx.rN;) {
     const r = fx.rolls[i]!;
     r.t -= dt;
     const s = world.ships.get(r.id);
     if (r.t <= 0 || !s) {
       const last = fx.rolls[--fx.rN]!;
-      fx.rolls[fx.rN] = fx.rolls[i]!; fx.rolls[i] = last;
+      fx.rolls[fx.rN] = fx.rolls[i]!;
+      fx.rolls[i] = last;
       continue;
     }
     q.set(s.rot[0], s.rot[1], s.rot[2], s.rot[3]);
     const w = FRAMES[s.frame].radius * 1.05;
-    const ang = rollAngle(s), ca = Math.cos(ang), sa = Math.sin(ang);
+    const ang = rollAngle(s),
+      ca = Math.cos(ang),
+      sa = Math.sin(ang);
     for (const side of [-1, 1]) {
       // wingtip follows the visual roll: rotate (side*w, 0) about the forward axis
       v.set(side * w * ca, side * w * sa, 0.3).applyQuaternion(q);
-      const x = s.pos[0] + v.x, y = s.pos[1] + v.y, z = s.pos[2] + v.z;
+      const x = s.pos[0] + v.x,
+        y = s.pos[1] + v.y,
+        z = s.pos[2] + v.z;
       fx.glow.emit(x, y, z, 0, 0, 0, 0.6, 1.1, 0.15, 1.6, 1.9, 2.4, 0.8);
-      fx.puffs.emit(x, y, z, rr(-0.5, 0.5), rr(-0.5, 0.5), rr(-0.5, 0.5), 1.0, 0.9, 2.4, 0.95, 0.97, 1.0, 0.45, 0.8, 0, 0.8, 0.85, 0.9);
+      fx.puffs.emit(
+        x,
+        y,
+        z,
+        rr(-0.5, 0.5),
+        rr(-0.5, 0.5),
+        rr(-0.5, 0.5),
+        1.0,
+        0.9,
+        2.4,
+        0.95,
+        0.97,
+        1.0,
+        0.45,
+        0.8,
+        0,
+        0.8,
+        0.85,
+        0.9,
+      );
     }
     // whoosh streak trailing behind the roll
-    fx.streaks.push(s.pos[0], s.pos[1], s.pos[2], w * 0.6, 1.4, 1.7, 2.2, 0.35, -s.vel[0] * 0.07, -s.vel[1] * 0.07, -s.vel[2] * 0.07);
+    fx.streaks.push(
+      s.pos[0],
+      s.pos[1],
+      s.pos[2],
+      w * 0.6,
+      1.4,
+      1.7,
+      2.2,
+      0.35,
+      -s.vel[0] * 0.07,
+      -s.vel[1] * 0.07,
+      -s.vel[2] * 0.07,
+    );
     i++;
   }
 }

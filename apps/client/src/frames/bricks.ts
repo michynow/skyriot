@@ -20,7 +20,10 @@ export class Bricks {
   parts: Part[] = [];
 
   private add(slot: Slot, g: THREE.BufferGeometry, pos: V3, rot?: V3, mirrorX = false) {
-    if (rot) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rot[0], rot[1], rot[2], 'YXZ')));
+    if (rot)
+      g.applyMatrix4(
+        new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rot[0], rot[1], rot[2], 'YXZ')),
+      );
     g.translate(pos[0], pos[1], pos[2]);
     const ng = g.index ? g.toNonIndexed() : g;
     ng.deleteAttribute('uv');
@@ -33,7 +36,9 @@ export class Bricks {
       const n = m.getAttribute('normal') as THREE.BufferAttribute;
       for (let i = 0; i < p.count; i += 3) {
         for (const a of [p, n]) {
-          const x = a.getX(i), y = a.getY(i), z = a.getZ(i);
+          const x = a.getX(i),
+            y = a.getY(i),
+            z = a.getZ(i);
           a.setXYZ(i, a.getX(i + 2), a.getY(i + 2), a.getZ(i + 2));
           a.setXYZ(i + 2, x, y, z);
         }
@@ -58,7 +63,12 @@ export class Bricks {
         const lz = (k - (nz - 1) / 2) * pitch;
         const g = new THREE.CylinderGeometry(0.13, 0.13, 0.09, 8);
         g.translate(lx, size[1] / 2 + 0.045, lz);
-        if (rot) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rot[0], rot[1], rot[2], 'YXZ')));
+        if (rot)
+          g.applyMatrix4(
+            new THREE.Matrix4().makeRotationFromEuler(
+              new THREE.Euler(rot[0], rot[1], rot[2], 'YXZ'),
+            ),
+          );
         this.add(slot, g, pos, undefined, mirror);
       }
     }
@@ -68,7 +78,10 @@ export class Bricks {
   wedge(slot: Slot, size: V3, pos: V3, o: { flip?: boolean; rot?: V3; mirror?: boolean } = {}) {
     const [w, h, d] = size;
     const s = new THREE.Shape();
-    s.moveTo(0, 0); s.lineTo(d, 0); s.lineTo(d, h); s.closePath();
+    s.moveTo(0, 0);
+    s.lineTo(d, 0);
+    s.lineTo(d, h);
+    s.closePath();
     const g = new THREE.ExtrudeGeometry(s, { depth: w, bevelEnabled: false });
     g.translate(-d / 2, -h / 2, -w / 2);
     g.rotateY(o.flip ? Math.PI / 2 : -Math.PI / 2);
@@ -76,7 +89,13 @@ export class Bricks {
   }
 
   /** Cylinder along Z by default (axis 'z'), or 'y'. */
-  cyl(slot: Slot, r: number, len: number, pos: V3, o: { axis?: 'x' | 'y' | 'z'; r2?: number; seg?: number; mirror?: boolean; rot?: V3 } = {}) {
+  cyl(
+    slot: Slot,
+    r: number,
+    len: number,
+    pos: V3,
+    o: { axis?: 'x' | 'y' | 'z'; r2?: number; seg?: number; mirror?: boolean; rot?: V3 } = {},
+  ) {
     const g = new THREE.CylinderGeometry(o.r2 ?? r, r, len, o.seg ?? 12);
     const ax = o.axis ?? 'z';
     if (ax === 'z') g.rotateX(Math.PI / 2);
@@ -86,7 +105,15 @@ export class Bricks {
 
   /** Scaled sphere (ellipsoid); `top` keeps only the upper half (canopy). */
   ellipsoid(slot: Slot, size: V3, pos: V3, o: { top?: boolean; mirror?: boolean } = {}) {
-    const g = new THREE.SphereGeometry(0.5, 14, 10, 0, Math.PI * 2, 0, o.top ? Math.PI / 2 : Math.PI);
+    const g = new THREE.SphereGeometry(
+      0.5,
+      14,
+      10,
+      0,
+      Math.PI * 2,
+      0,
+      o.top ? Math.PI / 2 : Math.PI,
+    );
     g.scale(size[0], size[1], size[2]);
     this.add(slot, g, pos, undefined, o.mirror);
   }

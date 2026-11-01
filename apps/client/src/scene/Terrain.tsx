@@ -76,11 +76,16 @@ export function Terrain({ map, hf }: { map: MapDef; hf: Heightfield }) {
       sh.uniforms.uMaxH = { value: map.maxHeight };
       sh.vertexShader = sh.vertexShader
         .replace('void main() {', 'varying vec3 vWP; varying vec3 vWN;\nvoid main() {')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = position; vWN = normal;');
+        .replace(
+          '#include <begin_vertex>',
+          '#include <begin_vertex>\nvWP = position; vWN = normal;',
+        );
       sh.fragmentShader = header + sh.fragmentShader.replace('#include <map_fragment>', splat);
     };
     return m;
   }, [sand, red, rock, map.maxHeight]);
 
-  return <mesh geometry={geometry} material={material} castShadow receiveShadow frustumCulled={false} />;
+  return (
+    <mesh geometry={geometry} material={material} castShadow receiveShadow frustumCulled={false} />
+  );
 }

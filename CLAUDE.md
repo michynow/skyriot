@@ -11,6 +11,7 @@ Browser nation-vs-nation flight-combat game. Read before coding:
 Commands: `pnpm dev` (server :2567 + client :5173), `pnpm typecheck`, `pnpm format`, `pnpm db:up`.
 
 Hard rules:
+
 - `packages/shared/src/types.ts` and `content/**` are shared contracts — don't change shape without the orchestrator.
 - No unit/integration tests. Verify by running the game.
 - Original IP only (ADR 0005). Never copy names/assets/text from existing games.

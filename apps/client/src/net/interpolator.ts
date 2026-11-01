@@ -48,7 +48,13 @@ export function createInterpolator(delayMs = 100): Interpolator {
   const samples: number[] = [];
   let tick = 0;
 
-  function place(dst: ShipState, a: ShipState | undefined, b: ShipState, t: number, extraSec: number) {
+  function place(
+    dst: ShipState,
+    a: ShipState | undefined,
+    b: ShipState,
+    t: number,
+    extraSec: number,
+  ) {
     copyInto(dst, b);
     if (extraSec > 0) {
       for (let i = 0; i < 3; i++) dst.pos[i] = b.pos[i]! + b.vel[i]! * extraSec;
@@ -132,7 +138,8 @@ export function createInterpolator(delayMs = 100): Interpolator {
         place(dst, from?.byId.get(ship.id), ship, t, extraSec);
         out.set(ship.id, dst);
       }
-      if (cache.size > out.size + 16) for (const id of cache.keys()) if (!last.byId.has(id)) cache.delete(id);
+      if (cache.size > out.size + 16)
+        for (const id of cache.keys()) if (!last.byId.has(id)) cache.delete(id);
       return out;
     },
 

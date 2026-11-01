@@ -69,7 +69,8 @@ export function MapScene({ map }: { map: MapDef }) {
   const scene = useThree((s) => s.scene);
   useEffect(() => {
     if (world.map !== map) world.map = map;
-    if (!world.heightfield || world.heightfield.heights.length !== hf.heights.length) world.heightfield = hf;
+    if (!world.heightfield || world.heightfield.heights.length !== hf.heights.length)
+      world.heightfield = hf;
   }, [map, hf]);
   useEffect(() => {
     scene.fog = new THREE.Fog(map.env.fogColor, map.env.fogNear * 1.6, map.env.fogFar * 1.25);
@@ -81,7 +82,11 @@ export function MapScene({ map }: { map: MapDef }) {
     const pm = new THREE.PMREMGenerator(gl);
     const env = pm.fromScene(new RoomEnvironment(), 0.04).texture;
     setShipEnv(env);
-    return () => { setShipEnv(null); env.dispose(); pm.dispose(); };
+    return () => {
+      setShipEnv(null);
+      env.dispose();
+      pm.dispose();
+    };
   }, [gl]);
   const atmos = map.env.kind === 'atmosphere';
   return (

@@ -8,7 +8,11 @@ function colored(g: THREE.BufferGeometry, hex: string) {
   ng.deleteAttribute('uv');
   const c = new THREE.Color(hex);
   const arr = new Float32Array(ng.getAttribute('position').count * 3);
-  for (let i = 0; i < arr.length; i += 3) { arr[i] = c.r; arr[i + 1] = c.g; arr[i + 2] = c.b; }
+  for (let i = 0; i < arr.length; i += 3) {
+    arr[i] = c.r;
+    arr[i + 1] = c.g;
+    arr[i + 2] = c.b;
+  }
   ng.setAttribute('color', new THREE.BufferAttribute(arr, 3));
   return ng;
 }
@@ -21,7 +25,10 @@ function rockGeo() {
   for (let i = 0; i < p.count; i++) {
     const key = `${p.getX(i).toFixed(3)},${p.getY(i).toFixed(3)},${p.getZ(i).toFixed(3)}`;
     let k = seen.get(key);
-    if (k === undefined) { k = 0.75 + rnd() * 0.5; seen.set(key, k); }
+    if (k === undefined) {
+      k = 0.75 + rnd() * 0.5;
+      seen.set(key, k);
+    }
     p.setXYZ(i, p.getX(i) * k, p.getY(i) * k * 0.8, p.getZ(i) * k);
   }
   const ng = g.toNonIndexed();
@@ -34,9 +41,11 @@ function butteGeo() {
   const cols = ['#7a3b27', '#a45a38', '#8a4630', '#b76c43', '#8f4a31', '#c27a4c'];
   const parts: THREE.BufferGeometry[] = [];
   let y = 0;
-  const r0 = 1, h = 1 / cols.length;
+  const r0 = 1,
+    h = 1 / cols.length;
   cols.forEach((c, i) => {
-    const rb = r0 * (1 - i * 0.045), rt = r0 * (1 - (i + 1) * 0.045) * (i === cols.length - 1 ? 0.92 : 1);
+    const rb = r0 * (1 - i * 0.045),
+      rt = r0 * (1 - (i + 1) * 0.045) * (i === cols.length - 1 ? 0.92 : 1);
     const g = new THREE.CylinderGeometry(rt * (1 + (i % 2) * 0.05), rb, h, 9, 1);
     g.translate(0, y + h / 2, 0);
     y += h;
@@ -53,7 +62,8 @@ function towerGeo() {
   let y = 0;
   const floors = 7;
   for (let i = 0; i < floors; i++) {
-    const w = 3.2 - i * 0.18, hh = 2.2 + rnd() * 0.5;
+    const w = 3.2 - i * 0.18,
+      hh = 2.2 + rnd() * 0.5;
     const g = new THREE.BoxGeometry(w, hh, w);
     g.translate((rnd() - 0.5) * 0.15 * i, y + hh / 2, (rnd() - 0.5) * 0.15 * i);
     parts.push(colored(g, cols[i % cols.length]!));
@@ -65,13 +75,15 @@ function towerGeo() {
     }
     y += hh;
   }
-  for (let i = 0; i < 3; i++) for (let k = 0; k < 3; k++) {
-    const s = new THREE.CylinderGeometry(0.22, 0.22, 0.18, 8);
-    s.translate((i - 1) * 0.7, y + 0.09, (k - 1) * 0.7);
-    parts.push(colored(s, '#6b5f58'));
-  }
+  for (let i = 0; i < 3; i++)
+    for (let k = 0; k < 3; k++) {
+      const s = new THREE.CylinderGeometry(0.22, 0.22, 0.18, 8);
+      s.translate((i - 1) * 0.7, y + 0.09, (k - 1) * 0.7);
+      parts.push(colored(s, '#6b5f58'));
+    }
   const rot = new THREE.BoxGeometry(1.4, 2.4, 1.4); // broken chunk leaning off the top
-  rot.rotateZ(0.5); rot.translate(1.3, y + 0.6, 0.2);
+  rot.rotateZ(0.5);
+  rot.translate(1.3, y + 0.6, 0.2);
   parts.push(colored(rot, '#8a5a3c'));
   return mergeGeometries(parts)!;
 }
@@ -88,7 +100,8 @@ function pylonGeo() {
     parts.push(colored(r, '#8a5a3c'));
   }
   const arm = new THREE.BoxGeometry(4.6, 0.3, 0.3);
-  arm.rotateZ(-0.9); arm.translate(2.2, 11, 0);
+  arm.rotateZ(-0.9);
+  arm.translate(2.2, 11, 0);
   parts.push(colored(arm, '#a4503a'));
   const base = new THREE.BoxGeometry(1.8, 0.7, 1.8);
   base.translate(0, 0.35, 0);
@@ -96,7 +109,12 @@ function pylonGeo() {
   return mergeGeometries(parts)!;
 }
 
-interface Spot { x: number; y: number; z: number; slope: number }
+interface Spot {
+  x: number;
+  y: number;
+  z: number;
+  slope: number;
+}
 
 function slopeAt(hf: Heightfield, x: number, z: number) {
   const d = 10;
@@ -105,19 +123,33 @@ function slopeAt(hf: Heightfield, x: number, z: number) {
   return Math.hypot(dx, dz) / (2 * d);
 }
 
-function place(hf: Heightfield, map: MapDef, rnd: () => number, count: number, ok: (s: Spot) => boolean) {
+function place(
+  hf: Heightfield,
+  map: MapDef,
+  rnd: () => number,
+  count: number,
+  ok: (s: Spot) => boolean,
+) {
   const out: Spot[] = [];
   const half = map.size * 0.46;
   for (let tries = 0; out.length < count && tries < count * 40; tries++) {
-    const x = (rnd() * 2 - 1) * half, z = (rnd() * 2 - 1) * half;
+    const x = (rnd() * 2 - 1) * half,
+      z = (rnd() * 2 - 1) * half;
     const s = { x, y: sampleHeight(hf, x, z), z, slope: slopeAt(hf, x, z) };
     if (ok(s)) out.push(s);
   }
   return out;
 }
 
-function Instances({ geo, spots, mat, fill }: {
-  geo: THREE.BufferGeometry; spots: Spot[]; mat: THREE.Material;
+function Instances({
+  geo,
+  spots,
+  mat,
+  fill,
+}: {
+  geo: THREE.BufferGeometry;
+  spots: Spot[];
+  mat: THREE.Material;
   fill: (o: THREE.Object3D, s: Spot, rnd: () => number, i: number) => void;
 }) {
   const ref = useMemo(() => {
@@ -125,7 +157,9 @@ function Instances({ geo, spots, mat, fill }: {
     const o = new THREE.Object3D();
     const rnd = mulberry32(spots.length * 31 + 5);
     spots.forEach((s, i) => {
-      o.position.set(s.x, s.y, s.z); o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1);
+      o.position.set(s.x, s.y, s.z);
+      o.rotation.set(0, 0, 0);
+      o.scale.set(1, 1, 1);
       fill(o, s, rnd, i);
       o.updateMatrix();
       im.setMatrixAt(i, o.matrix);
@@ -148,35 +182,69 @@ export function Scatter({ map, hf }: { map: MapDef; hf: Heightfield }) {
     const buttes = place(hf, map, rnd, 26, (s) => s.slope < 0.12 && s.y < map.maxHeight * 0.4);
     const towers = place(hf, map, rnd, 34, (s) => s.slope < 0.1 && s.y < map.maxHeight * 0.55);
     const pylons = place(hf, map, rnd, 45, (s) => s.slope < 0.2);
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, flatShading: true, envMapIntensity: 0 });
-    const rockMat = new THREE.MeshStandardMaterial({ color: '#b07050', roughness: 1, flatShading: true, envMapIntensity: 0 });
-    return { rocks, buttes, towers, pylons, mat, rockMat, rg: rockGeo(), bg: butteGeo(), tg: towerGeo(), pg: pylonGeo() };
+    const mat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.92,
+      flatShading: true,
+      envMapIntensity: 0,
+    });
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: '#b07050',
+      roughness: 1,
+      flatShading: true,
+      envMapIntensity: 0,
+    });
+    return {
+      rocks,
+      buttes,
+      towers,
+      pylons,
+      mat,
+      rockMat,
+      rg: rockGeo(),
+      bg: butteGeo(),
+      tg: towerGeo(),
+      pg: pylonGeo(),
+    };
   }, [map, hf]);
 
-  const fillRock = useMemo(() => (o: THREE.Object3D, s: Spot, r: () => number) => {
-    const k = 1.5 + Math.pow(r(), 4) * 10;
-    o.scale.set(k * (0.8 + r() * 0.6), k * (0.6 + r() * 0.5), k * (0.8 + r() * 0.6));
-    o.rotation.set((r() - 0.5) * 0.4, r() * 6.28, (r() - 0.5) * 0.4);
-    o.position.y = s.y + k * 0.15;
-  }, []);
-  const fillButte = useMemo(() => (o: THREE.Object3D, _s: Spot, r: () => number) => {
-    const w = 30 + r() * 60, h = 45 + r() * 90;
-    o.scale.set(w, h, w * (0.7 + r() * 0.5));
-    o.rotation.y = r() * 6.28;
-    o.position.y -= 15;
-  }, []);
-  const fillTower = useMemo(() => (o: THREE.Object3D, _s: Spot, r: () => number) => {
-    const k = 1.3 + r() * 1.7;
-    o.scale.set(k, k * (0.8 + r() * 0.8), k);
-    o.rotation.set((r() - 0.5) * 0.08, r() * 6.28, (r() - 0.5) * 0.08);
-    o.position.y -= 0.5;
-  }, []);
-  const fillPylon = useMemo(() => (o: THREE.Object3D, _s: Spot, r: () => number) => {
-    const k = 1.2 + r() * 1.2;
-    o.scale.setScalar(k);
-    o.rotation.set((r() - 0.5) * 0.5, r() * 6.28, (r() - 0.5) * 0.7);
-    o.position.y -= 0.4;
-  }, []);
+  const fillRock = useMemo(
+    () => (o: THREE.Object3D, s: Spot, r: () => number) => {
+      const k = 1.5 + Math.pow(r(), 4) * 10;
+      o.scale.set(k * (0.8 + r() * 0.6), k * (0.6 + r() * 0.5), k * (0.8 + r() * 0.6));
+      o.rotation.set((r() - 0.5) * 0.4, r() * 6.28, (r() - 0.5) * 0.4);
+      o.position.y = s.y + k * 0.15;
+    },
+    [],
+  );
+  const fillButte = useMemo(
+    () => (o: THREE.Object3D, _s: Spot, r: () => number) => {
+      const w = 30 + r() * 60,
+        h = 45 + r() * 90;
+      o.scale.set(w, h, w * (0.7 + r() * 0.5));
+      o.rotation.y = r() * 6.28;
+      o.position.y -= 15;
+    },
+    [],
+  );
+  const fillTower = useMemo(
+    () => (o: THREE.Object3D, _s: Spot, r: () => number) => {
+      const k = 1.3 + r() * 1.7;
+      o.scale.set(k, k * (0.8 + r() * 0.8), k);
+      o.rotation.set((r() - 0.5) * 0.08, r() * 6.28, (r() - 0.5) * 0.08);
+      o.position.y -= 0.5;
+    },
+    [],
+  );
+  const fillPylon = useMemo(
+    () => (o: THREE.Object3D, _s: Spot, r: () => number) => {
+      const k = 1.2 + r() * 1.2;
+      o.scale.setScalar(k);
+      o.rotation.set((r() - 0.5) * 0.5, r() * 6.28, (r() - 0.5) * 0.7);
+      o.position.y -= 0.4;
+    },
+    [],
+  );
 
   return (
     <>

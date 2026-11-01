@@ -40,17 +40,25 @@ function pips(b: Bricks, tier: number, y: number, z0: number, step = 0.28) {
 
 /** Panel lines: thin dark grooves across a flat top (x extent w, z from z0..z1) at height y. */
 function panels(b: Bricks, w: number, y: number, z0: number, z1: number, n: number, x = 0) {
-  for (let i = 0; i < n; i++) b.box('dark', [w, 0.02, 0.025], [x, y, z0 + ((z1 - z0) * (i + 0.5)) / n]);
+  for (let i = 0; i < n; i++)
+    b.box('dark', [w, 0.02, 0.025], [x, y, z0 + ((z1 - z0) * (i + 0.5)) / n]);
   b.box('dark', [0.025, 0.02, z1 - z0], [x - w * 0.28, y, (z0 + z1) / 2]);
   b.box('dark', [0.025, 0.02, z1 - z0], [x + w * 0.28, y, (z0 + z1) / 2]);
 }
 /** Small greebles: vents, bolts, antenna, decal plates. */
-function greebles(b: Bricks, spots: [number, number, number][], kind: 'vent' | 'bolt' | 'antenna' | 'plate') {
+function greebles(
+  b: Bricks,
+  spots: [number, number, number][],
+  kind: 'vent' | 'bolt' | 'antenna' | 'plate',
+) {
   for (const [x, y, z] of spots) {
-    if (kind === 'vent') for (let i = 0; i < 3; i++) b.box('dark', [0.3, 0.03, 0.05], [x, y, z + i * 0.09]);
+    if (kind === 'vent')
+      for (let i = 0; i < 3; i++) b.box('dark', [0.3, 0.03, 0.05], [x, y, z + i * 0.09]);
     else if (kind === 'bolt') b.cyl('dark', 0.05, 0.05, [x, y, z], { axis: 'y', seg: 6 });
-    else if (kind === 'antenna') { b.cyl('dark', 0.015, 0.45, [x, y + 0.22, z], { axis: 'y', seg: 5 }); b.box('accent', [0.04, 0.04, 0.04], [x, y + 0.46, z]); }
-    else b.box('secondary', [0.28, 0.02, 0.18], [x, y, z]);
+    else if (kind === 'antenna') {
+      b.cyl('dark', 0.015, 0.45, [x, y + 0.22, z], { axis: 'y', seg: 5 });
+      b.box('accent', [0.04, 0.04, 0.04], [x, y + 0.46, z]);
+    } else b.box('secondary', [0.28, 0.02, 0.18], [x, y, z]);
   }
 }
 
@@ -78,17 +86,48 @@ function wasp(tier: number, glow: boolean): FrameModelData {
   }
   pips(b, tier, 0.44, 0.3);
   panels(b, 0.7, 0.251, -0.7, 2.0, 7);
-  greebles(b, [[-0.25, 0.26, 1.2], [0.25, 0.26, 1.2]], 'vent');
+  greebles(
+    b,
+    [
+      [-0.25, 0.26, 1.2],
+      [0.25, 0.26, 1.2],
+    ],
+    'vent',
+  );
   greebles(b, [[0.3, 0.26, 0.2]], 'antenna');
-  greebles(b, [[-0.3, 0.26, 0.1], [1.9, 0.01, 0.95], [-1.9, 0.01, 0.95]], 'plate');
-  if (band >= 1) for (const s of [1, -1]) b.box('secondary', [0.1, 0.3, 1.6], [s * 0.5, 0.05, 0.6], { studs: false });
-  if (band >= 2) for (const s of [1, -1]) {
-    b.wedge('primary', [0.12, 0.45, 1.0], [s * 0.9, 0.0, -1.2], { flip: true });
-    b.box('dark', [0.14, 0.14, 0.9], [s * 2.55, -0.02, 1.35], { rot: [0, -s * 0.52, 0] });
-  }
-  if (band >= 3) for (const s of [1, -1]) b.wedge('primary', [0.14, 1.2, 1.6], [s * 3.0, 0.4, 2.2], { flip: false, rot: [0, 0, s * 0.25] });
-  if (glow) for (const s of [1, -1]) b.box('trim', [2.3, 0.04, 0.06], [s * 1.55, 0.02, 0.45], { rot: [0, -s * 0.52, 0] });
-  return { body: b.build(), engines: [{ pos: [-0.38, 0, 2.4], r: 0.2 }, { pos: [0.38, 0, 2.4], r: 0.2 }] };
+  greebles(
+    b,
+    [
+      [-0.3, 0.26, 0.1],
+      [1.9, 0.01, 0.95],
+      [-1.9, 0.01, 0.95],
+    ],
+    'plate',
+  );
+  if (band >= 1)
+    for (const s of [1, -1])
+      b.box('secondary', [0.1, 0.3, 1.6], [s * 0.5, 0.05, 0.6], { studs: false });
+  if (band >= 2)
+    for (const s of [1, -1]) {
+      b.wedge('primary', [0.12, 0.45, 1.0], [s * 0.9, 0.0, -1.2], { flip: true });
+      b.box('dark', [0.14, 0.14, 0.9], [s * 2.55, -0.02, 1.35], { rot: [0, -s * 0.52, 0] });
+    }
+  if (band >= 3)
+    for (const s of [1, -1])
+      b.wedge('primary', [0.14, 1.2, 1.6], [s * 3.0, 0.4, 2.2], {
+        flip: false,
+        rot: [0, 0, s * 0.25],
+      });
+  if (glow)
+    for (const s of [1, -1])
+      b.box('trim', [2.3, 0.04, 0.06], [s * 1.55, 0.02, 0.45], { rot: [0, -s * 0.52, 0] });
+  return {
+    body: b.build(),
+    engines: [
+      { pos: [-0.38, 0, 2.4], r: 0.2 },
+      { pos: [0.38, 0, 2.4], r: 0.2 },
+    ],
+  };
 }
 
 function anvil(tier: number, glow: boolean): FrameModelData {
@@ -103,7 +142,10 @@ function anvil(tier: number, glow: boolean): FrameModelData {
   b.box('secondary', [3.3, 0.14, 0.5], [0, 0.62, 1.2]);
   for (const s of [1, -1]) {
     // broad wings with leading-edge wedge
-    b.box('primary', [3.0, 0.35, 2.8], [s * 3.1, -0.15, 1.4], { rot: [0, -s * 0.12, 0], studs: true });
+    b.box('primary', [3.0, 0.35, 2.8], [s * 3.1, -0.15, 1.4], {
+      rot: [0, -s * 0.12, 0],
+      studs: true,
+    });
     b.wedge('secondary', [3.0, 0.3, 1.0], [s * 3.1, -0.15, -0.5], { rot: [0, -s * 0.12, 0] });
     // two nacelles per side
     for (const x of [2.0, 3.9]) {
@@ -116,11 +158,37 @@ function anvil(tier: number, glow: boolean): FrameModelData {
   }
   pips(b, tier, 0.7, 0.2, 0.3);
   panels(b, 2.6, 0.605, -1.6, 3.6, 12);
-  greebles(b, [[-1.0, 0.61, 2.5], [1.0, 0.61, 2.5], [-1.0, 0.61, 3.2], [1.0, 0.61, 3.2]], 'vent');
-  greebles(b, [[0.9, 0.62, 0.0], [-0.9, 0.62, 0.0]], 'antenna');
-  greebles(b, [[-4.6, 0.04, 1.4], [4.6, 0.04, 1.4], [3.1, 0.04, 2.0], [-3.1, 0.04, 2.0]], 'plate');
+  greebles(
+    b,
+    [
+      [-1.0, 0.61, 2.5],
+      [1.0, 0.61, 2.5],
+      [-1.0, 0.61, 3.2],
+      [1.0, 0.61, 3.2],
+    ],
+    'vent',
+  );
+  greebles(
+    b,
+    [
+      [0.9, 0.62, 0.0],
+      [-0.9, 0.62, 0.0],
+    ],
+    'antenna',
+  );
+  greebles(
+    b,
+    [
+      [-4.6, 0.04, 1.4],
+      [4.6, 0.04, 1.4],
+      [3.1, 0.04, 2.0],
+      [-3.1, 0.04, 2.0],
+    ],
+    'plate',
+  );
   for (let i = 0; i < 6; i++) greebles(b, [[-1.4 + i * 0.56, 0.62, -0.9]], 'bolt');
-  if (band >= 1) for (const s of [1, -1]) b.box('dark', [0.5, 0.7, 4.0], [s * 1.85, 0.2, 0.7], { studs: true });
+  if (band >= 1)
+    for (const s of [1, -1]) b.box('dark', [0.5, 0.7, 4.0], [s * 1.85, 0.2, 0.7], { studs: true });
   if (band >= 2) {
     for (const s of [1, -1]) {
       b.cyl('dark', 0.16, 1.4, [s * 5.1, -0.1, -0.6]);
@@ -158,10 +226,26 @@ function halo(tier: number, glow: boolean): FrameModelData {
   b.box('dark', [0.14, 1.2, 0.14], [0, 1.0, 0.2]);
   pips(b, tier, 0.86, 0.6);
   panels(b, 0.8, 0.86, -0.8, 2.2, 6);
-  greebles(b, [[0.5, 0.86, 1.4], [-0.5, 0.86, 1.4]], 'vent');
+  greebles(
+    b,
+    [
+      [0.5, 0.86, 1.4],
+      [-0.5, 0.86, 1.4],
+    ],
+    'vent',
+  );
   greebles(b, [[0, 1.6, 0.2]], 'antenna');
-  greebles(b, [[1.9, 0.18, 1.0], [-1.9, 0.18, 1.0]], 'plate');
-  if (band >= 1) for (const s of [1, -1]) b.box('secondary', [0.2, 0.5, 1.2], [s * 0.9, 0.55, 1.4], { studs: false });
+  greebles(
+    b,
+    [
+      [1.9, 0.18, 1.0],
+      [-1.9, 0.18, 1.0],
+    ],
+    'plate',
+  );
+  if (band >= 1)
+    for (const s of [1, -1])
+      b.box('secondary', [0.2, 0.5, 1.2], [s * 0.9, 0.55, 1.4], { studs: false });
   if (band >= 2) b.cyl('secondary', 0.95, 0.15, [0, 0, 1.55], { seg: 16 });
   if (glow) b.cyl('trim', 0.92, 0.05, [0, 0, 0.2], { seg: 16 });
 
@@ -172,17 +256,24 @@ function halo(tier: number, glow: boolean): FrameModelData {
   const n = 8;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
-    r.box('dark', [0.45, 0.38, 0.38], [Math.cos(a) * 2.35, Math.sin(a) * 2.35, 0], { rot: [0, 0, a] });
+    r.box('dark', [0.45, 0.38, 0.38], [Math.cos(a) * 2.35, Math.sin(a) * 2.35, 0], {
+      rot: [0, 0, a],
+    });
   }
   if (band >= 1) r.torus('primary', 1.7, 0.08, [0, 0, 0]);
-  if (band >= 2) for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2;
-    r.box('accent', [0.3, 0.3, 0.3], [Math.cos(a) * 1.7, Math.sin(a) * 1.7, 0]);
-  }
+  if (band >= 2)
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      r.box('accent', [0.3, 0.3, 0.3], [Math.cos(a) * 1.7, Math.sin(a) * 1.7, 0]);
+    }
   if (glow) r.torus('trim', 2.35, 0.05, [0, 0, -0.18]);
   return {
     body: b.build(),
-    engines: [{ pos: [0, 0, 2.7], r: 0.38 }, { pos: [-1.9, -0.15, 1.9], r: 0.2 }, { pos: [1.9, -0.15, 1.9], r: 0.2 }],
+    engines: [
+      { pos: [0, 0, 2.7], r: 0.38 },
+      { pos: [-1.9, -0.15, 1.9], r: 0.2 },
+      { pos: [1.9, -0.15, 1.9], r: 0.2 },
+    ],
     spinner: { pivot: [0, 0, 0.2], geos: r.build(), speed: 0.9 },
   };
 }
@@ -216,16 +307,48 @@ function bulwark(tier: number, glow: boolean): FrameModelData {
   for (const e of engines) b.cyl('accent', 0.26, 0.08, [e.pos[0], e.pos[1], 3.52]);
   pips(b, tier, 0.8, -0.6, 0.3);
   panels(b, 3.2, 0.752, -2.0, 3.0, 10);
-  greebles(b, [[-1.0, 0.76, 2.6], [1.0, 0.76, 2.6], [-1.0, 0.76, 2.0], [1.0, 0.76, 2.0]], 'vent');
-  greebles(b, [[-0.7, 2.0, 0.6], [0.7, 2.0, 0.8]], 'antenna');
-  greebles(b, [[1.2, 0.77, -1.5], [-1.2, 0.77, -1.5], [0, 2.01, 0.9]], 'plate');
-  for (let i = 0; i < 8; i++) for (const s of [1, -1]) greebles(b, [[s * 1.7, 0.76, -2 + i * 0.7]], 'bolt');
-  if (band >= 1) for (const s of [1, -1]) b.box('primary', [0.6, 0.8, 2.4], [s * 1.5, 0.75, 1.9], { studs: true });
+  greebles(
+    b,
+    [
+      [-1.0, 0.76, 2.6],
+      [1.0, 0.76, 2.6],
+      [-1.0, 0.76, 2.0],
+      [1.0, 0.76, 2.0],
+    ],
+    'vent',
+  );
+  greebles(
+    b,
+    [
+      [-0.7, 2.0, 0.6],
+      [0.7, 2.0, 0.8],
+    ],
+    'antenna',
+  );
+  greebles(
+    b,
+    [
+      [1.2, 0.77, -1.5],
+      [-1.2, 0.77, -1.5],
+      [0, 2.01, 0.9],
+    ],
+    'plate',
+  );
+  for (let i = 0; i < 8; i++)
+    for (const s of [1, -1]) greebles(b, [[s * 1.7, 0.76, -2 + i * 0.7]], 'bolt');
+  if (band >= 1)
+    for (const s of [1, -1])
+      b.box('primary', [0.6, 0.8, 2.4], [s * 1.5, 0.75, 1.9], { studs: true });
   if (band >= 2) for (const s of [1, -1]) b.cyl('dark', 0.15, 1.8, [s * 1.0, 1.55, -1.2]);
   if (band >= 3) b.box('secondary', [1.3, 0.5, 1.0], [0, 2.3, 1.5], { studs: true });
   if (glow) for (const s of [1, -1]) b.box('trim', [0.05, 0.05, 5.8], [s * 2.47, 0.35, 0.3]);
 
-  const pads = [[-1.4, -1.9], [1.4, -1.9], [-1.4, 1.9], [1.4, 1.9]].map(([x, z]) => ({ pos: [x!, -0.7, z!] as V3, r: 0.6 }));
+  const pads = [
+    [-1.4, -1.9],
+    [1.4, -1.9],
+    [-1.4, 1.9],
+    [1.4, 1.9],
+  ].map(([x, z]) => ({ pos: [x!, -0.7, z!] as V3, r: 0.6 }));
   for (const p of pads) {
     h.cyl('dark', 0.7, 0.2, [p.pos[0], -0.6, p.pos[2]], { axis: 'y' });
     h.cyl('accent', 0.5, 0.06, [p.pos[0], -0.72, p.pos[2]], { axis: 'y' });
@@ -246,13 +369,26 @@ function bulwark(tier: number, glow: boolean): FrameModelData {
       f.box('secondary', [1.8, 0.08, 1.1], [0.9, 0, 0]);
       f.box('accent', [0.12, 0.12, 1.1], [1.8, 0, 0]);
       f.wedge('dark', [1.2, 0.1, 0.8], [0.7, 0, 0.9], { rot: [0, 0, 0] });
-      return { geos: f.build(), pivots: [[-1.8, 0.2, -1.6], [1.8, 0.2, -1.6], [-1.8, 0.2, 2.2], [1.8, 0.2, 2.2]] as V3[] };
+      return {
+        geos: f.build(),
+        pivots: [
+          [-1.8, 0.2, -1.6],
+          [1.8, 0.2, -1.6],
+          [-1.8, 0.2, 2.2],
+          [1.8, 0.2, 2.2],
+        ] as V3[],
+      };
     })(),
     engines,
     pads,
     legs: {
       geos: l.build(),
-      pivots: [[-1.85, -0.1, -2.3], [1.85, -0.1, -2.3], [-1.85, -0.1, 2.5], [1.85, -0.1, 2.5]],
+      pivots: [
+        [-1.85, -0.1, -2.3],
+        [1.85, -0.1, -2.3],
+        [-1.85, -0.1, 2.5],
+        [1.85, -0.1, 2.5],
+      ],
     },
   };
 }

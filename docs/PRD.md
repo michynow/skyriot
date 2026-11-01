@@ -1,18 +1,20 @@
 # SKYRIOT — Product Requirements Document
 
-Working title. Original browser game in the nation-vs-nation arcade flight-combat MMO genre. Inspired by the *feel* of that genre — not a recreation of any existing title. All names, lore, maps, ships, skills and art are our own.
+Working title. Original browser game in the nation-vs-nation arcade flight-combat MMO genre. Inspired by the _feel_ of that genre — not a recreation of any existing title. All names, lore, maps, ships, skills and art are our own.
 
 ## 1. Vision
 
 Fast, readable, skill-heavy 3D aerial combat in the browser. Two nations at war, four ship Frames any pilot can fly, short punchy missions with a crude-comedy story, and scheduled nation-wide war events that feed a Glory rank ladder. The full vertical climb (level 1 → 100) takes **8–10 hours**, not months. No pay-to-win. No gambling upgrades.
 
 ### Pillars
+
 1. **Flight feel first.** Mouse-aim, momentum, boost, barrel rolls, dodgeable projectiles. If flying an empty map isn't fun, nothing else matters.
 2. **PvP is the point.** Server-authoritative from day one. Every system serves the nation war.
 3. **Respect the player's time.** Every mission 5–10 min. Every level-up unlocks something.
 4. **Fair.** Power comes from play, never from a wallet. Upgrades are deterministic.
 
 ### Non-goals (v1)
+
 - Single-player / offline mode.
 - Player trading / market (expansion — needs anti-dupe economy backend).
 - Gamepad (v1.1), mobile.
@@ -21,14 +23,15 @@ Fast, readable, skill-heavy 3D aerial combat in the browser. Two nations at war,
 
 ## 2. World & factions
 
-| Nation | Identity | Colours | City |
-|---|---|---|---|
-| **Aurelian Concord** | Smug corporate theocracy; shareholders are saints | Gold, white, cyan | **Gildspire** |
-| **Vex Freehold** | Scrapper punk republic; votes by bar fight | Red, black, orange | **Rivet Harbor** |
+| Nation               | Identity                                          | Colours            | City             |
+| -------------------- | ------------------------------------------------- | ------------------ | ---------------- |
+| **Aurelian Concord** | Smug corporate theocracy; shareholders are saints | Gold, white, cyan  | **Gildspire**    |
+| **Vex Freehold**     | Scrapper punk republic; votes by bar fight        | Red, black, orange | **Rivet Harbor** |
 
 A pilot picks a nation at character creation (switching nation = expansion feature, with cooldown/penalty).
 
 ### Story & tone
+
 - Crude adult comedy (Borderlands / Deadpool register): swearing, innuendo, gross-out, morally rotten commanders on both sides, self-mocking propaganda.
 - **No** explicit sexual content or nudity. Nothing sexual involving anything that reads as a minor.
 - 17+ age gate at signup. "Clean comms" toggle bleeps profanity.
@@ -39,21 +42,21 @@ A pilot picks a nation at character creation (switching nation = expansion featu
 
 Every pilot owns all four Frames and swaps in the hangar. Each Frame has its own loadout and skill kit. Frames are brick-built ("lego-like") from modular parts in v1; GLB loading kept as a seam for real models later.
 
-| Frame | Role | Handling | Signature |
-|---|---|---|---|
-| **Wasp** | Agile fighter | Fastest turn rate & speed, lowest HP | Highest Deflect stacking, burst evasion skills |
-| **Anvil** | Heavy bomber | Slow turns, high HP/armor | Siege barrages, carpet bombing, ground strike |
-| **Halo** | Support | Medium | Heals, shields, buffs, debuff fields, resurrection beacon |
+| Frame       | Role                  | Handling                                                      | Signature                                                                                                                                                                                |
+| ----------- | --------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Wasp**    | Agile fighter         | Fastest turn rate & speed, lowest HP                          | Highest Deflect stacking, burst evasion skills                                                                                                                                           |
+| **Anvil**   | Heavy bomber          | Slow turns, high HP/armor                                     | Siege barrages, carpet bombing, ground strike                                                                                                                                            |
+| **Halo**    | Support               | Medium                                                        | Heals, shields, buffs, debuff fields, resurrection beacon                                                                                                                                |
 | **Bulwark** | Armored hover-gunship | Hovers, **lands and drives on terrain** (hull in space), slow | **Siege mode** (grounded = full strength; airborne = hover-locked, weaker multipliers; rooted, first-person gunner view, Target lock for mortar, +damage/+range), artillery, area denial |
 
 ### Core kits (v1)
 
-| Frame | Core Skills |
-|---|---|
-| Wasp | **Overdrive** (frenzy: +fire rate, +speed, 90 s), **Phantom Weave** (evasion: +Deflect beyond cap, 90 s), **Hunter Sight** (faster lock, 60 s), Afterburn Dash, Ghost Skin, Flares |
-| Anvil | **Air Barrage Mode** / **Ground Strike Mode** (mutually exclusive bombing modes changing the Secondary), **Bulk Plating** (+max HP, 120 s), Carpet Drop, Iron Hide, Flares |
-| Halo | **Rally Field** (ally damage aura, 120 s), **Overcharge** (ally regen aura, 90 s), **Purge** (break locks on allies), Mend Beam, Aegis Bubble, Flares |
-| Bulwark | **Fortify** (−30% damage taken, 120 s), **Barrage Calibration** (+mortar damage/splash, 90 s), Siege Anchor, Scrap Wall, Flares |
+| Frame   | Core Skills                                                                                                                                                                        |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wasp    | **Overdrive** (frenzy: +fire rate, +speed, 90 s), **Phantom Weave** (evasion: +Deflect beyond cap, 90 s), **Hunter Sight** (faster lock, 60 s), Afterburn Dash, Ghost Skin, Flares |
+| Anvil   | **Air Barrage Mode** / **Ground Strike Mode** (mutually exclusive bombing modes changing the Secondary), **Bulk Plating** (+max HP, 120 s), Carpet Drop, Iron Hide, Flares         |
+| Halo    | **Rally Field** (ally damage aura, 120 s), **Overcharge** (ally regen aura, 90 s), **Purge** (break locks on allies), Mend Beam, Aegis Bubble, Flares                              |
+| Bulwark | **Fortify** (−30% damage taken, 120 s), **Barrage Calibration** (+mortar damage/splash, 90 s), Siege Anchor, Scrap Wall, Flares                                                    |
 
 Long buffs last 1–3 minutes and are recastable the moment they expire (no extra cooldown); active buffs show as timed icons in the HUD and as visual auras on the Ship. **Every Skill activation has its own animation** (Ship VFX + HUD flash).
 
@@ -61,21 +64,21 @@ Skill kits are our own designs covering these roles (no 1:1 renames of any exist
 
 ## 4. Controls
 
-| Input | Action |
-|---|---|
-| Mouse | Steers: ship turns toward the cursor at Frame turn rate. The **crosshair is fixed at screen centre (= Ship nose, where guns fire and missiles lock)**; a small arrow from centre shows the cursor direction |
-| W / S | Throttle up / down (stall floor on atmospheric maps) |
-| A / D | Strafe (visual bank) |
-| **Double-tap A / D** | **Barrel roll** — full 360° spin with a 25–35 m lateral displacement, 0.25 s invulnerability, costs fuel, 3 s cooldown. Not available while Grounded/Docked |
-| Q / E | Vertical strafe down / up |
-| Space | Booster (fuel, regenerates) |
-| Shift | Hover/brake (Bulwark: land when near ground) |
-| R | Launch from a Launch Deck |
-| LMB / RMB | Primary / secondary weapon |
-| 1–0 | 10-slot hotbar: skills, Flares (a skill), consumables (shield kit, repair kit, fuel cell) |
-| Tab | Cycle target (one locked target at a time unless a Skill says otherwise) |
-| Alt (hold) | Free-look |
-| Scroll | Camera zoom |
+| Input                | Action                                                                                                                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mouse                | Steers: ship turns toward the cursor at Frame turn rate. The **crosshair is fixed at screen centre (= Ship nose, where guns fire and missiles lock)**; a small arrow from centre shows the cursor direction |
+| W / S                | Throttle up / down (stall floor on atmospheric maps)                                                                                                                                                        |
+| A / D                | Strafe (visual bank)                                                                                                                                                                                        |
+| **Double-tap A / D** | **Barrel roll** — full 360° spin with a 25–35 m lateral displacement, 0.25 s invulnerability, costs fuel, 3 s cooldown. Not available while Grounded/Docked                                                 |
+| Q / E                | Vertical strafe down / up                                                                                                                                                                                   |
+| Space                | Booster (fuel, regenerates)                                                                                                                                                                                 |
+| Shift                | Hover/brake (Bulwark: land when near ground)                                                                                                                                                                |
+| R                    | Launch from a Launch Deck                                                                                                                                                                                   |
+| LMB / RMB            | Primary / secondary weapon                                                                                                                                                                                  |
+| 1–0                  | 10-slot hotbar: skills, Flares (a skill), consumables (shield kit, repair kit, fuel cell)                                                                                                                   |
+| Tab                  | Cycle target (one locked target at a time unless a Skill says otherwise)                                                                                                                                    |
+| Alt (hold)           | Free-look                                                                                                                                                                                                   |
+| Scroll               | Camera zoom                                                                                                                                                                                                 |
 
 Close third-person chase camera with slight lag. Mouse steering is deliberately damped (sensitivity setting + deadzone).
 
@@ -95,6 +98,7 @@ Close third-person chase camera with slight lag. Mouse steering is deliberately 
 - **Damage feedback**: floating damage numbers on hits dealt (deflected hits marked), hit markers.
 
 ### HUD
+
 - HP/shield/fuel panel top-left. Near the crosshair only Primary/Secondary rounds (icon + small weapon name). Incoming-missile warning with time-to-impact.
 - **Radar**: circular, heading-up, range per Frame (`radarRangeM`); blips above/below marked. Enemies beyond radar range are neither shown nor sent by the server.
 - **Crosshair range**: shows distance to what's under the aim; changes state when inside Primary range / missile lock range.
@@ -111,22 +115,23 @@ Close third-person chase camera with slight lag. Mouse steering is deliberately 
 - **Glory**: PvP currency & rank ladder (kills, assists, objectives, event wins; bonus for defending). Unlocks ranks, titles, cosmetics, sidegrade variants, command abilities in events.
 
 ### Currencies
-| Name | Purpose |
-|---|---|
-| **Credits** | Spending money (shop, upgrades) |
-| **Scrap** | Upgrade material (missions, mobs, events) |
-| **Glory** | PvP rank currency |
+
+| Name        | Purpose                                   |
+| ----------- | ----------------------------------------- |
+| **Credits** | Spending money (shop, upgrades)           |
+| **Scrap**   | Upgrade material (missions, mobs, events) |
+| **Glory**   | PvP rank currency                         |
 
 ## 7. Maps
 
 Each map has an **environment profile** (gravity, stall speed, ground behaviour) read by the flight model — new map types are mostly data.
 
-| Map | Profile | Content | Story |
-|---|---|---|---|
-| **Gildspire** / **Rivet Harbor** | City (safe zone) | Shop, hangar, mission board, enemy-proof | — |
-| **Rustwater Canyons** | Atmospheric, desert canyons | Low-altitude gorge dogfights; **Strategic Point war** | Ch. 1–3 |
-| **Shatterwave Archipelago** | Atmospheric, stormy ocean, floating islands, lightning hazards | **Base war**, **Capture the Flag** | Ch. 4–6 |
-| **The Graveyard Belt** | Space: zero-G, no stall, asteroids & capital wrecks; Bulwark siege-locks to hulls | **Mothership raid** | Ch. 7–10 |
+| Map                              | Profile                                                                           | Content                                               | Story    |
+| -------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------- | -------- |
+| **Gildspire** / **Rivet Harbor** | City (safe zone)                                                                  | Shop, hangar, mission board, enemy-proof              | —        |
+| **Rustwater Canyons**            | Atmospheric, desert canyons                                                       | Low-altitude gorge dogfights; **Strategic Point war** | Ch. 1–3  |
+| **Shatterwave Archipelago**      | Atmospheric, stormy ocean, floating islands, lightning hazards                    | **Base war**, **Capture the Flag**                    | Ch. 4–6  |
+| **The Graveyard Belt**           | Space: zero-G, no stall, asteroids & capital wrecks; Bulwark siege-locks to hulls | **Mothership raid**                                   | Ch. 7–10 |
 
 **Gate graph:** `Gildspire ↔ Canyons ↔ Archipelago ↔ Belt ↔ Rivet Harbor`, plus a shortcut gate from each city to its frontline. Each map has a home side per nation.
 
@@ -134,12 +139,12 @@ Each map has an **environment profile** (gravity, stall speed, ground behaviour)
 
 ## 8. Events (scheduled)
 
-| Event | Map | Win condition |
-|---|---|---|
-| Strategic Point war | Canyons | Hold majority of capture points when timer ends |
-| Base war | Archipelago | Destroy enemy forward base core |
-| Capture the Flag | Archipelago | First to N captures |
-| Mothership raid | Belt | Destroy (or defend) the nation mothership |
+| Event               | Map         | Win condition                                   |
+| ------------------- | ----------- | ----------------------------------------------- |
+| Strategic Point war | Canyons     | Hold majority of capture points when timer ends |
+| Base war            | Archipelago | Destroy enemy forward base core                 |
+| Capture the Flag    | Archipelago | First to N captures                             |
+| Mothership raid     | Belt        | Destroy (or defend) the nation mothership       |
 
 All award Glory; defenders get a bonus.
 
@@ -170,14 +175,14 @@ pnpm monorepo · Vite + React + react-three-fiber + drei + postprocessing · zus
 
 ## 12. Milestones
 
-| Milestone | Scope |
-|---|---|
-| **M0 — Starter repo** | Monorepo, client/server/shared, Docker Postgres + Drizzle schema stub, Leva + debug commands, `pnpm dev` |
+| Milestone               | Scope                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M0 — Starter repo**   | Monorepo, client/server/shared, Docker Postgres + Drizzle schema stub, Leva + debug commands, `pnpm dev`                                                                                                                                                                                                                                                                              |
 | **M1 — Vertical slice** | Rustwater Canyons; all 4 Frames flyable with distinct handling + Bulwark siege; primary tracers, homing missiles, barrel roll, Flares, Deflect, death/respawn; server-authoritative netcode with prediction, interpolation, lag compensation, lag sim; bots to 20/nation; HUD (HP/shield/fuel, crosshair, lead indicator, 10-slot hotbar, minimap); hangar stub (pick nation + Frame) |
-| **M2 — Economy** | Cities, shop, inventory, upgrades (+visuals), persistence, auth |
-| **M3 — Campaign** | Story missions & cutscenes ch. 1–10, levels 1–100, full skill kits |
-| **M4 — War** | Archipelago, Belt, 4 events, Glory rank |
-| Expansion | Trading, nation switch, more maps, 100-pilot war instances, gamepad, real models |
+| **M2 — Economy**        | Cities, shop, inventory, upgrades (+visuals), persistence, auth                                                                                                                                                                                                                                                                                                                       |
+| **M3 — Campaign**       | Story missions & cutscenes ch. 1–10, levels 1–100, full skill kits                                                                                                                                                                                                                                                                                                                    |
+| **M4 — War**            | Archipelago, Belt, 4 events, Glory rank                                                                                                                                                                                                                                                                                                                                               |
+| Expansion               | Trading, nation switch, more maps, 100-pilot war instances, gamepad, real models                                                                                                                                                                                                                                                                                                      |
 
 ## 13. Success criteria (M1)
 

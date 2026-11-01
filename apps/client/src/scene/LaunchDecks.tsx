@@ -16,17 +16,27 @@ function buildDeck(nation: NationId, R: number) {
   const n = 36;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
-    const x = Math.sin(a) * (R - 1), z = Math.cos(a) * (R - 1);
-    b.box(i % 3 === 0 ? 'secondary' : 'primary', [(2 * Math.PI * R) / n * 0.85, 1.4, 2.2], [x, 0.7, z], { rot: [0, a, 0], studs: i % 2 === 0 });
+    const x = Math.sin(a) * (R - 1),
+      z = Math.cos(a) * (R - 1);
+    b.box(
+      i % 3 === 0 ? 'secondary' : 'primary',
+      [((2 * Math.PI * R) / n) * 0.85, 1.4, 2.2],
+      [x, 0.7, z],
+      { rot: [0, a, 0], studs: i % 2 === 0 },
+    );
     // landing lights between the blocks
     const a2 = a + Math.PI / n;
-    b.box('accent', [0.5, 0.35, 0.5], [Math.sin(a2) * (R - 1), 1.5, Math.cos(a2) * (R - 1)], { rot: [0, a2, 0] });
+    b.box('accent', [0.5, 0.35, 0.5], [Math.sin(a2) * (R - 1), 1.5, Math.cos(a2) * (R - 1)], {
+      rot: [0, a2, 0],
+    });
   }
   // pad + inner lights
   b.cyl('dark', R * 0.82, 0.3, [0, 0.15, 0], { axis: 'y', seg: 40 });
   for (let i = 0; i < 16; i++) {
     const a = (i / 16) * Math.PI * 2;
-    b.box('accent', [1.2, 0.12, 0.5], [Math.sin(a) * R * 0.72, 0.36, Math.cos(a) * R * 0.72], { rot: [0, a, 0] });
+    b.box('accent', [1.2, 0.12, 0.5], [Math.sin(a) * R * 0.72, 0.36, Math.cos(a) * R * 0.72], {
+      rot: [0, a, 0],
+    });
   }
   // emblem (original, simple geometry)
   const e = R * 0.42;
@@ -70,12 +80,28 @@ function pillarMat(n: NationId) {
   let m = pillarMats.get(n);
   if (!m) {
     const c = new THREE.Color(PALETTES[n].accent).multiplyScalar(1.6);
-    m = new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false, side: THREE.DoubleSide });
+    m = new THREE.MeshBasicMaterial({
+      color: c,
+      transparent: true,
+      opacity: 0.22,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      fog: false,
+      toneMapped: false,
+      side: THREE.DoubleSide,
+    });
     pillarMats.set(n, m);
   }
   return m;
 }
-const ringMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#9dffc8').multiplyScalar(2.5), transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+const ringMat = new THREE.MeshBasicMaterial({
+  color: new THREE.Color('#9dffc8').multiplyScalar(2.5),
+  transparent: true,
+  opacity: 0.9,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  toneMapped: false,
+});
 
 function Deck({ nation, deck }: { nation: NationId; deck: LaunchDeck }) {
   const R = deck.radius;
@@ -90,14 +116,27 @@ function Deck({ nation, deck }: { nation: NationId; deck: LaunchDeck }) {
   const beacon = useRef<THREE.Mesh>(null);
   useFrame(({ clock, camera }) => {
     const s = world.ownId ? world.ships.get(world.ownId) : undefined;
-    const docked = !!s && s.docked && s.nation === nation &&
-      Math.hypot(s.pos[0] - deck.pos[0], s.pos[2] - deck.pos[2]) < R && Math.abs(s.pos[1] - deck.pos[1]) < 40;
+    const docked =
+      !!s &&
+      s.docked &&
+      s.nation === nation &&
+      Math.hypot(s.pos[0] - deck.pos[0], s.pos[2] - deck.pos[2]) < R &&
+      Math.abs(s.pos[1] - deck.pos[1]) < 40;
     if (ring.current) {
       ring.current.visible = docked;
       const p = 1 + 0.04 * Math.sin(clock.elapsedTime * 4);
       ring.current.scale.set(p, p, 1);
     }
-    if (beacon.current) { const d = camera.position.distanceTo(beacon.current.position.set(deck.pos[0], deck.pos[1] + 4, deck.pos[2])); beacon.current.position.set(0, 4, 0); const k = Math.min(14, Math.max(0.8, d * 0.0035)) * (1 + 0.1 * Math.sin(clock.elapsedTime * 2)); beacon.current.scale.set(k, 900, k); beacon.current.visible = d > BEACON_HIDE_NEAR_M; }
+    if (beacon.current) {
+      const d = camera.position.distanceTo(
+        beacon.current.position.set(deck.pos[0], deck.pos[1] + 4, deck.pos[2]),
+      );
+      beacon.current.position.set(0, 4, 0);
+      const k =
+        Math.min(14, Math.max(0.8, d * 0.0035)) * (1 + 0.1 * Math.sin(clock.elapsedTime * 2));
+      beacon.current.scale.set(k, 900, k);
+      beacon.current.visible = d > BEACON_HIDE_NEAR_M;
+    }
   });
   return (
     <group position={deck.pos}>
@@ -105,8 +144,22 @@ function Deck({ nation, deck }: { nation: NationId; deck: LaunchDeck }) {
         const g = geos[s];
         return g ? <mesh key={s} geometry={g} material={mats[s]} castShadow receiveShadow /> : null;
       })}
-      <mesh ref={ring} geometry={ringGeo(R)} material={ringMat} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.6, 0]} visible={false} />
-      <mesh ref={beacon} geometry={pillarGeo} material={pillarMat(nation)} position={[0, 4, 0]} scale={[1, 900, 1]} renderOrder={12} />
+      <mesh
+        ref={ring}
+        geometry={ringGeo(R)}
+        material={ringMat}
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.6, 0]}
+        visible={false}
+      />
+      <mesh
+        ref={beacon}
+        geometry={pillarGeo}
+        material={pillarMat(nation)}
+        position={[0, 4, 0]}
+        scale={[1, 900, 1]}
+        renderOrder={12}
+      />
     </group>
   );
 }

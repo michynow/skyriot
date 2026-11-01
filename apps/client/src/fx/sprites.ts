@@ -77,7 +77,11 @@ export class SpriteBatch {
   private C: Float32Array;
   private geo: THREE.InstancedBufferGeometry;
 
-  constructor(readonly cap: number, additive: boolean, mode: 'glow' | 'ring' | 'ringFlat' = 'glow') {
+  constructor(
+    readonly cap: number,
+    additive: boolean,
+    mode: 'glow' | 'ring' | 'ringFlat' = 'glow',
+  ) {
     this.geo = quadGeo(cap);
     this.A = (this.geo.getAttribute('iA') as THREE.BufferAttribute).array as Float32Array;
     this.B = (this.geo.getAttribute('iB') as THREE.BufferAttribute).array as Float32Array;
@@ -96,18 +100,39 @@ export class SpriteBatch {
     this.mesh.renderOrder = additive ? 20 : 19;
   }
 
-  push(x: number, y: number, z: number, size: number, r: number, g: number, b: number, a: number, sx = 0, sy = 0, sz = 0) {
+  push(
+    x: number,
+    y: number,
+    z: number,
+    size: number,
+    r: number,
+    g: number,
+    b: number,
+    a: number,
+    sx = 0,
+    sy = 0,
+    sz = 0,
+  ) {
     if (this.n >= this.cap) return;
     const i = this.n++ * 4;
-    this.A[i] = x; this.A[i + 1] = y; this.A[i + 2] = z; this.A[i + 3] = size;
-    this.B[i] = sx; this.B[i + 1] = sy; this.B[i + 2] = sz;
-    this.C[i] = r; this.C[i + 1] = g; this.C[i + 2] = b; this.C[i + 3] = a;
+    this.A[i] = x;
+    this.A[i + 1] = y;
+    this.A[i + 2] = z;
+    this.A[i + 3] = size;
+    this.B[i] = sx;
+    this.B[i + 1] = sy;
+    this.B[i + 2] = sz;
+    this.C[i] = r;
+    this.C[i + 1] = g;
+    this.C[i + 2] = b;
+    this.C[i + 3] = a;
   }
 
   /** Upload what was pushed this frame. */
   flush() {
     this.geo.instanceCount = this.n;
-    for (const k of ['iA', 'iB', 'iC']) (this.geo.getAttribute(k) as THREE.BufferAttribute).needsUpdate = true;
+    for (const k of ['iA', 'iB', 'iC'])
+      (this.geo.getAttribute(k) as THREE.BufferAttribute).needsUpdate = true;
     this.n = 0;
   }
 }
@@ -122,20 +147,53 @@ export class ParticlePool {
   }
 
   /** Emit one particle. `grav` > 0 pulls down, < 0 rises. Alpha fades out over life; size lerps s0 -> s1. */
-  emit(x: number, y: number, z: number, vx: number, vy: number, vz: number, life: number,
-    s0: number, s1: number, r: number, g: number, b: number, a: number, drag = 0, grav = 0,
-    er = r, eg = g, eb = b) {
+  emit(
+    x: number,
+    y: number,
+    z: number,
+    vx: number,
+    vy: number,
+    vz: number,
+    life: number,
+    s0: number,
+    s1: number,
+    r: number,
+    g: number,
+    b: number,
+    a: number,
+    drag = 0,
+    grav = 0,
+    er = r,
+    eg = g,
+    eb = b,
+  ) {
     if (this.n >= this.cap) return;
-    const o = this.n++ * S, d = this.d;
-    d[o] = x; d[o + 1] = y; d[o + 2] = z; d[o + 3] = vx; d[o + 4] = vy; d[o + 5] = vz;
-    d[o + 6] = life; d[o + 7] = life; d[o + 8] = s0; d[o + 9] = s1;
-    d[o + 10] = r; d[o + 11] = g; d[o + 12] = b; d[o + 13] = a; d[o + 14] = drag; d[o + 15] = grav;
-    d[o + 16] = er; d[o + 17] = eg; d[o + 18] = eb;
+    const o = this.n++ * S,
+      d = this.d;
+    d[o] = x;
+    d[o + 1] = y;
+    d[o + 2] = z;
+    d[o + 3] = vx;
+    d[o + 4] = vy;
+    d[o + 5] = vz;
+    d[o + 6] = life;
+    d[o + 7] = life;
+    d[o + 8] = s0;
+    d[o + 9] = s1;
+    d[o + 10] = r;
+    d[o + 11] = g;
+    d[o + 12] = b;
+    d[o + 13] = a;
+    d[o + 14] = drag;
+    d[o + 15] = grav;
+    d[o + 16] = er;
+    d[o + 17] = eg;
+    d[o + 18] = eb;
   }
 
   update(dt: number, batch: SpriteBatch) {
     const d = this.d;
-    for (let i = 0; i < this.n; ) {
+    for (let i = 0; i < this.n;) {
       const o = i * S;
       d[o + 6]! -= dt;
       if (d[o + 6]! <= 0) {
@@ -144,13 +202,25 @@ export class ParticlePool {
         continue;
       }
       const k = Math.max(0, 1 - d[o + 14]! * dt);
-      d[o + 3]! *= k; d[o + 4] = d[o + 4]! * k - d[o + 15]! * dt; d[o + 5]! *= k;
-      d[o]! += d[o + 3]! * dt; d[o + 1]! += d[o + 4]! * dt; d[o + 2]! += d[o + 5]! * dt;
+      d[o + 3]! *= k;
+      d[o + 4] = d[o + 4]! * k - d[o + 15]! * dt;
+      d[o + 5]! *= k;
+      d[o]! += d[o + 3]! * dt;
+      d[o + 1]! += d[o + 4]! * dt;
+      d[o + 2]! += d[o + 5]! * dt;
       const t = 1 - d[o + 6]! / d[o + 7]!;
       const f = 1 - t;
       const alpha = d[o + 13]! * f * f * Math.min(1, t * 12);
-      batch.push(d[o]!, d[o + 1]!, d[o + 2]!, d[o + 8]! + (d[o + 9]! - d[o + 8]!) * t,
-        d[o + 10]! + (d[o + 16]! - d[o + 10]!) * t, d[o + 11]! + (d[o + 17]! - d[o + 11]!) * t, d[o + 12]! + (d[o + 18]! - d[o + 12]!) * t, alpha);
+      batch.push(
+        d[o]!,
+        d[o + 1]!,
+        d[o + 2]!,
+        d[o + 8]! + (d[o + 9]! - d[o + 8]!) * t,
+        d[o + 10]! + (d[o + 16]! - d[o + 10]!) * t,
+        d[o + 11]! + (d[o + 17]! - d[o + 11]!) * t,
+        d[o + 12]! + (d[o + 18]! - d[o + 12]!) * t,
+        alpha,
+      );
       i++;
     }
   }

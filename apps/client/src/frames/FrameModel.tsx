@@ -22,10 +22,28 @@ export interface FrameModelProps {
 
 // Shared flame geometry: base at origin, tip along +Z (behind the ship).
 const diamondGeo = new THREE.OctahedronGeometry(1, 0);
-const diamondMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.4, 2.0), transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false });
-const flameGeo = new THREE.ConeGeometry(1, 1, 10, 1, true).translate(0, 0.5, 0).rotateX(Math.PI / 2);
+const diamondMat = new THREE.MeshBasicMaterial({
+  color: new THREE.Color(2.6, 2.4, 2.0),
+  transparent: true,
+  opacity: 0.85,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  toneMapped: false,
+  fog: false,
+});
+const flameGeo = new THREE.ConeGeometry(1, 1, 10, 1, true)
+  .translate(0, 0.5, 0)
+  .rotateX(Math.PI / 2);
 
-export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shipId }: FrameModelProps) {
+export function FrameModel({
+  frame,
+  nation,
+  tier,
+  upgrade,
+  sieged,
+  boosting,
+  shipId,
+}: FrameModelProps) {
   const data = useMemo(() => getModel(frame, tier, upgrade), [frame, tier, upgrade]);
   const mats = useMemo(() => getMaterials(nation, upgrade), [nation, upgrade]);
   const flame = useMemo(() => getFlameMaterials(nation), [nation]);
@@ -38,7 +56,17 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
   const padFlames = useRef<(THREE.Group | null)[]>([]);
   const hull = useRef<THREE.Group>(null);
   const hover = useRef<THREE.Group>(null);
-  const st = useRef({ boost: 0, siege: sieged ? 1 : 0, ground: 0, leg: 0, fin: 0, kick: 0, was: false, idle: 1, t: Math.random() * 100 });
+  const st = useRef({
+    boost: 0,
+    siege: sieged ? 1 : 0,
+    ground: 0,
+    leg: 0,
+    fin: 0,
+    kick: 0,
+    was: false,
+    idle: 1,
+    t: Math.random() * 100,
+  });
 
   useFrame((_, dt) => {
     const s = st.current;
@@ -47,7 +75,9 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
     const sg = sieged ?? (shipId ? !!world.ships.get(shipId)?.sieged : false);
     s.boost += ((b ? 1 : 0) - s.boost) * (1 - Math.exp(-8 * dt));
     s.siege += ((sg ? 1 : 0) - s.siege) * (1 - Math.exp(-2.5 * dt));
-    const gr0 = !!(shipId && (world.ships.get(shipId) as { grounded?: boolean } | undefined)?.grounded);
+    const gr0 = !!(
+      shipId && (world.ships.get(shipId) as { grounded?: boolean } | undefined)?.grounded
+    );
     s.leg += ((sg && gr0 ? 1 : 0) - s.leg) * (1 - Math.exp(-2.5 * dt));
     s.fin += ((sg && !gr0 ? 1 : 0) - s.fin) * (1 - Math.exp(-3 * dt));
     if (data.fins) {
@@ -63,7 +93,8 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
       for (let i = 0; i < data.pads.length; i++) {
         const g = padFlames.current[i];
         if (!g) continue;
-        const len = (0.5 + s.fin * 2.4) * (1 + 0.15 * Math.sin(s.t * 50 + i * 1.7)) * (1 - s.ground * 0.7);
+        const len =
+          (0.5 + s.fin * 2.4) * (1 + 0.15 * Math.sin(s.t * 50 + i * 1.7)) * (1 - s.ground * 0.7);
         g.scale.set(0.6 + s.fin * 0.3, 0.6 + s.fin * 0.3, len);
       }
     }
@@ -75,7 +106,8 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
       if (!g) continue;
       const e = data.engines[i]!;
       const flick = 1 + 0.14 * Math.sin(s.t * 47 + i * 2.1) + 0.08 * Math.sin(s.t * 91 + i);
-      const len = (0.55 + s.boost * 3.4) * e.r * 4 * flick * (sg ? 0.35 : 1) * (1 + s.kick * 0.7) * s.idle;
+      const len =
+        (0.55 + s.boost * 3.4) * e.r * 4 * flick * (sg ? 0.35 : 1) * (1 + s.kick * 0.7) * s.idle;
       const dm = diamonds.current[i];
       if (dm) {
         dm.visible = s.boost > 0.35;
@@ -87,7 +119,11 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
     const me = shipId ? world.ships.get(shipId) : undefined;
     const docked = !!me?.docked;
     const gr = docked || !!(me as { grounded?: boolean } | undefined)?.grounded;
-    const idle = docked ? 0.25 : gr ? 0.45 + Math.min(1, Math.hypot(me!.vel[0], me!.vel[2]) / 25) * 0.35 : 1;
+    const idle = docked
+      ? 0.25
+      : gr
+        ? 0.45 + Math.min(1, Math.hypot(me!.vel[0], me!.vel[2]) / 25) * 0.35
+        : 1;
     s.idle += (idle - s.idle) * (1 - Math.exp(-6 * dt));
     s.ground += ((gr ? 1 : 0) - s.ground) * (1 - Math.exp(-5 * dt));
     if (hover.current) hover.current.position.y = -0.55 * s.ground;
@@ -97,7 +133,8 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
     for (const g of flames.current) if (g) g.visible = hv;
     for (const g of fins.current) if (g) g.visible = hv;
     for (const g of padFlames.current) if (g) g.visible = hv;
-    if (spinner.current && data.spinner) spinner.current.rotation.z += dt * data.spinner.speed * (1 + s.boost);
+    if (spinner.current && data.spinner)
+      spinner.current.rotation.z += dt * data.spinner.speed * (1 + s.boost);
     if (data.legs) {
       for (let i = 0; i < data.legs.pivots.length; i++) {
         const g = legs.current[i];
@@ -115,13 +152,17 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
       <group ref={hull}>
         {SLOTS.map((slot) => {
           const g = data.body[slot];
-          return g ? <mesh key={slot} geometry={g} material={mats[slot]} castShadow receiveShadow /> : null;
+          return g ? (
+            <mesh key={slot} geometry={g} material={mats[slot]} castShadow receiveShadow />
+          ) : null;
         })}
         {data.hover && (
           <group ref={hover}>
             {SLOTS.map((slot) => {
               const g = data.hover![slot];
-              return g ? <mesh key={slot} geometry={g} material={mats[slot]} castShadow receiveShadow /> : null;
+              return g ? (
+                <mesh key={slot} geometry={g} material={mats[slot]} castShadow receiveShadow />
+              ) : null;
             })}
           </group>
         )}
@@ -150,9 +191,19 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
         ))}
       {data.pads &&
         data.pads.map((p, i) => (
-          <group key={`p${i}`} position={[p.pos[0], p.pos[1] - 0.1, p.pos[2]]} rotation={[Math.PI / 2, 0, 0]} ref={(el) => void (padFlames.current[i] = el)}>
+          <group
+            key={`p${i}`}
+            position={[p.pos[0], p.pos[1] - 0.1, p.pos[2]]}
+            rotation={[Math.PI / 2, 0, 0]}
+            ref={(el) => void (padFlames.current[i] = el)}
+          >
             <mesh geometry={flameGeo} material={flame.outer} renderOrder={5} />
-            <mesh geometry={flameGeo} material={flame.inner} scale={[0.55, 0.55, 0.6]} renderOrder={6} />
+            <mesh
+              geometry={flameGeo}
+              material={flame.inner}
+              scale={[0.55, 0.55, 0.6]}
+              renderOrder={6}
+            />
           </group>
         ))}
       {data.legs &&
@@ -164,12 +215,25 @@ export function FrameModel({ frame, nation, tier, upgrade, sieged, boosting, shi
             })}
           </group>
         ))}
-      {shipId && <BuffVisuals shipId={shipId} frame={frame} nation={nation} upgrade={upgrade} data={data} />}
+      {shipId && (
+        <BuffVisuals shipId={shipId} frame={frame} nation={nation} upgrade={upgrade} data={data} />
+      )}
       {data.engines.map((e, i) => (
         <group key={i} position={e.pos} ref={(el) => void (flames.current[i] = el)}>
           <mesh geometry={flameGeo} material={flame.outer} renderOrder={5} />
-          <mesh geometry={flameGeo} material={flame.inner} scale={[0.55, 0.55, 0.6]} renderOrder={6} />
-          <mesh ref={(el) => void (diamonds.current[i] = el)} geometry={diamondGeo} material={diamondMat} renderOrder={7} visible={false} />
+          <mesh
+            geometry={flameGeo}
+            material={flame.inner}
+            scale={[0.55, 0.55, 0.6]}
+            renderOrder={6}
+          />
+          <mesh
+            ref={(el) => void (diamonds.current[i] = el)}
+            geometry={diamondGeo}
+            material={diamondMat}
+            renderOrder={7}
+            visible={false}
+          />
         </group>
       ))}
     </group>

@@ -47,6 +47,7 @@ Hidden inside: Rapier world, static terrain heightfield collider, kinematic char
 `SimEvents` is a plain list (`projectileSpawned`, `hit`, `shipDestroyed`, `skillUsed`, …) the caller forwards to the network / FX. Sim never does I/O.
 
 **Rules**
+
 - Fixed tick `TICK_HZ = 30`. Never variable dt inside sim.
 - All tuning numbers come from `content/` (overridable at runtime by the dev Leva panel via `sim.tuning`).
 - Deterministic given same inputs & same Rapier build. Use `@dimforge/rapier3d-compat` everywhere.
@@ -96,11 +97,11 @@ Hidden: part catalogue, instanced meshes, nation palette, tier/upgrade → extra
 
 ## 3. Netcode
 
-| Channel | Direction | Rate | Content |
-|---|---|---|---|
-| `input` | C → S | every client tick (30 Hz) | `PilotInput { seq, aim: dir vec3, throttle, strafe, vertical, boost, brake, fire1, fire2, hotbar, rollL, rollR }` |
-| `snapshot` | S → C | 20 Hz | server tick, server time, per-Ship compact state, `lastProcessedSeq` for the receiving client |
-| `events` | S → C | on occurrence | `SimEvents` (Projectile spawns, hits, deaths, Skill casts) |
+| Channel    | Direction | Rate                      | Content                                                                                                           |
+| ---------- | --------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `input`    | C → S     | every client tick (30 Hz) | `PilotInput { seq, aim: dir vec3, throttle, strafe, vertical, boost, brake, fire1, fire2, hotbar, rollL, rollR }` |
+| `snapshot` | S → C     | 20 Hz                     | server tick, server time, per-Ship compact state, `lastProcessedSeq` for the receiving client                     |
+| `events`   | S → C     | on occurrence             | `SimEvents` (Projectile spawns, hits, deaths, Skill casts)                                                        |
 
 - Messages are compact plain objects encoded with Colyseus' msgpack (`room.send` / `client.send`). We **do not** use Colyseus Schema state sync for Ships — our own snapshot gives control over rate, quantization, and per-client `lastProcessedSeq`. ponytail: full snapshot of all Ships to every client; ~60 Ships × ~40 B × 20 Hz ≈ 48 KB/s. Add interest management (distance-tiered rates) when bandwidth bites.
 - Projectiles: server sends spawn (origin, dir, speed, type, tick). Clients simulate their visuals locally; server sends `hit` / `expire` authoritatively.
@@ -140,12 +141,12 @@ Postgres via Drizzle. Server is the only writer. Tables: `account`, `pilot`, `it
 
 ## 7. Ownership map (for parallel work)
 
-| Area | Paths |
-|---|---|
-| Sim + server | `packages/shared/src/{sim,net}`, `apps/server/**` |
-| Rendering & art | `apps/client/src/{scene,frames,fx}`, `packages/shared/src/terrain` (read-only consumer) |
-| HUD, UI, input, client net, dev tools | `apps/client/src/{hud,ui,input,net,dev}`, `apps/client/src/App.tsx`, `Game.tsx` |
-| Shared contracts (orchestrator) | `packages/shared/src/{types.ts,content/**}` — change only by agreement |
+| Area                                  | Paths                                                                                   |
+| ------------------------------------- | --------------------------------------------------------------------------------------- |
+| Sim + server                          | `packages/shared/src/{sim,net}`, `apps/server/**`                                       |
+| Rendering & art                       | `apps/client/src/{scene,frames,fx}`, `packages/shared/src/terrain` (read-only consumer) |
+| HUD, UI, input, client net, dev tools | `apps/client/src/{hud,ui,input,net,dev}`, `apps/client/src/App.tsx`, `Game.tsx`         |
+| Shared contracts (orchestrator)       | `packages/shared/src/{types.ts,content/**}` — change only by agreement                  |
 
 ## 8. Scaling path (not built now)
 

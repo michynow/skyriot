@@ -14,5 +14,9 @@ export function App() {
       </Suspense>
     );
   }
-  return options ? <Game options={options} onExit={() => setOptions(null)} /> : <Lobby onLaunch={setOptions} />;
+  return options ? (
+    <Game options={options} onExit={() => setOptions(null)} />
+  ) : (
+    <Lobby onLaunch={setOptions} />
+  );
 }
