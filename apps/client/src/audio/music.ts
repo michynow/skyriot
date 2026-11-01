@@ -1,241 +1,637 @@
-import type { NationId } from '@skyriot/shared';
+import type { MapDef, NationId } from '@skyriot/shared';
+import { MAP_THEMES, THEMES, type N, type SectionDef, type ThemeDef } from './score';
 
 /**
- * Generative war music: dark synthwave / industrial in A minor. A lookahead scheduler (setInterval only
- * wakes it; every note is placed on the AudioContext clock) renders a 4-bar loop of 16th steps. Layers
- * crossfade with an intensity value: 0 idle (pads + bass), ~0.5 enemies near, 1 combat (full drums + lead).
+ * Score player for the composed themes in score.ts. A lookahead scheduler (setInterval only wakes it; every
+ * note is placed on the AudioContext clock) renders one bar at a time of the current section. The lobby plays
+ * the nation's title theme, the game plays the loaded Map's theme (opening with its 2-bar sting). Intensity
+ * (0 idle, ~0.5 enemies near, 1 combat) works twice: layer gains crossfade continuously, and the form jumps
+ * into its fight sections (pre-chorus, chorus, bridge, key-lifted chorus) when combat starts and back out to
+ * the calm ones when it ends.
  */
 export type MusicMode = 'lobby' | 'game';
 
-const LOOKAHEAD_S = 0.2;
+const LOOKAHEAD_S = 0.3;
 const TICK_MS = 25;
+/** Intensity the lobby plays at (title themes have no fight sections; this sets drum/lead levels). */
+const LOBBY_I = 0.6;
+const HOT_I = 0.75;
+const DEFAULT_ARP = [0, 1, 2, 3, 4, 3, 2, 1, 0, 1, 2, 3, 4, 3, 2, 1];
 const hz = (m: number) => 440 * 2 ** ((m - 69) / 12);
-
-interface Theme {
-  chords: number[][];
-  roots: number[];
-  /** [step, midi, lengthInSteps] over 64 steps */
-  lead: [number, number, number][];
-  gritty: boolean;
-}
-const THEMES: Record<NationId, Theme> = {
-  // Concord: brighter, heroic (Dorian-flavoured lead over i-VI-III-VII)
-  concord: {
-    chords: [[57, 60, 64], [53, 57, 60], [55, 60, 64], [55, 59, 62]],
-    roots: [45, 41, 48, 43],
-    lead: [[0, 72, 3], [4, 76, 2], [6, 74, 2], [8, 72, 4], [16, 69, 3], [20, 72, 2], [22, 76, 2], [24, 77, 4], [32, 76, 3], [36, 79, 2], [38, 76, 2], [40, 72, 4], [48, 74, 3], [52, 71, 2], [54, 74, 2], [56, 67, 6]],
-    gritty: false,
-  },
-  // Vex: grittier, Phrygian b2 and distortion
-  vex: {
-    chords: [[57, 60, 64], [58, 62, 65], [57, 60, 64], [55, 58, 62]],
-    roots: [45, 46, 45, 43],
-    lead: [[0, 69, 3], [4, 70, 2], [6, 69, 2], [8, 67, 4], [16, 69, 3], [20, 72, 2], [22, 70, 2], [24, 69, 5], [32, 69, 2], [35, 70, 2], [38, 72, 2], [40, 70, 4], [48, 67, 3], [52, 69, 2], [54, 66, 2], [56, 69, 6]],
-    gritty: true,
-  },
-};
-const BASS_PATTERN = [0, 0, 12, 0, 0, 7, 12, 0];
-const OSTINATO_STEPS = [0, 3, 6, 8, 11, 14];
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+const ramp = (v: number, a: number, b: number) => clamp01((v - a) / (b - a));
 
 export interface Music {
   start(): void;
   setIntensity(v: number): void;
   setMode(mode: MusicMode): void;
   setNation(n: NationId): void;
-  stats(): { steps: number; intensity: number; mode: MusicMode };
+  setMap(map: MapDef | null): void;
+  stats(): { steps: number; intensity: number; mode: MusicMode; theme: string; section: string };
+}
+
+interface Voice {
+  type?: OscillatorType;
+  cut?: number;
+  atk?: number;
+  rel?: number;
+  det?: number[];
+  /** Filter closes over the note (plucks, palm mutes). */
+  pluck?: boolean;
+  /** Delayed vibrato depth in cents. */
+  vib?: number;
+  /** Echo / reverb send amounts. */
+  dly?: number;
+  rev?: number;
 }
 
 export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer): Music {
   let mode: MusicMode = 'lobby';
   let nation: NationId = 'concord';
+  let sky: MapDef['env']['sky'] | null = null;
   let intensity = 0;
-  let smooth = 0;
-  let nextTime = 0;
-  let step = 0;
+  let theme: ThemeDef = THEMES['title-concord']!;
+  let sectionIdx = 0;
+  let barInSection = 0;
+  let nextBar = 0;
   let steps = 0;
+  /** Layers play at fight level during a sting, whatever the intensity. */
+  let stingBoost = false;
   let timer: ReturnType<typeof setInterval> | null = null;
 
-  // Shared FX: ping-pong-ish delay for pads / lead.
-  const delay = ac.createDelay(1);
+  // Shared FX: tempo-synced dotted-8th echo and a long noise-tail reverb.
+  const delay = ac.createDelay(2);
   const fb = ac.createGain();
   const dlp = ac.createBiquadFilter();
   const delayOut = ac.createGain();
   dlp.type = 'lowpass';
-  dlp.frequency.value = 2200;
-  fb.gain.value = 0.38;
-  delayOut.gain.value = 0.45;
+  dlp.frequency.value = 2600;
+  delayOut.gain.value = 0.5;
   delay.connect(dlp).connect(fb).connect(delay);
   dlp.connect(delayOut).connect(out);
-
-  const shaper = ac.createWaveShaper();
-  const curve = new Float32Array(1024);
-  for (let i = 0; i < curve.length; i++) {
-    const x = (i / (curve.length - 1)) * 2 - 1;
-    curve[i] = Math.tanh(x * 5);
+  const verb = ac.createConvolver();
+  const ir = ac.createBuffer(2, Math.floor(ac.sampleRate * 3), ac.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3;
   }
-  shaper.curve = curve;
-  shaper.connect(out);
+  verb.buffer = ir;
+  const verbOut = ac.createGain();
+  verbOut.gain.value = 0.6;
+  verb.connect(verbOut).connect(out);
 
-  const mk = () => {
+  // Pads, strings, arps and bass sit on a bus that ducks on every kick (theme.pump), so drums punch through.
+  const pumpBus = ac.createGain();
+  pumpBus.connect(out);
+  const mk = (dest: AudioNode) => {
     const g = ac.createGain();
     g.gain.value = 0;
-    g.connect(out);
+    g.connect(dest);
     return g;
   };
-  const layers = { pad: mk(), bass: mk(), kick: mk(), snare: mk(), hat: mk(), ost: mk(), lead: mk() };
-  const cur: Record<keyof typeof layers, number> = { pad: 0, bass: 0, kick: 0, snare: 0, hat: 0, ost: 0, lead: 0 };
-  const tgt: Record<keyof typeof layers, number> = { ...cur };
+  const layers = {
+    pad: mk(pumpBus),
+    orch: mk(pumpBus),
+    bass: mk(pumpBus),
+    arp: mk(pumpBus),
+    drums: mk(out),
+    gtr: mk(out),
+    lead: mk(out),
+  };
+  type Layer = keyof typeof layers;
 
-  const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-  function retarget() {
-    const I = intensity;
-    const lobby = mode === 'lobby';
-    tgt.pad = lobby ? 0.55 : 0.4;
-    tgt.bass = lobby ? 0.12 : 0.3 + 0.3 * I;
-    tgt.kick = lobby ? 0 : clamp01((I - 0.3) / 0.35) * 0.9;
-    tgt.snare = lobby ? 0 : clamp01((I - 0.5) / 0.35) * 0.55;
-    tgt.hat = lobby ? 0 : clamp01((I - 0.45) / 0.4) * 0.35;
-    tgt.ost = lobby ? 0.1 : clamp01((I - 0.3) / 0.4) * 0.45;
-    tgt.lead = lobby ? 0.22 : clamp01((I - 0.65) / 0.3) * 0.5;
+  const shaperOf = (k: number) => {
+    const s = ac.createWaveShaper();
+    const curve = new Float32Array(1024);
+    for (let i = 0; i < curve.length; i++)
+      curve[i] = Math.tanh(((i / (curve.length - 1)) * 2 - 1) * k);
+    s.curve = curve;
+    s.oversample = '2x';
+    return s;
+  };
+  /** Drive into a cabinet-ish lowpass with a mid bump, trimmed down from the drive's near-full-scale output. */
+  const amp = (k: number, trim: number, dest: AudioNode) => {
+    const drive = shaperOf(k);
+    const cab = ac.createBiquadFilter();
+    cab.type = 'lowpass';
+    cab.frequency.value = 4200;
+    const mid = ac.createBiquadFilter();
+    mid.type = 'peaking';
+    mid.frequency.value = 1500;
+    mid.gain.value = 4;
+    const g = ac.createGain();
+    g.gain.value = trim;
+    drive.connect(cab).connect(mid).connect(g).connect(dest);
+    return drive;
+  };
+  // Rhythm guitar: voices sum *before* the drive so power chords intermodulate. The lead guitar has its own amp.
+  const gtrDrive = amp(9, 0.12, layers.gtr);
+  const leadDrive = amp(6, 0.16, layers.lead);
+  // Gritty themes push the bass through mild drive.
+  const bassGrit = shaperOf(3);
+  bassGrit.connect(layers.bass);
+
+  const effI = () => (mode === 'lobby' ? LOBBY_I : intensity);
+  function retarget(tc = 0.7) {
+    const I = stingBoost ? Math.max(effI(), 0.9) : effI();
+    const tgt: Record<Layer, number> = {
+      pad: 0.8 - 0.2 * I,
+      orch: 0.8,
+      bass: 0.5 + 0.6 * ramp(I, 0.1, 0.6),
+      drums: 0.3 + 0.8 * ramp(I, 0.3, 0.9),
+      gtr: 0.25 + 0.75 * ramp(I, 0.1, 0.9),
+      arp: 0.55 + 0.45 * ramp(I, 0.1, 0.6),
+      lead: 0.6 + 0.5 * ramp(I, 0.4, 1),
+    };
     const now = ac.currentTime;
-    for (const k of Object.keys(layers) as (keyof typeof layers)[]) layers[k].gain.setTargetAtTime(tgt[k], now, 0.7);
+    for (const k of Object.keys(layers) as Layer[]) layers[k].gain.setTargetAtTime(tgt[k], now, tc);
   }
 
-  function env(g: GainNode, t: number, peak: number, atk: number, dur: number) {
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + atk);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  function send(src: AudioNode, node: AudioNode, amount: number) {
+    if (amount <= 0) return;
+    const g = ac.createGain();
+    g.gain.value = amount;
+    src.connect(g).connect(node);
   }
-  function note(dest: AudioNode, type: OscillatorType, f: number, t: number, dur: number, peak: number, cutoff: number, send = 0, atk = 0.01) {
-    const o = ac.createOscillator();
+  /** One enveloped, filtered note; `det` stacks detuned oscillators into one voice (supersaw, pad). */
+  function tone(dest: AudioNode, m: number, t: number, dur: number, peak: number, v: Voice = {}) {
+    const atk = v.atk ?? 0.01;
+    const rel = v.rel ?? 0.08;
+    const cut = v.cut ?? 3000;
+    const hold = t + Math.max(atk, dur);
     const g = ac.createGain();
     const lp = ac.createBiquadFilter();
-    o.type = type;
-    o.frequency.value = f;
     lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(cutoff, t);
-    lp.frequency.exponentialRampToValueAtTime(Math.max(120, cutoff * 0.3), t + dur);
-    env(g, t, peak, atk, dur);
-    o.connect(lp).connect(g).connect(dest);
-    if (send) {
-      const s = ac.createGain();
-      s.gain.value = send;
-      g.connect(s).connect(delay);
+    lp.frequency.setValueAtTime(cut, t);
+    if (v.pluck) lp.frequency.exponentialRampToValueAtTime(Math.max(150, cut * 0.25), t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + atk);
+    g.gain.setValueAtTime(peak, hold);
+    g.gain.setTargetAtTime(0.0001, hold, rel / 3);
+    lp.connect(g).connect(dest);
+    send(g, delay, v.dly ?? 0);
+    send(g, verb, v.rev ?? 0);
+    const end = hold + rel + 0.05;
+    let lfoGain: GainNode | null = null;
+    if (v.vib && dur > 0.3) {
+      const lfo = ac.createOscillator();
+      lfoGain = ac.createGain();
+      lfo.frequency.value = 5.5;
+      lfoGain.gain.setValueAtTime(0, t);
+      lfoGain.gain.linearRampToValueAtTime(v.vib, t + Math.min(0.5, dur * 0.6));
+      lfo.connect(lfoGain);
+      lfo.start(t);
+      lfo.stop(end);
     }
-    o.start(t);
-    o.stop(t + dur + 0.05);
+    for (const det of v.det ?? [0]) {
+      const o = ac.createOscillator();
+      o.type = v.type ?? 'sawtooth';
+      o.frequency.value = hz(m);
+      o.detune.value = det;
+      if (lfoGain) lfoGain.connect(o.detune);
+      o.connect(lp);
+      o.start(t);
+      o.stop(end);
+    }
   }
-  function hit(dest: AudioNode, t: number, dur: number, peak: number, ftype: BiquadFilterType, f: number) {
+  function bell(dest: AudioNode, m: number, t: number, peak: number, rev: number) {
+    for (const [ratio, p, d] of [
+      [1, peak, 1.6],
+      [2.76, peak * 0.35, 0.5],
+      [5.4, peak * 0.12, 0.25],
+    ] as const) {
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = 'sine';
+      o.frequency.value = hz(m) * ratio;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(p, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+      o.connect(g).connect(dest);
+      send(g, verb, rev);
+      send(g, delay, rev * 0.5);
+      o.start(t);
+      o.stop(t + d + 0.05);
+    }
+  }
+  function hit(
+    t: number,
+    dur: number,
+    peak: number,
+    ftype: BiquadFilterType,
+    f: number,
+    rev = 0,
+    sweepTo = 0,
+  ) {
     const s = ac.createBufferSource();
     const g = ac.createGain();
-    const f1 = ac.createBiquadFilter();
+    const flt = ac.createBiquadFilter();
     s.buffer = noise;
-    f1.type = ftype;
-    f1.frequency.value = f;
-    env(g, t, peak, 0.002, dur);
-    s.connect(f1).connect(g).connect(dest);
+    flt.type = ftype;
+    flt.frequency.setValueAtTime(f, t);
+    if (sweepTo) flt.frequency.exponentialRampToValueAtTime(sweepTo, t + dur);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + (sweepTo ? dur * 0.95 : 0.002));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(flt).connect(g).connect(layers.drums);
+    send(g, verb, rev);
     s.start(t, Math.random() * 1.5);
     s.stop(t + dur + 0.05);
   }
+  /** Pitched drum body: a sine that drops from `from` to `to` Hz. */
+  function thump(
+    t: number,
+    from: number,
+    to: number,
+    drop: number,
+    decay: number,
+    peak: number,
+    rev = 0,
+  ) {
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.frequency.setValueAtTime(from, t);
+    o.frequency.exponentialRampToValueAtTime(to, t + drop);
+    g.gain.setValueAtTime(peak, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+    o.connect(g).connect(layers.drums);
+    send(g, verb, rev);
+    o.start(t);
+    o.stop(t + decay + 0.05);
+  }
+  function kick(t: number, peak: number) {
+    thump(t, 170, 45, 0.11, 0.42, peak);
+    hit(t, 0.012, peak * 0.5, 'highpass', 3000);
+    if (theme.pump > 0) {
+      pumpBus.gain.setValueAtTime(1 - theme.pump, t);
+      pumpBus.gain.setTargetAtTime(1, t + 0.02, 0.07);
+    }
+  }
+  function snare(t: number, peak: number, rev: number) {
+    hit(t, 0.22, peak, 'bandpass', 1800, rev);
+    hit(t, 0.08, peak * 0.6, 'highpass', 5000);
+    thump(t, 260, 180, 0.04, 0.12, peak * 0.55);
+  }
+  const tom = (t: number, m: number, peak: number) =>
+    thump(t, hz(m) * 1.5, hz(m), 0.08, 0.35, peak, 0.3);
+  /** Chorus downbeat: crash (or thunder) plus a sub drop. */
+  function impact(t: number) {
+    if (theme.thunder) hit(t, 3, 0.5, 'lowpass', 260, 0.6);
+    else hit(t, 1.8, 0.35, 'highpass', 5000, 0.4);
+    thump(t, 70, 32, 0.8, 1.2, 0.7);
+  }
 
-  function scheduleStep(s: number, t: number, stepDur: number) {
-    const th = THEMES[nation];
-    const bar = Math.floor(s / 16) % 4;
-    const ss = s % 16;
-    const chord = th.chords[bar]!;
-    const root = th.roots[bar]!;
-    const lobby = mode === 'lobby';
-    const active = (k: keyof typeof layers) => tgt[k] > 0.01 || cur[k] > 0.015;
-    const bassDest = th.gritty ? shaper : layers.bass;
-
-    if (ss === 0 && active('pad')) {
-      const barDur = stepDur * 16;
-      const depth = lobby ? 0.15 : 0.15 + 0.5 * intensity;
-      for (const m of chord) {
-        for (const det of [-7, 7]) {
-          const o = ac.createOscillator();
-          const lp = ac.createBiquadFilter();
-          const g = ac.createGain();
-          o.type = 'sawtooth';
-          o.frequency.value = hz(m);
-          o.detune.value = det;
-          lp.type = 'lowpass';
-          lp.frequency.value = lobby ? 700 : 900 + 900 * intensity;
-          g.gain.setValueAtTime(0.0001, t);
-          g.gain.exponentialRampToValueAtTime(0.14, t + 0.3);
-          // gated pulsing on 8ths
-          for (let i = 0; i < 8; i++) {
-            const t0 = t + (i * barDur) / 8;
-            g.gain.setValueAtTime(0.14, Math.max(t + 0.3, t0));
-            g.gain.linearRampToValueAtTime(0.14 * (1 - depth), t0 + (0.75 * barDur) / 8);
-          }
-          g.gain.setValueAtTime(0.14 * (1 - depth), t + barDur - 0.05);
-          g.gain.exponentialRampToValueAtTime(0.0001, t + barDur + 0.25);
-          o.connect(lp).connect(g).connect(layers.pad);
-          g.connect(delay);
-          o.start(t);
-          o.stop(t + barDur + 0.3);
+  function drums(
+    sec: SectionDef,
+    t: number,
+    s16: number,
+    I: number,
+    lastBar: boolean,
+    rev: number,
+  ) {
+    const style = sec.drums;
+    const hot = I > 0.85;
+    for (let i = 0; i < 16; i++) {
+      const ti = t + i * s16;
+      if (style === 'half') {
+        if (i === 0 || i === 10) kick(ti, 0.9);
+        if (i === 8) snare(ti, 0.8, rev);
+        if (i % 2 === 0 || hot) hit(ti, 0.05, i % 4 === 0 ? 0.35 : 0.22, 'highpass', 8000);
+      } else if (style === 'drive') {
+        if ([0, 8, 10].includes(i) || (hot && [3, 6, 14].includes(i))) kick(ti, 1);
+        if (i === 4 || i === 12) snare(ti, 0.9, rev * 0.5);
+        if (i === 14) hit(ti, 0.18, 0.35, 'highpass', 6500);
+        else if (i % 2 === 0 || hot) hit(ti, 0.05, i % 4 === 2 ? 0.4 : 0.25, 'highpass', 8000);
+      } else if (style === 'build') {
+        if (i % 4 === 0) kick(ti, 0.85);
+        if (lastBar ? true : i === 8 || i === 12)
+          snare(ti, lastBar ? 0.2 + (0.7 * i) / 15 : 0.7, rev);
+      } else if (style === 'roll') {
+        if (i === 0) kick(ti, 1);
+        if (i >= 8 || lastBar) tom(ti, 52 - (i % 8) * 2, 0.6);
+      } else if (style === 'pulse') {
+        if (i % 4 === 0) kick(ti, 0.85);
+        if (i % 4 === 2) hit(ti, 0.14, 0.32, 'highpass', 7000, 0.2);
+        if (I > 0.6 && (i === 4 || i === 12)) {
+          hit(ti, 0.16, 0.7, 'bandpass', 1300, rev);
+          hit(ti + 0.012, 0.1, 0.4, 'bandpass', 1500);
         }
-      }
-    }
-    if (ss % 2 === 0 && active('bass')) {
-      const semis = BASS_PATTERN[(ss / 2) % 8]!;
-      note(bassDest, 'sawtooth', hz(root + semis), t, stepDur * 1.8, 0.5, lobby ? 350 : 700 + 600 * intensity);
-      if (!lobby) note(layers.bass, 'square', hz(root - 12), t, stepDur * 1.8, 0.35, 300);
-    }
-    if (!lobby) {
-      if (ss % 4 === 0 && active('kick')) {
-        const o = ac.createOscillator();
-        const g = ac.createGain();
-        o.frequency.setValueAtTime(160, t);
-        o.frequency.exponentialRampToValueAtTime(42, t + 0.14);
-        env(g, t, 1, 0.003, 0.28);
-        o.connect(g).connect(layers.kick);
-        o.start(t);
-        o.stop(t + 0.3);
-      }
-      if ((ss === 4 || ss === 12) && active('snare')) {
-        hit(layers.snare, t, 0.2, 0.8, 'bandpass', 1900);
-        note(layers.snare, 'triangle', 190, t, 0.12, 0.5, 1500);
-      }
-      if (active('hat') && (ss % 4 === 2 || (intensity > 0.85 && ss % 2 === 1))) hit(layers.hat, t, 0.05, 0.5, 'highpass', 8000);
-      if (active('ost') && OSTINATO_STEPS.includes(ss)) {
-        const m = chord[OSTINATO_STEPS.indexOf(ss) % chord.length]! + 12;
-        note(th.gritty ? shaper : layers.ost, 'square', hz(m), t, stepDur * 1.4, 0.3, 2400, 0.12, 0.003);
-      }
-    } else if (ss % 4 === 0 && active('ost')) {
-      // calm hangar arpeggio
-      note(layers.ost, 'sine', hz(chord[(ss / 4) % chord.length]! + 12), t, stepDur * 6, 0.35, 3000, 0.3, 0.02);
-    }
-    if (active('lead')) {
-      const bs = s % 64;
-      for (const [ls, m, len] of th.lead) {
-        if (ls === bs) note(th.gritty ? shaper : layers.lead, th.gritty ? 'sawtooth' : 'square', hz(m), t, stepDur * len * 0.95, 0.35, th.gritty ? 1800 : 3200, 0.4, 0.015);
+        if (hot && i % 2 === 1) hit(ti, 0.03, 0.15, 'highpass', 9000);
+      } else if (style === 'taiko') {
+        // Big low drums in a hall instead of a kit: accents on 1 and the "and" of 3.
+        if (i === 0 || i === 10) tom(ti, 33, 1);
+        if (i === 3 || i === 6) tom(ti, 36, 0.6);
+        if (i === 8 || i === 12) tom(ti, 43, 0.75);
+        if (hot && (i === 13 || i === 14 || i === 15)) tom(ti, 48, 0.45);
+        if (i === 0 || i === 10) kick(ti, 0.6);
+      } else if (style === 'hits') {
+        if (i === 0 || i === 6 || i === 8) {
+          kick(ti, 1);
+          tom(ti, i === 6 ? 43 : 36, 0.8);
+        }
+        if (lastBar && i >= 12) snare(ti, 0.4 + 0.1 * (i - 12), rev);
       }
     }
   }
 
-  function tick() {
-    const bpm = mode === 'lobby' ? 92 : 122;
-    const stepDur = 60 / bpm / 4;
-    // mirror the layer smoothing so we know when a layer is audibly silent
-    const dt = TICK_MS / 1000;
-    for (const k of Object.keys(cur) as (keyof typeof cur)[]) cur[k] += (tgt[k] - cur[k]) * (1 - Math.exp(-dt / 0.7));
-    smooth += (intensity - smooth) * 0.1;
-    if (ac.state !== 'running') return;
-    if (nextTime < ac.currentTime) nextTime = ac.currentTime + 0.05;
-    while (nextTime < ac.currentTime + LOOKAHEAD_S) {
-      scheduleStep(step, nextTime, stepDur);
-      nextTime += stepDur;
-      step = (step + 1) % 64;
-      steps++;
+  /** Hook notes falling in [w0, w0 + 4) beats of the hook timeline scaled by `scale`. */
+  function hookBar(
+    hook: N[],
+    w0: number,
+    scale: number,
+    each: (n: N, beatInBar: number, durBeats: number) => void,
+  ) {
+    for (const n of hook) {
+      const b = n[1] * scale - w0;
+      if (b >= 0 && b < 4) each(n, b, n[2] * scale);
     }
+  }
+  /** The theme's signature lead voice. */
+  function leadNote(th: ThemeDef, m: number, t: number, dur: number, gain: number, I: number) {
+    const sp = th.space;
+    if (th.voice === 'guitar') {
+      tone(leadDrive, m, t, dur, 0.3 * gain, {
+        cut: 2600,
+        atk: 0.008,
+        rel: 0.2,
+        det: [-4, 4],
+        vib: 22,
+        rev: 0.25,
+        dly: 0.15,
+      });
+    } else if (th.voice === 'choir') {
+      bell(layers.lead, m + 12, t, 0.05 * gain, 0.8);
+      tone(layers.lead, m, t, dur, 0.1 * gain, {
+        type: 'triangle',
+        cut: 1800,
+        atk: 0.12,
+        rel: 0.8,
+        det: [-8, 8],
+        vib: 10,
+        rev: 0.8,
+        dly: 0.25,
+      });
+    } else if (th.voice === 'synth') {
+      tone(layers.lead, m, t, dur, 0.06 * gain, {
+        type: 'square',
+        cut: 2400 + 1600 * I,
+        atk: 0.01,
+        rel: 0.3,
+        det: [-6, 6],
+        vib: 16,
+        dly: 0.45 + 0.2 * sp,
+        rev: 0.35,
+      });
+    } else {
+      tone(layers.lead, m, t, dur, 0.045 * gain, {
+        cut: 3200 + 1500 * I,
+        atk: 0.015,
+        rel: 0.25,
+        det: [-14, 0, 14],
+        dly: 0.25 + 0.2 * sp,
+        rev: 0.25 + 0.3 * sp,
+      });
+    }
+  }
+
+  function pickTheme(): ThemeDef {
+    if (mode === 'game' && sky) return MAP_THEMES[sky];
+    return THEMES[`title-${nation}`] ?? THEMES['title-concord']!;
+  }
+  function nextSection(from: number, I: number): number {
+    const n = theme.sections.length;
+    let i = from;
+    for (let k = 0; k < n; k++) {
+      i = i + 1 >= n ? theme.loopFrom : i + 1;
+      if ((theme.sections[i]!.minI ?? 0) <= I) return i;
+    }
+    return theme.loopFrom;
+  }
+
+  /** Schedule one bar starting at `t`; returns its duration. */
+  function scheduleBar(t: number): number {
+    const want = pickTheme();
+    if (want !== theme) {
+      theme = want;
+      sectionIdx = 0;
+      barInSection = 0;
+    }
+    const th = theme;
+    const sec = th.sections[sectionIdx]!;
+    if ((sec.lead === 'sting') !== stingBoost) {
+      stingBoost = !stingBoost;
+      retarget(stingBoost ? 0.1 : 0.7);
+    }
+    const beat = 60 / th.bpm;
+    const barDur = beat * 4;
+    const s16 = beat / 4;
+    const at = (b: number) => t + b * beat;
+    const I = effI();
+    const sp = th.space;
+    const lift = sec.lift ?? 0;
+    const chord = th.chords[((sec.chordOffset ?? 0) + barInSection) % th.chords.length]!;
+    const root = chord.root + lift;
+    const tones = chord.tones.map((m) => m + lift);
+    const lastBar = barInSection === sec.bars - 1;
+    delay.delayTime.setValueAtTime(beat * 0.75, t);
+    fb.gain.setValueAtTime(0.25 + 0.35 * sp, t);
+
+    if (sec.pad) {
+      for (const m of tones)
+        tone(layers.pad, m, t, barDur, 0.05, {
+          cut: 500 + 1500 * I * (1 - 0.5 * sp),
+          atk: 0.08 + sp * 0.9,
+          rel: 0.5 + sp * 1.5,
+          det: [-9, 9],
+          dly: 0.2 + 0.2 * sp,
+          rev: 0.25 + 0.5 * sp,
+        });
+    }
+    if (sec.strings) {
+      for (const m of tones)
+        tone(layers.orch, m + 12, t, barDur, 0.035, {
+          cut: 2600,
+          atk: 0.35,
+          rel: 0.6,
+          det: [-12, 0, 12],
+          rev: 0.4,
+        });
+    }
+    if (sec.choir) {
+      for (const m of tones)
+        tone(layers.orch, m, t, barDur, 0.06, {
+          type: 'triangle',
+          cut: 1400,
+          atk: 0.6,
+          rel: 1.2,
+          det: [-6, 6],
+          rev: 0.7,
+        });
+    }
+    if (sec.brass === 'stabs') {
+      for (const b of [0, 2.5])
+        for (const m of tones)
+          tone(layers.orch, m, at(b), beat * 0.6, 0.06, {
+            cut: 2200,
+            atk: 0.02,
+            rel: 0.15,
+            pluck: true,
+            det: [-5, 5],
+            rev: 0.3,
+          });
+    }
+    if (sec.bells) {
+      [0, 1.5, 3].forEach((b, i) =>
+        bell(layers.orch, tones[i % tones.length]! + 24, at(b), 0.07, 0.4 + 0.4 * sp),
+      );
+    }
+    if (sec.arp) {
+      const ext = [...tones, ...tones.map((m) => m + 12), ...tones.map((m) => m + 24)];
+      (th.arp ?? DEFAULT_ARP).forEach((idx, i) => {
+        if (idx < 0) return;
+        tone(layers.arp, ext[idx % ext.length]!, t + i * s16, s16 * 0.9, 0.1, {
+          type: th.gritty ? 'sawtooth' : 'square',
+          cut: 1500 + 2500 * I,
+          pluck: true,
+          atk: 0.004,
+          rel: 0.1,
+          dly: 0.3 + 0.35 * sp,
+          rev: 0.15 + 0.3 * sp,
+        });
+      });
+    }
+
+    // Bass: low saw (through grit on gritty themes) plus a clean sine sub.
+    const bassDest = th.gritty ? bassGrit : layers.bass;
+    const bassCut = 400 + 1100 * I;
+    const bassNote = (m: number, b: number, d: number, peak = 0.32) => {
+      tone(bassDest, m, at(b), d * beat * 0.9, peak, { cut: bassCut, pluck: true, rel: 0.06 });
+      tone(layers.bass, m - 12, at(b), d * beat * 0.9, peak * 0.8, {
+        type: 'sine',
+        cut: 400,
+        rel: 0.06,
+      });
+    };
+    if (sec.bass === 'drone') {
+      tone(bassDest, root, t, barDur, 0.22, { cut: 300 + 300 * I, atk: 0.2, rel: 0.4 });
+      tone(layers.bass, root - 12, t, barDur, 0.2, { type: 'sine', cut: 300, atk: 0.2, rel: 0.4 });
+    } else if (sec.bass === 'eighths') {
+      for (let i = 0; i < 8; i++) bassNote(root, i / 2, 0.5, i % 2 ? 0.24 : 0.32);
+    } else if (sec.bass === 'octaves') {
+      for (let i = 0; i < 8; i++) bassNote(root + (i % 2) * 12, i / 2, 0.45, i % 2 ? 0.22 : 0.34);
+    } else if (sec.bass === 'gallop') {
+      for (let b = 0; b < 4; b++)
+        for (const [o, d] of [
+          [0, 0.5],
+          [0.5, 0.25],
+          [0.75, 0.25],
+        ])
+          bassNote(root, b + o!, d!, o ? 0.28 : 0.36);
+    } else if (sec.bass === 'riff') {
+      for (const n of th.riff ?? []) bassNote(root + n[0], n[1], n[2]);
+    }
+
+    // Guitar: power chord = root, fifth, octave from the low-E register.
+    if (sec.gtr) {
+      const r = root < 40 ? root + 12 : root;
+      const power = (m: number, b: number, d: number, peak: number, cut: number) => {
+        for (const p of [m, m + 7, m + 12])
+          tone(gtrDrive, p, at(b), d * beat, peak, {
+            cut,
+            pluck: true,
+            det: [-7, 7],
+            rel: 0.08,
+            rev: 0.12,
+          });
+      };
+      if (sec.gtr === 'chug') for (let i = 0; i < 8; i++) power(r, i / 2, 0.35, 0.09, 900);
+      else if (sec.gtr === 'riff')
+        for (const n of th.riff ?? []) power(r + n[0], n[1], n[2] * 0.85, 0.08, n[3] ? 2600 : 1200);
+      else {
+        power(r, 0, 2.3, 0.1, 3500);
+        power(r, 2.5, 1.4, 0.1, 3500);
+      }
+    }
+
+    // Lead: the hook, positioned by the section bar on the 32-beat hook timeline.
+    if (sec.lead || sec.brass === 'hook') {
+      const sting = sec.lead === 'sting';
+      const double = sec.lead === 'hook2x';
+      const scale = double ? 0.5 : 1;
+      const w0 = (barInSection * 4) % (double ? 16 : 32);
+      // Teases only play the call (hook bars 1-2 and 5-6) so the verse hints at what the chorus delivers.
+      const tease = sec.lead === 'tease' && (w0 / 4) % 4 >= 2;
+      hookBar(sting ? (th.sting ?? []) : th.hook, w0, scale, (n, b, d) => {
+        if (tease) return;
+        const m = n[0] + lift;
+        const accent = n[3] ? 1.3 : 1;
+        const len = d * beat * 0.95;
+        if (sec.lead === 'solo')
+          tone(layers.lead, m, at(b), len, 0.12 * accent, {
+            type: 'triangle',
+            cut: 2400,
+            atk: 0.04,
+            rel: 0.4,
+            vib: 8,
+            dly: 0.35 + 0.2 * sp,
+            rev: 0.4 + 0.3 * sp,
+          });
+        else if (sec.lead === 'bells') bell(layers.lead, m, at(b), 0.12 * accent, 0.6 + 0.3 * sp);
+        else if (sec.lead === 'tease') leadNote(th, m, at(b), len, 0.6 * accent, I);
+        else if (sec.lead) {
+          leadNote(th, m, at(b), len, accent, I);
+          // Chorus and sting get an octave double on top: the lift you feel when the hook arrives.
+          tone(layers.lead, m + 12, at(b), len, 0.022 * accent, {
+            type: 'square',
+            cut: 4000,
+            atk: 0.01,
+            rel: 0.2,
+            vib: 12,
+            dly: 0.3,
+            rev: 0.3,
+          });
+        }
+        if (sec.brass === 'hook' || sting)
+          tone(layers.orch, m - 12, at(b), len, 0.05, {
+            cut: 1800,
+            atk: 0.04,
+            rel: 0.2,
+            det: [-6, 6],
+            rev: 0.3,
+          });
+      });
+    }
+
+    const drumsOn = sec.drums !== 'none' && I >= (sec.drumsMinI ?? 0);
+    if (drumsOn) drums(sec, t, s16, I, lastBar, 0.1 + 0.3 * sp);
+    if (sec.crash && barInSection === 0) impact(t);
+    if (sec.riser && barInSection === Math.max(0, sec.bars - 2))
+      hit(t, barDur * 2, 0.25, 'bandpass', 300, 0.5, 6000);
+
+    // Advance the form. At 2-bar lines the song follows combat: calm sections jump into the fight ones
+    // when the fight starts, fight sections drop out when it ends (instead of waiting out up to 8 bars).
+    barInSection++;
+    const calm = (sec.minI ?? 0) < 0.5;
+    const hot = mode === 'game' && I >= HOT_I;
+    if (barInSection >= sec.bars || (barInSection % 2 === 0 && mode === 'game' && calm === hot)) {
+      const fight = th.sections.findIndex((s) => (s.minI ?? 0) >= 0.5);
+      sectionIdx = hot && calm && fight >= 0 ? fight : nextSection(sectionIdx, I);
+      barInSection = 0;
+    }
+    steps += 16;
+    return barDur;
+  }
+
+  function tick() {
+    if (ac.state !== 'running') return;
+    if (nextBar < ac.currentTime) nextBar = ac.currentTime + 0.05;
+    while (nextBar < ac.currentTime + LOOKAHEAD_S) nextBar += scheduleBar(nextBar);
   }
 
   return {
     start() {
       if (timer) return;
-      nextTime = ac.currentTime + 0.1;
+      nextBar = ac.currentTime + 0.1;
       retarget();
       timer = setInterval(tick, TICK_MS);
     },
@@ -248,12 +644,21 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     setMode(m) {
       if (m === mode) return;
       mode = m;
-      step = 0;
+      if (m === 'lobby') sky = null;
       retarget();
     },
     setNation(n) {
       nation = n;
     },
-    stats: () => ({ steps, intensity, mode }),
+    setMap(map) {
+      sky = map?.env.sky ?? null;
+    },
+    stats: () => ({
+      steps,
+      intensity,
+      mode,
+      theme: theme.id,
+      section: theme.sections[sectionIdx]?.name ?? '',
+    }),
   };
 }

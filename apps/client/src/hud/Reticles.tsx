@@ -12,7 +12,7 @@ import {
 } from '@skyriot/shared';
 import { world } from '../state/world';
 import { inputState } from '../input/input';
-import { isFlying, isGrounded, ownShip } from './hudStore';
+import { isFlying, isGrounded, ownShip, targetView } from './hudStore';
 import { project } from './view';
 import { Ammo } from './Ammo';
 
@@ -157,7 +157,7 @@ export function Reticles() {
       others.sort((a, b) => a.d - b.d);
 
       // Target (single, Tab-selected).
-      let target = inputState.targetId ? world.ships.get(inputState.targetId) : undefined;
+      let target = targetView(inputState.targetId);
       if (target && (!target.alive || target.nation === own.nation)) {
         inputState.targetId = null;
         target = undefined;

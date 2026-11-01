@@ -1,26 +1,36 @@
-import type { ShipId, ShipState } from '@skyriot/shared';
+import { ROLL_DURATION_SEC, type ShipId, type ShipState } from '@skyriot/shared';
 
 /** Last barrel-roll direction per Ship, written by the FX layer from `barrelRoll` events. */
 export const rollDirs = new Map<ShipId, number>();
-const maxTicks = new Map<ShipId, number>();
+/** Render-clock start (ms) and direction of each roll in progress. */
+const rolls = new Map<ShipId, { start: number; dir: number; done: boolean }>();
 
 /**
- * Visual-only barrel-roll angle (radians, 0 when not rolling). Uses ShipState.rollPhase (0..1, -1 = none) when the sim
- * provides it, else derives the phase from the countdown in rollTicks.
+ * Visual-only barrel-roll angle (radians, 0 when not rolling). The sim's rollPhase only advances per tick / snapshot
+ * (20-30 Hz), which made the spin stutter; it is used to detect the start, then the spin runs on the render clock.
  */
 export function rollAngle(s: ShipState): number {
-  let phase = (s as { rollPhase?: number }).rollPhase;
-  if (phase === undefined) {
-    if (s.rollTicks > 0) {
-      const m = Math.max(maxTicks.get(s.id) ?? 0, s.rollTicks);
-      maxTicks.set(s.id, m);
-      phase = 1 - s.rollTicks / m;
-    } else {
-      maxTicks.delete(s.id);
-      phase = -1;
-    }
+  const now = performance.now();
+  let r = rolls.get(s.id);
+  if (!r && s.rollPhase >= 0) {
+    r = {
+      start: now - s.rollPhase * ROLL_DURATION_SEC * 1000,
+      dir: s.rollDir || rollDirs.get(s.id) || 1,
+      done: false,
+    };
+    rolls.set(s.id, r);
   }
-  if (phase < 0 || phase > 1) return 0;
-  const e = phase < 0.5 ? 4 * phase * phase * phase : 1 - Math.pow(-2 * phase + 2, 3) / 2; // ease in-out cubic
-  return e * Math.PI * 2 * ((s as { rollDir?: number }).rollDir || rollDirs.get(s.id) || 1);
+  if (!r) return 0;
+  // Kept (done) until the sim reports the roll over, so a lagging snapshot can't restart it.
+  if (s.rollPhase < 0 && (r.done || !s.alive)) {
+    rolls.delete(s.id);
+    return 0;
+  }
+  const phase = (now - r.start) / (ROLL_DURATION_SEC * 1000);
+  if (r.done || phase >= 1) {
+    r.done = true;
+    return 0;
+  }
+  const e = (1 - Math.cos(Math.PI * phase)) / 2; // ease in-out sine: peak spin ~1.6x average, no whip
+  return e * Math.PI * 2 * r.dir;
 }

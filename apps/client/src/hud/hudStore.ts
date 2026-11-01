@@ -4,6 +4,7 @@ import {
   FRAMES,
   RESPAWN_SEC,
   SKILLS,
+  STRUCTURES,
   TICK_HZ,
   WEAPONS,
   sampleHeight,
@@ -318,6 +319,40 @@ function objectiveLine(me: NationId, bases: Record<NationId, BaseView>): string 
 
 export const structureName = (st: StructureState): string => STRUCTURE_NAME[st.kind];
 
+/** The selected Target (Ship or Base structure) in one shape: id, name, nation, aim point, velocity. */
+export interface TargetView {
+  id: string;
+  name: string;
+  nation: NationId;
+  alive: boolean;
+  pos: [number, number, number];
+  vel: [number, number, number];
+}
+const _structTarget: TargetView = {
+  id: '',
+  name: '',
+  nation: 'concord',
+  alive: false,
+  pos: [0, 0, 0],
+  vel: [0, 0, 0],
+};
+export function targetView(id: string | null): TargetView | undefined {
+  if (!id) return undefined;
+  const ship = world.ships.get(id);
+  if (ship) return ship;
+  const st = world.structures.get(id);
+  if (!st) return undefined;
+  const t = _structTarget;
+  t.id = st.id;
+  t.name = structureName(st);
+  t.nation = st.nation;
+  t.alive = st.alive;
+  t.pos[0] = st.pos[0];
+  t.pos[1] = st.pos[1] + STRUCTURES[st.kind].height / 2;
+  t.pos[2] = st.pos[2];
+  return t;
+}
+
 /** Route sim events the HUD cares about (killfeed, hit markers, damage numbers, impacts, deck). */
 export function handleHudEvent(ev: SimEvent): void {
   const ownId = world.ownId;
@@ -357,6 +392,8 @@ export function handleHudEvent(ev: SimEvent): void {
         ev.pos,
         ev.deflected ? 'DEFLECT' : String(Math.round(ev.damage)),
         ev.deflected ? 'defl' : (victim?.shield ?? 0) > 1 ? 'shield' : 'hp',
+        ev.victim,
+        ev.deflected ? 0 : ev.damage,
       );
     }
     if (ev.victim === ownId) {
@@ -436,7 +473,13 @@ export function handleHudEvent(ev: SimEvent): void {
         ours ? 'bad' : 'good',
       );
     }
-  } else if (ev.type === 'structureHit' && !ev.shielded) {
+  }
+  if (ev.type === 'structureHit' && ev.attacker === ownId) {
+    useHud.setState((s) => ({ hitNonce: s.hitNonce + 1, hitDeflected: ev.shielded }));
+    if (ev.shielded) pushFloater(ev.pos, 'ABSORBED', 'absorb', ev.structure);
+    else pushFloater(ev.pos, String(Math.round(ev.damage)), 'struct', ev.structure, ev.damage);
+  }
+  if (ev.type === 'structureHit' && !ev.shielded) {
     const st = world.structures.get(ev.structure);
     const me = ownShip()?.nation;
     if (st && st.nation === me) {

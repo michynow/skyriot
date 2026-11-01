@@ -3,10 +3,16 @@ import type { StructureKind } from '../types';
 /** Physical size and toughness per structure kind. Colliders are upright cylinders standing on `pos`. */
 export const STRUCTURES: Record<StructureKind, { maxHp: number; radius: number; height: number }> =
   {
-    core: { maxHp: 15000, radius: 36, height: 60 },
-    shieldStation: { maxHp: 4000, radius: 12, height: 40 },
-    turret: { maxHp: 1500, radius: 6, height: 14 },
+    core: { maxHp: 40000, radius: 36, height: 60 },
+    shieldStation: { maxHp: 12000, radius: 12, height: 40 },
+    turret: { maxHp: 3000, radius: 6, height: 14 },
   };
+
+/**
+ * Structures are armoured against gunfire: tracer rounds deal this fraction. Locked missiles, bombs and
+ * mortar shells do the real work, so taking a Shield Station down is a team job.
+ */
+export const STRUCTURE_ARMOR = { tracerMul: 0.2 };
 
 export const TURRET = {
   weapon: 'turret-flak',

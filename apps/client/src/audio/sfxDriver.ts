@@ -94,6 +94,12 @@ export function handleAudioEvent(ev: SimEvent): void {
       }
       break;
     }
+    case 'structureHit':
+      if (ev.attacker === ownShip()?.id) {
+        lastCombat = now();
+        playSfx(ev.shielded ? 'hit-shield' : 'hit-dealt', { volume: 0.9 });
+      }
+      break;
     case 'hit': {
       const t = tracked.get(ev.projectile);
       if (t) {
