@@ -40,8 +40,10 @@ import {
   REVERSE_SPEED_MUL,
   SHIP_QUERY_GROUPS,
   SIEGE_LOCK_CONE_MUL,
+  SLIP_TAU_SEC,
   THROTTLE_DECEL_MUL,
   TURN_GAIN,
+  TURN_SPEED_FALLOFF,
   TURN_TAU_SEC,
 } from './constants';
 import { damageShip } from './damage';
@@ -146,6 +148,16 @@ function rollVelocity(
   const hl = Math.hypot(hx, fx) || 1;
   out[0] = (hx / hl) * mag;
   out[2] = (fx / hl) * mag;
+}
+
+/** Airborne turn-rate multiplier: tighter below cruise, wider toward boost speed. */
+function speedTurnMul(fd: { cruiseSpeed: number; boostSpeed: number }, speed: number): number {
+  const span = Math.max(fd.boostSpeed - fd.cruiseSpeed, 1);
+  return clamp(
+    1 + (TURN_SPEED_FALLOFF * (fd.cruiseSpeed - Math.abs(speed))) / span,
+    1 - TURN_SPEED_FALLOFF,
+    1 + TURN_SPEED_FALLOFF,
+  );
 }
 
 /** Terrain normal (smoothed outside) at x/z into `out`. */
@@ -277,7 +289,10 @@ export function stepFlight(
   const maxRate =
     s.flipTicks > 0
       ? FLIP_TURN_RATE
-      : fd.turnRate * rec.mods.turnRateMul * (sieged ? siegeMods(s).turnRateMul : 1);
+      : fd.turnRate *
+        rec.mods.turnRateMul *
+        (sieged ? siegeMods(s).turnRateMul : 1) *
+        (grounded ? 1 : speedTurnMul(fd, s.speed));
   const cosA = clamp(_f0[0]! * ax + _f0[1]! * ay + _f0[2]! * az, -1, 1);
   const angle = Math.acos(cosA);
   let cx = _f0[1]! * az - _f0[2]! * ay;
@@ -562,9 +577,15 @@ export function stepFlight(
   }
   const ceilPush = clamp((s.pos[1] - (ctx.map.ceiling - CEILING_SOFT_M)) / CEILING_SOFT_M, 0, 1);
   if (ceilPush > 0) ty = Math.min(ty, -ceilPush * CEILING_PUSH_SPEED);
-  rec.lat[0] += (tx - rec.lat[0]) * kLat;
-  rec.lat[1] += (ty - rec.lat[1]) * kLat;
-  rec.lat[2] += (tz - rec.lat[2]) * kLat;
+  // Momentum: the velocity keeps its old heading as the nose swings (the difference lands in lat),
+  // then bleeds off; slower when coasting, so turns slide a little. Pivot Flip keeps its clean 180.
+  if (s.flipTicks === 0) {
+    for (let i = 0; i < 3; i++) rec.lat[i]! += (_f0[i]! - _f1[i]!) * s.speed;
+  }
+  const kBlend = tx === 0 && ty === 0 && tz === 0 ? 1 - Math.exp(-dt / SLIP_TAU_SEC) : kLat;
+  rec.lat[0] += (tx - rec.lat[0]) * kBlend;
+  rec.lat[1] += (ty - rec.lat[1]) * kBlend;
+  rec.lat[2] += (tz - rec.lat[2]) * kBlend;
 
   // ---- move through the world ----
   rollVelocity(fd, s, _f1[0]!, _f1[2]!, _rv);
