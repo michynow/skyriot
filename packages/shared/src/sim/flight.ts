@@ -31,7 +31,6 @@ import {
   HOVER_MAX_SPEED,
   LAND_HEIGHT,
   LANDING_ASSIST_HEIGHT,
-  LATERAL_TAU_SEC,
   LAUNCH_KICK,
   LIFTOFF_KICK,
   ROLL_DISPLACEMENT_PER_IMPULSE,
@@ -40,7 +39,6 @@ import {
   REVERSE_SPEED_MUL,
   SHIP_QUERY_GROUPS,
   SIEGE_LOCK_CONE_MUL,
-  SLIP_TAU_SEC,
   THROTTLE_DECEL_MUL,
   TURN_GAIN,
   TURN_SPEED_FALLOFF,
@@ -457,7 +455,7 @@ export function stepFlight(
     ctx.events.push({ type: 'barrelRoll', id: s.id, dir });
   }
 
-  const kLat = 1 - Math.exp(-dt / LATERAL_TAU_SEC);
+  const kLat = 1 - Math.exp(-dt / fd.lateralTauSec);
   const accel = fd.accel * dt;
 
   if (grounded) {
@@ -582,7 +580,7 @@ export function stepFlight(
   if (s.flipTicks === 0) {
     for (let i = 0; i < 3; i++) rec.lat[i]! += (_f0[i]! - _f1[i]!) * s.speed;
   }
-  const kBlend = tx === 0 && ty === 0 && tz === 0 ? 1 - Math.exp(-dt / SLIP_TAU_SEC) : kLat;
+  const kBlend = tx === 0 && ty === 0 && tz === 0 ? 1 - Math.exp(-dt / fd.slipTauSec) : kLat;
   rec.lat[0] += (tx - rec.lat[0]) * kBlend;
   rec.lat[1] += (ty - rec.lat[1]) * kBlend;
   rec.lat[2] += (tz - rec.lat[2]) * kBlend;

@@ -1,7 +1,5 @@
 // Sim-internal tuning constants. ponytail: move to content/ once the orchestrator agrees on shape.
 
-/** Time constant (s) of lateral/vertical velocity blending; roll impulse decays over ~3x this. */
-export const LATERAL_TAU_SEC = 0.1;
 export const BRAKE_DECEL_MUL = 1.6;
 /** Easing off the throttle (S / release) slows at this fraction of accel: only Brake bleeds speed fast. */
 export const THROTTLE_DECEL_MUL = 0.5;
@@ -75,8 +73,6 @@ export const TURN_GAIN = 9;
 export const TURN_TAU_SEC = 0.06;
 /** Turn rate gains/loses up to this fraction: +below cruise, −toward boost speed. */
 export const TURN_SPEED_FALLOFF = 0.35;
-/** Momentum: with no strafe/vertical input, sideways slip from turning bleeds off with this time constant (s). */
-export const SLIP_TAU_SEC = 0.18;
 
 // Launch Decks
 export const DECK_HALF_THICKNESS = 1;

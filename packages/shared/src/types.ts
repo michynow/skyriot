@@ -367,6 +367,10 @@ export interface FrameDef extends Omit<EngineDef, 'id' | 'name'> {
   shieldRegenDelaySec: number;
   strafeSpeed: number;
   verticalSpeed: number;
+  /** Time constant (s) of strafe/vertical velocity blending (strafe/vertical onset). */
+  lateralTauSec: number;
+  /** Momentum: with no strafe/vertical input, sideways slip from turning bleeds off with this time constant (s). */
+  slipTauSec: number;
   fuelBurnPerSec: number; // fraction of tank
   fuelRegenPerSec: number;
   rollImpulse: number; // m/s lateral burst
