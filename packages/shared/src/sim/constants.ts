@@ -70,9 +70,9 @@ export const DAMAGE_AURA_RADIUS = 55;
 
 // Steering smoothing
 /** Desired turn rate = angle-to-aim * gain (capped at turnRate): eases out of turns. */
-export const TURN_GAIN = 5;
+export const TURN_GAIN = 9;
 /** Angular velocity blend time constant (s): eases into turns. */
-export const TURN_TAU_SEC = 0.1;
+export const TURN_TAU_SEC = 0.06;
 /** Turn rate gains/loses up to this fraction: +below cruise, −toward boost speed. */
 export const TURN_SPEED_FALLOFF = 0.35;
 /** Momentum: with no strafe/vertical input, sideways slip from turning bleeds off with this time constant (s). */
