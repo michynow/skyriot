@@ -12,28 +12,6 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@skyriot/client", "dev"],
       "port": 5173
-    },
-    {
-      "name": "perf-server",
-      "runtimeExecutable": "env",
-      "runtimeArgs": ["PORT=2568", "pnpm", "--filter", "@skyriot/server", "dev"],
-      "port": 2568
-    },
-    {
-      "name": "perf-client",
-      "runtimeExecutable": "env",
-      "runtimeArgs": [
-        "VITE_SERVER_URL=ws://localhost:2568",
-        "pnpm",
-        "--filter",
-        "@skyriot/client",
-        "exec",
-        "vite",
-        "--port",
-        "5174",
-        "--strictPort"
-      ],
-      "port": 5174
     }
   ]
 }

@@ -6,9 +6,11 @@ import {
   generateHeightfield,
   sampleHeight,
   EMPTY_INPUT,
+  TICK_DT,
   type FrameId,
   type PilotInput,
   type ShipId,
+  type ShipState,
   type SimEvent,
 } from '@skyriot/shared';
 import { botBrain, createBotMemory } from '../src/bots/botBrain';
@@ -235,6 +237,36 @@ const tally = (roll: boolean) => {
 const rollRes = tally(true);
 const straightRes = tally(false);
 console.log('missile trials (30 each) roll@60m:', rollRes, 'straight:', straightRes);
+
+// 2b'. Lag compensation: a single Needle shot fired when it hits with no lag must still hit when the
+// shooter sees the world VIEW_LAG ticks late and fires that much later (150 ms each way + interp).
+const VIEW_LAG = 15;
+function shotHits(fireTick: number, viewTick: number): boolean {
+  const sim2 = fresh(true);
+  sim2.addShip('t', spawn('wasp', 'concord'), [-500, 600, -450]);
+  // Lagged shooter starts further back so it fires from the same spot (it flies straight at cruise).
+  const back = (fireTick - viewTick) * FRAMES.wasp.cruiseSpeed * TICK_DT;
+  sim2.addShip('sh', spawn('wasp'), [0, 600, 600 + back]);
+  let hit = false;
+  for (let i = 0; i < fireTick + 60 && !hit; i++) {
+    const ev = sim2.step(
+      new Map([
+        ['t', mk(i, { aim: [1, 0, 0] })],
+        ['sh', mk(i, { aim: [0, 0, -1], fire1: i === fireTick, viewTick })],
+      ]),
+    );
+    hit = ev.some((e) => e.type === 'hit' && e.victim === 't');
+  }
+  sim2.dispose();
+  return hit;
+}
+const lagComp = { hitWindow: 0, lagged: 0 };
+for (let f = 0; f < 150; f++) {
+  if (!shotHits(f, f)) continue;
+  lagComp.hitWindow++;
+  if (shotHits(f + VIEW_LAG, f)) lagComp.lagged++;
+}
+console.log(`lag comp (${VIEW_LAG} ticks view lag): hits`, lagComp);
 
 // 2c. Soft boundary, ceiling, teleport, Barrel Roll curve, grounded/docked purity.
 function edgeTest() {
@@ -465,7 +497,7 @@ let purges = 0;
 for (let k = 0; k < 10; k++) if (purgeTrial(k)) purges++;
 console.log('purge breaks guidance', purges, '/ 10');
 
-// 3. Prediction equality: stepLocal vs server step, identical inputs, bit-compare.
+// 3. Prediction equality: stepLocal (with reconcile + replay) vs server step, bit-compare.
 function prediction(
   god: boolean,
   frame: FrameId,
@@ -484,10 +516,21 @@ function prediction(
   }
   let worst = 0;
   const N = 400;
+  // Like the Predictor: every SNAP ticks the client gets the server state from LAG ticks ago,
+  // overwrites its own, and replays the inputs since. Hidden state that isn't rebuilt shows here.
+  const SNAP = 3,
+    LAG = 9;
+  const inputs: PilotInput[] = [];
+  const snaps: ShipState[] = [];
   for (let i = 0; i < N; i++) {
     const inp = mk(i + 1, script(i));
+    inputs.push(inp);
     a.step(new Map([['p', inp]]));
-    b.stepLocal('p', inp);
+    snaps.push(structuredClone(a.getShip('p')!));
+    if (i % SNAP === 0 && i >= LAG) {
+      b.setShipState('p', structuredClone(snaps[i - LAG]!));
+      for (let j = i - LAG + 1; j <= i; j++) b.stepLocal('p', inputs[j]!);
+    } else b.stepLocal('p', inp);
     const sa = a.getShip('p')!;
     const sb = b.getShip('p')!;
     for (let k = 0; k < 3; k++)
@@ -521,6 +564,26 @@ const eq = {
     aim: [1, 0, -1],
   })),
   diveBounce: prediction(true, 'anvil', [0, 700, 0], () => ({ aim: [0.1, -1, 0.1], boost: true })),
+  ceilingClimb: prediction(false, 'wasp', [0, map.ceiling - 40, 0], (i) => ({
+    aim: [Math.sin(i / 15), 0.8, -1],
+    vertical: 1,
+    boost: i % 80 < 40,
+  })),
+  floorSkim: prediction(true, 'wasp', [300, sampleHeight(hf, 300, 0) + 15, 0], (i) => ({
+    aim: [Math.sin(i / 25), -0.3, -1],
+    vertical: -1,
+    strafe: i % 30 < 15 ? 1 : -1,
+  })),
+  ...Object.fromEntries(
+    frames.map((f) => [
+      `hotbarAllBars_${f}`,
+      prediction(true, f, [0, 600, 0], (i) => ({
+        ...sweep(i),
+        // Every slot of all three bars, one press each, spaced so most come off cooldown.
+        hotbar: i % 13 === 0 ? (i / 13) % FRAMES[f].hotbar.length : -1,
+      })),
+    ]),
+  ),
   bulwarkGround: prediction(false, 'bulwark', [0, sampleHeight(hf, 0, 0) + 30, 0], (i) => ({
     aim: [0.3, 0, -1],
     vertical: i < 100 ? -1 : i > 250 ? 1 : 0,
@@ -572,7 +635,12 @@ check(
 );
 check(rollRes.hit <= TRIALS * 0.25, 'rolling target should mostly evade');
 check(straightRes.hit >= TRIALS * 0.7, 'straight-flying target should mostly get hit');
-for (const [k, v] of Object.entries(eq)) check(v === 0, `prediction mismatch ${k}: ${v}`);
+// Reconcile rebuilds hidden lateral velocity from vel, which leaves float rounding (~1e-14).
+for (const [k, v] of Object.entries(eq)) check(v < 1e-6, `prediction mismatch ${k}: ${v}`);
+check(
+  lagComp.hitWindow > 0 && lagComp.lagged === lagComp.hitWindow,
+  'lag comp: shots that hit unlagged must hit at the same view time',
+);
 check(spawned > 0, 'no projectiles spawned');
 check(hits > 0, 'no projectile hit anything');
 sim.dispose();

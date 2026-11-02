@@ -42,7 +42,7 @@ export const PROJECTILE_RADIUS = 0.6;
 export const DEFLECT_CAP = 0.15;
 export const DEFLECT_DAMAGE_MUL = 0.5;
 export const SPLASH_MIN_FRACTION = 0.25;
-export const LAG_HISTORY_TICKS = 12;
+export const LAG_HISTORY_TICKS = 20; // > LAG_COMP_MAX_MS in ticks (18)
 
 // Skills
 export const REPAIR_KIT_FRACTION = 0.35;

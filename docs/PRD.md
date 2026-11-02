@@ -93,7 +93,7 @@ Close third-person chase camera with slight lag. Mouse steering is deliberately 
 - **Flares** skill breaks missile locks.
 - **Deflect** stat: chance (hard cap 15%) for a hit to glance for 30% damage. Wasp stacks highest.
 - **Shield → HP.** Shield regenerates after 4 s without damage.
-- Server-authoritative hit detection with **lag compensation** (rewind targets to shooter's view time, capped 200 ms).
+- Server-authoritative hit detection with **lag compensation** (rewind targets to shooter's view time, capped 600 ms so 150 ms each way still registers).
 - Death → respawn at nation's nearest spawn point after 5 s. Small credit/XP loss? **No** — no death penalty beyond the timer.
 - Terrain/structure impact above a speed threshold: **with shield up the Ship bounces**, shield is emptied and a 15% max-HP chunk is lost; **with no shield the Ship is destroyed.** Low-speed scrapes are harmless.
 - **Ammo**: Primary and Secondary have finite rounds per Frame (counter in HUD). Refill by docking on your Nation's **Launch Deck** (floating platform near spawn): slow down over it, dock, resupply in ~2 s, press **R** to launch. Respawn happens docked on a Launch Deck.

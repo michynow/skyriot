@@ -36,7 +36,10 @@ export interface Sim {
   ships(): Iterable<ShipState>;
   /** Overwrite a Ship's state (client reconciliation). */
   setShipState(id: ShipId, state: ShipState): void;
-  /** Client prediction: step only these Ships, no Projectile damage authority. */
+  /**
+   * Step one Ship only. Client prediction: movement and movement Skills, no damage authority. On the
+   * authoritative sim (input catch-up) it is that Ship's full tick; its events come with the next step().
+   */
   stepLocal(id: ShipId, input: PilotInput): void;
   /** Move a Ship (dev /tp): clears dock/ground state, syncs the body, emits a `teleport` event next step. */
   teleport(id: ShipId, pos: Vec3): void;

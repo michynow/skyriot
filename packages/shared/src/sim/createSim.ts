@@ -28,7 +28,7 @@ import {
   TIMESCALE_MIN,
 } from './constants';
 import { stepProjectiles, stepWeapons, pushHistory } from './combat';
-import { deriveLateral, stepFlight, syncBody } from './flight';
+import { deriveLateral, stepFlight, syncBody, syncVelocity } from './flight';
 import { forwardOf } from './math';
 import { castSkill, stepSkillEffects, tickTimers, useHotbar } from './skills';
 import { createMods, initToggles, resolveMods } from './buffs';
@@ -325,6 +325,39 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     });
   }
 
+  /**
+   * One Ship's own tick: launch or flight, then timers and Skills. `predictOnly` (client prediction)
+   * skips weapons, shield regen and Skills that don't move the Ship.
+   */
+  function stepShip(rec: ShipRec, input: PilotInput, predictOnly: boolean): void {
+    const s = rec.state;
+    if (!s.alive) {
+      tickTimers(rec);
+      return;
+    }
+    if (s.launchPhase !== 'none') {
+      stepLaunch(ctx, rec, input);
+      tickTimers(rec);
+      return;
+    }
+    resolveMods(ctx, rec);
+    stepFlight(ctx, rec, input, !predictOnly);
+    pushOutOfDomes(ctx, rec);
+    if (!s.alive) return;
+    tickTimers(rec);
+    useHotbar(ctx, rec, input.hotbar, predictOnly);
+    if (!predictOnly) {
+      stepWeapons(ctx, rec, input);
+      if (rec.shieldDelay > 0) rec.shieldDelay -= ctx.dt;
+      else
+        s.shield = Math.min(
+          s.maxShield,
+          s.shield + frames[s.frame].shieldRegenPerSec * rec.mods.shieldRegenMul * ctx.dt,
+        );
+    }
+    syncVelocity(rec, frames[s.frame]);
+  }
+
   return {
     get tick() {
       return ctx.tick;
@@ -352,26 +385,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
         }
         // Frozen = a human whose input hasn't arrived; skipping keeps seq-for-seq lockstep with prediction.
         if (frozen?.has(s.id)) continue;
-        if (s.launchPhase !== 'none') {
-          stepLaunch(ctx, rec, input);
-          tickTimers(rec);
-          continue;
-        }
-        resolveMods(ctx, rec);
-        stepFlight(ctx, rec, input, ctx.authoritative);
-        pushOutOfDomes(ctx, rec);
-        if (!ctx.authoritative) continue;
-        if (s.alive) {
-          tickTimers(rec);
-          useHotbar(ctx, rec, input.hotbar, false);
-          stepWeapons(ctx, rec, input);
-          if (rec.shieldDelay > 0) rec.shieldDelay -= ctx.dt;
-          else
-            s.shield = Math.min(
-              s.maxShield,
-              s.shield + frames[s.frame].shieldRegenPerSec * rec.mods.shieldRegenMul * ctx.dt,
-            );
-        }
+        stepShip(rec, input, !ctx.authoritative);
       }
       ctx.tick++;
       pushHistory(ctx);
@@ -448,20 +462,10 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     stepLocal(id, input) {
       const rec = ctx.ships.get(id);
       if (!rec) return;
-      ctx.events = discard;
+      // Authoritative (server input catch-up): the full Ship tick, events go out with the next step().
+      ctx.events = ctx.authoritative ? pending : discard;
       refreshFrames();
-      // Same order as step(): flight, timers, then Skills.
-      if (rec.state.launchPhase !== 'none') {
-        stepLaunch(ctx, rec, input);
-        tickTimers(rec);
-        discard.length = 0;
-        return;
-      }
-      resolveMods(ctx, rec);
-      stepFlight(ctx, rec, input, false);
-      pushOutOfDomes(ctx, rec);
-      tickTimers(rec);
-      useHotbar(ctx, rec, input.hotbar, true);
+      stepShip(rec, input, !ctx.authoritative);
       discard.length = 0;
     },
 

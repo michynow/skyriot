@@ -12,7 +12,7 @@ interface Entry {
 }
 
 export interface Interpolator {
-  /** rtt (ms) refines the server-clock estimate: serverNow ~ serverTimeMs + rtt/2. */
+  /** rtt (ms) is only used by latestTick() (serverNow ~ newest received + rtt/2). */
   push(snap: Snapshot, rttMs?: number): void;
   /** Remote-ship render states at performance.now()-style `nowMs`, ~delay behind. Map is reused. */
   sample(nowMs: number): ReadonlyMap<ShipId, ShipState>;
@@ -43,7 +43,10 @@ export function createInterpolator(delayMs = 100): Interpolator {
   const buf: Entry[] = [];
   const cache = new Map<ShipId, ShipState>();
   const out = new Map<ShipId, ShipState>();
-  let offset = 0; // serverTimeMs - localNow
+  // serverTimeMs - localNow at arrival over the fastest recent packet: render time trails the newest
+  // received snapshot (not the server's now), so delayMs covers jitter at any latency.
+  let offset = 0;
+  let halfRtt = 0;
   let haveOffset = false;
   const samples: number[] = [];
   let tick = 0;
@@ -81,7 +84,8 @@ export function createInterpolator(delayMs = 100): Interpolator {
 
   return {
     push(snap, rttMs = 0) {
-      const sample = snap.serverTimeMs + rttMs / 2 - performance.now();
+      halfRtt = rttMs / 2;
+      const sample = snap.serverTimeMs - performance.now();
       // Late packets only ever lower the sample, so the best estimate is the max over a ~2 s window.
       // The live offset slews toward it at a bounded rate so render time never jitters per snapshot.
       samples.push(sample);
@@ -148,7 +152,9 @@ export function createInterpolator(delayMs = 100): Interpolator {
     latestTick(nowMs) {
       const last = buf[buf.length - 1];
       if (!last) return 0;
-      return last.snap.tick + Math.max(0, nowMs + offset - last.snap.serverTimeMs) / TICK_MS;
+      return (
+        last.snap.tick + Math.max(0, nowMs + offset + halfRtt - last.snap.serverTimeMs) / TICK_MS
+      );
     },
   };
 }

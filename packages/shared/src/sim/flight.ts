@@ -697,6 +697,18 @@ export function stepFlight(
   syncBody(ctx, rec);
 }
 
+/**
+ * End of a Ship's tick: rebuild `vel` from nose speed + `lat` + roll so `deriveLateral` inverts it
+ * exactly. Skills, dome bounces, impacts and clamps change speed/lat after the move wrote `vel`.
+ */
+export function syncVelocity(rec: ShipRec, fd: { rollImpulse: number }): void {
+  const s = rec.state;
+  if (s.docked || s.launchPhase !== 'none' || !s.alive) return;
+  forwardOf(s.rot, _f0);
+  rollVelocity(fd, s, _f0[0]!, _f0[2]!, _rv);
+  for (let i = 0; i < 3; i++) s.vel[i] = _f0[i]! * s.speed + rec.lat[i]! + _rv[i]!;
+}
+
 /** Recompute hidden lateral velocity after a state overwrite (reconciliation). */
 export function deriveLateral(rec: ShipRec, fd: { rollImpulse: number }): void {
   forwardOf(rec.state.rot, _f0);
