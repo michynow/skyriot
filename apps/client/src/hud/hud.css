@@ -2231,3 +2231,17 @@
 .threat .pip.msl {
   fill: #ffb347;
 }
+
+.roll-denied {
+  position: absolute;
+  left: 50%;
+  top: calc(50% + 70px);
+  transform: translateX(-50%);
+  font:
+    800 14px 'Orbitron',
+    sans-serif;
+  letter-spacing: 0.15em;
+  color: #ffb347;
+  text-shadow: 0 0 6px #000;
+  zoom: var(--hud-scale, 1);
+}

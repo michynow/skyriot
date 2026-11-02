@@ -403,6 +403,7 @@ function Warnings() {
       incomingDist: x.incomingDist,
       halted: x.halted,
       haltPrompt: x.haltPrompt,
+      rollDeniedSec: x.rollDeniedSec,
       overDeck: x.overDeck,
     })),
   );
@@ -422,6 +423,9 @@ function Warnings() {
         </div>
       )}
       {h.halted && flying && <Loadout />}
+      {h.rollDeniedSec > 0 && flying && (
+        <div className="roll-denied">ROLL RECHARGING {h.rollDeniedSec.toFixed(1)}s</div>
+      )}
       {h.overDeck && flying && !h.docked && (
         <div className="deck-hint">
           HOLD <kbd>S</kbd> TO LAND

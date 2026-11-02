@@ -121,6 +121,8 @@ export interface HudState {
   halted: boolean;
   /** First B pressed: waiting for B / Y to confirm the halt. */
   haltPrompt: boolean;
+  /** Seconds left on the Barrel Roll recharge, shown briefly after a double-tap that came too early; 0 = hide. */
+  rollDeniedSec: number;
   /** Over our own Launch Deck's approach (S lands). */
   overDeck: boolean;
   /** Distance (m) of the nearest guided missile homing on us; -1 = none. */
@@ -205,6 +207,7 @@ export const useHud = create<HudState>(() => ({
   consoleLines: [],
   halted: false,
   haltPrompt: false,
+  rollDeniedSec: 0,
   overDeck: false,
   incomingDist: -1,
   launchPhase: 'none',
@@ -567,6 +570,7 @@ export function startHudFeed(): () => void {
         cooldownSec: cd.map((c) => c / TICK_HZ),
         halted: own.halted === true,
         haltPrompt: now < inputState.haltPromptUntil,
+        rollDeniedSec: now - inputState.rollDeniedAt < 900 ? own.rollCooldownTicks / TICK_HZ : 0,
         overDeck:
           !own.docked &&
           !!world.map?.launchDecks[own.nation].some(

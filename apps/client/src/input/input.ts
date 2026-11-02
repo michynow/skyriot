@@ -3,6 +3,7 @@ import {
   EMPTY_INPUT,
   FRAMES,
   STRUCTURES,
+  TICK_HZ,
   type PilotInput,
   type ShipId,
   type ShipState,
@@ -18,6 +19,8 @@ export const inputState = {
   onOpenChat: null as (() => void) | null,
   /** performance.now() until which a first B press waits for confirmation (B again or Y) to halt. */
   haltPromptUntil: 0,
+  /** performance.now() of the last double-tap made while the Barrel Roll was still recharging. */
+  rollDeniedAt: 0,
   /** Last aim direction sent (unit, world space); HUD range feedback raycasts along it from the Ship. */
   aim: [0, 0, -1] as [number, number, number],
 };
@@ -38,13 +41,16 @@ export function saveInputSettings(): void {
   }
 }
 
-const DOUBLE_TAP_MS = 300; // max gap from the first key release to the second press
+const DOUBLE_TAP_MS = 380; // max gap from the first key release to the second press
+/** A roll request is re-sent this long, so a tap a few ticks early (recharge ending) or a frozen tick isn't lost. */
+const ROLL_ARM_MS = 300;
 export const AIM_DISTANCE = 600;
 
 const keys = new Set<string>();
 const lastUp: Record<string, number> = {};
-let rollLeft = false;
-let rollRight = false;
+/** performance.now() until which a roll request (-1 left / +1 right) is armed. */
+let rollArmUntil = 0;
+let rollArmDir = 0;
 let hotbar = -1;
 let launch = false;
 let halt = false;
@@ -187,9 +193,13 @@ export function attachInput(canvas: HTMLElement): () => void {
       // Roll = second press within DOUBLE_TAP_MS of the first key's release (a held-then-released key counts).
       const up = lastUp[e.code];
       if (up !== undefined && performance.now() - up <= DOUBLE_TAP_MS) {
-        if (e.code === 'KeyA') rollLeft = true;
-        else rollRight = true;
+        rollArmDir = e.code === 'KeyA' ? -1 : 1;
+        rollArmUntil = performance.now() + ROLL_ARM_MS;
         lastUp[e.code] = -1e9;
+        const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+        // Still recharging past the arm window: the roll won't happen, say so instead of failing silently.
+        if (own && own.rollCooldownTicks / TICK_HZ > ROLL_ARM_MS / 1000)
+          inputState.rollDeniedAt = performance.now();
       }
     } else if (e.code === 'Tab') cycleTarget();
     else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') lockNearestToCrosshair();
@@ -355,6 +365,8 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
   const alive = id ? (world.ships.get(id) ?? world.structures.get(id))?.alive : false;
   if (!own || !alive) inputState.targetId = null;
 
+  // Armed roll: resent every tick of the window; the sim ignores it once the roll has started.
+  const rollArm = performance.now() < rollArmUntil ? rollArmDir : 0;
   const input: PilotInput = {
     ...EMPTY_INPUT,
     seq,
@@ -369,15 +381,14 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
     fire1: !typing && fire1,
     fire2: !typing && fire2,
     hotbar: typing ? -1 : hotbar,
-    rollLeft: !typing && rollLeft,
-    rollRight: !typing && rollRight,
+    rollLeft: !typing && rollArm === -1,
+    rollRight: !typing && rollArm === 1,
     launch: !typing && launch,
     halt: !typing && halt,
     target: inputState.targetId,
   };
   if (import.meta.env.DEV && (input.rollLeft || input.rollRight))
     console.debug('[roll] sent', input.rollLeft ? 'left' : 'right', 'seq', seq);
-  rollLeft = rollRight = false;
   launch = false;
   halt = false;
   hotbar = -1;
