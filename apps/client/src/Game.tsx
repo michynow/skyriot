@@ -198,6 +198,7 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
       world.map = null;
       world.heightfield = null;
       inputState.targetId = null;
+      inputState.manualTarget = false;
     };
   }, [options]);
 

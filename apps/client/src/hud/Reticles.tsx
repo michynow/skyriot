@@ -403,7 +403,11 @@ export function Reticles() {
       ))}
       <div className="tgt" ref={targetEl} style={{ display: 'none' }}>
         <svg viewBox="-40 -40 80 80">
-          <path className="tgt-br" d="M-30 -16V-30H-16M16 -30H30V-16M30 16V30H16M-16 30H-30V16" />
+          <path className="tgt-dm" d="M0 -30L30 0 0 30 -30 0z" />
+          <path
+            className="tgt-br"
+            d="M-7 -23L0 -30 7 -23M23 -7L30 0 23 7M7 23L0 30 -7 23M-23 7L-30 0 -23 -7"
+          />
           <circle
             className="tgt-ring"
             ref={tbRing}

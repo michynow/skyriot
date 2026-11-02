@@ -1204,7 +1204,7 @@
   }
 }
 
-/* Lock-on target: corner brackets close in as the lock builds; red + pulse once locked. Tab picks add the diamond. */
+/* Lock-on target: dark orange diamond with bold corners, closing in as the lock builds; pulses once locked. */
 .tgt {
   width: 0;
   height: 0;
@@ -1219,16 +1219,18 @@
   height: 80px;
   overflow: visible;
 }
+.tgt-dm,
 .tgt-br {
   fill: none;
-  stroke: var(--tc);
-  stroke-width: 3;
-  stroke-linecap: square;
+  stroke: #c9560c;
+  stroke-width: 1.5;
+  stroke-linejoin: miter;
   transform: scale(var(--k));
-  transition:
-    transform 0.08s linear,
-    stroke 0.15s;
+  transition: transform 0.08s linear;
   filter: drop-shadow(0 0 3px #000);
+}
+.tgt-br {
+  stroke-width: 5;
 }
 .tgt-ring {
   fill: none;
@@ -1250,7 +1252,9 @@
 .tgt[data-locked='1'] {
   --tc: #ff4d4d;
 }
+.tgt[data-locked='1'] .tgt-dm,
 .tgt[data-locked='1'] .tgt-br {
+  stroke: #e0650f;
   animation: lockpulse 0.45s infinite alternate;
 }
 .tgt[data-locked='1'] .tgt-ring {
@@ -2199,7 +2203,8 @@
     0 0 4px #000;
 }
 
-/* Threat ring: one red pip on a ring round the crosshair per enemy holding a missile lock on us. */
+/* Invisible ring round the crosshair: one small red arrow per enemy holding a missile lock on us, pointing
+   their way; a bigger orange arrow + name/distance points at the Target when it is off screen. */
 .threat {
   position: absolute;
   width: 0;
@@ -2214,12 +2219,25 @@
   height: 240px;
   overflow: visible;
 }
-.threat circle {
-  fill: none;
-  stroke: #ff3b3b;
+.threat .off {
+  fill: #c9560c;
+  stroke: #fff;
   stroke-width: 1.5;
-  stroke-dasharray: 4 6;
-  opacity: 0.55;
+  filter: drop-shadow(0 0 4px #000);
+}
+.threat-label {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+  text-align: center;
+  color: #ff9a3c;
+  font:
+    700 13px/1.1 'Rajdhani',
+    sans-serif;
+  letter-spacing: 0.04em;
+  text-shadow:
+    0 0 4px #000,
+    0 1px 2px #000;
 }
 .threat .pip {
   fill: #ff2a2a;
@@ -2228,7 +2246,7 @@
   filter: drop-shadow(0 0 6px #ff2a2a);
   animation: lockpulse 0.3s infinite alternate;
 }
-.threat .pip.msl {
+.threat .msl .pip {
   fill: #ffb347;
 }
 
