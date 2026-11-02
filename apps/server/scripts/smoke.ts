@@ -108,6 +108,23 @@ const mk = (seq: number, patch: Partial<PilotInput>): PilotInput => ({
   ...patch,
 });
 const fresh = (authoritative: boolean) => createSim(map, { rapier: RAPIER, authoritative });
+/** Add a Ship at rest just above its nation's first Launch Deck: its next tick docks. */
+const atDeck = (
+  sim2: ReturnType<typeof fresh>,
+  id: ShipId,
+  frame: FrameId,
+  nation: 'concord' | 'vex' = 'vex',
+) => {
+  const deck = map.launchDecks[nation][0]!;
+  const s = sim2.addShip(id, spawn(frame, nation), [
+    deck.pos[0],
+    deck.pos[1] + FRAMES[frame].radius + 1,
+    deck.pos[2],
+  ]);
+  s.speed = 0;
+  s.vel.fill(0);
+  return s;
+};
 
 // 1. Dive into terrain: with shield -> bounce (shield 0, lose HP); without shield -> destroyed.
 function dive(shield: boolean) {
@@ -250,14 +267,15 @@ console.log('edge/ceiling', edge);
 
 function teleportTest() {
   const sim2 = fresh(true);
-  sim2.addShip('t', spawn('wasp', 'concord')); // spawns docked
-  const was = sim2.getShip('t')!.docked;
+  sim2.addShip('t', spawn('wasp', 'concord')); // humans spawn in the hangar
+  const was = sim2.getShip('t')!.launchPhase === 'hangar';
   sim2.teleport('t', [100, 600, 100]);
   const events = sim2.step(new Map([['t', mk(1, {})]]));
   const s = sim2.getShip('t')!;
   const ok =
     was &&
     !s.docked &&
+    s.launchPhase === 'none' &&
     Math.hypot(s.pos[0] - 100, s.pos[2] - 100) < 30 &&
     events.some((e) => e.type === 'teleport');
   sim2.dispose();
@@ -303,8 +321,7 @@ function purity() {
   const grounded = b.grounded && b.rollPhase < 0;
   sim2.dispose();
   const sim3 = fresh(true);
-  sim3.addShip('d', spawn('wasp', 'concord')); // docked
-  const d = sim3.getShip('d')!;
+  const d = atDeck(sim3, 'd', 'wasp', 'concord');
   for (let i = 0; i < 20; i++)
     sim3.step(new Map([['d', mk(i, { aim: [Math.sin(i / 5), 0, -Math.cos(i / 5)], strafe: 1 })]]));
   const [qx, qy, qz, qw] = d.rot;
@@ -316,6 +333,24 @@ function purity() {
   return { drift, grounded, dockOk, upY };
 }
 const pure = purity();
+
+/** Land on the own Launch Deck, resupply, launch: both events fire. */
+function deckTest() {
+  const sim2 = fresh(true);
+  const s = atDeck(sim2, 'k', 'anvil');
+  const seen = new Set<string>();
+  for (let i = 0; i < 90; i++)
+    for (const e of sim2.step(new Map([['k', mk(i + 1, { launch: i === 80 })]]))) seen.add(e.type);
+  sim2.dispose();
+  return {
+    docked: seen.has('docked'),
+    resupplied: seen.has('resupplied'),
+    launched: seen.has('launched'),
+    flying: !s.docked,
+  };
+}
+const deck = deckTest();
+console.log('deck', deck);
 console.log('grounded strafe drift', pure.drift.toFixed(2), 'docked upY', pure.upY.toFixed(4));
 
 // 2d. Frame core kits: buff expiry, maxHp revert, auras, toggles, Purge.
@@ -434,7 +469,7 @@ console.log('purge breaks guidance', purges, '/ 10');
 function prediction(
   god: boolean,
   frame: FrameId,
-  at: [number, number, number] | undefined,
+  at: [number, number, number] | 'deck',
   script: (i: number) => Partial<PilotInput>,
 ) {
   const a = fresh(true);
@@ -443,8 +478,10 @@ function prediction(
     a.tuning.god.add('p');
     b.tuning.god.add('p');
   }
-  a.addShip('p', spawn(frame), at);
-  b.addShip('p', spawn(frame), at);
+  for (const sim2 of [a, b]) {
+    if (at === 'deck') atDeck(sim2, 'p', frame);
+    else sim2.addShip('p', spawn(frame), at);
+  }
   let worst = 0;
   const N = 400;
   for (let i = 0; i < N; i++) {
@@ -479,7 +516,7 @@ const eq = {
     ...sweep(i),
     hotbar: i === 3 ? 1 : i === 10 ? 2 : sweep(i).hotbar,
   })),
-  dockedLaunch: prediction(false, 'wasp', undefined, (i) => ({
+  dockedLaunch: prediction(false, 'wasp', 'deck', (i) => ({
     launch: i === 40,
     aim: [1, 0, -1],
   })),
@@ -503,7 +540,7 @@ const check = (ok: boolean, msg: string) => {
 };
 check(belowTerrain === 0, 'ships went below terrain');
 check(negativeAmmo === 0, 'negative ammo');
-check((counts.docked ?? 0) + (counts.launched ?? 0) > 0, 'no deck docking/launch events');
+check(Object.values(deck).every(Boolean), 'deck dock/resupply/launch: ' + JSON.stringify(deck));
 check(
   bounce.impact?.type === 'terrainImpact' &&
     bounce.impact.bounced &&
