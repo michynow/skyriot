@@ -312,6 +312,8 @@ function applyVolumes() {
 
 /** Create/resume the AudioContext. Must be called from a user gesture (LAUNCH click / first lobby press). */
 export function initAudio(): void {
+  // Agent test runs (VITE_MUTE=1, or ?mute in the URL) never create an AudioContext: no sound at all.
+  if (import.meta.env.VITE_MUTE === '1' || new URLSearchParams(location.search).has('mute')) return;
   if (!ac) {
     try {
       ac = new AudioContext();

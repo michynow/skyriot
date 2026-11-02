@@ -9,8 +9,8 @@
     },
     {
       "name": "client",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@skyriot/client", "dev"],
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["VITE_MUTE=1", "pnpm", "--filter", "@skyriot/client", "dev"],
       "port": 5173
     }
   ]
