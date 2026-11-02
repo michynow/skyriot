@@ -140,7 +140,7 @@ export async function connect(options: JoinOptions, h: ConnectionHandlers): Prom
   }, WELCOME_TIMEOUT_MS);
 
   room.onMessage(MSG.welcome, (m: unknown) =>
-    throughLag(() => {
+    throughLag('down', () => {
       const w = parseWelcome(m);
       if (!w) return console.warn('[net] bad welcome', m);
       gotWelcome = true;
@@ -149,7 +149,7 @@ export async function connect(options: JoinOptions, h: ConnectionHandlers): Prom
     }),
   );
   room.onMessage(MSG.snapshot, (m: unknown) =>
-    throughLag(() => {
+    throughLag('down', () => {
       const s = parseSnapshot(m);
       if (!s) return;
       const sent = sentAt.get(s.ack);
@@ -162,13 +162,13 @@ export async function connect(options: JoinOptions, h: ConnectionHandlers): Prom
     }),
   );
   room.onMessage(MSG.events, (m: unknown) =>
-    throughLag(() => {
+    throughLag('down', () => {
       const events = parseEvents(m);
       if (events.length) h.onEvents(events);
     }),
   );
   room.onMessage(MSG.console, (m: unknown) =>
-    throughLag(() => {
+    throughLag('down', () => {
       if (isObj(m) && typeof m.text === 'string') h.onConsole(m.text);
     }),
   );
@@ -187,13 +187,13 @@ export async function connect(options: JoinOptions, h: ConnectionHandlers): Prom
     sendInput(input) {
       sentAt.set(input.seq, performance.now());
       sentAt.delete(input.seq - 120);
-      throughLag(() => {
+      throughLag('up', () => {
         if (!closed) room.send(MSG.input, input);
       });
     },
     sendChat(text) {
       const t = text.trim().slice(0, 200);
-      if (t) throughLag(() => !closed && room.send(MSG.chat, { text: t }));
+      if (t) throughLag('up', () => !closed && room.send(MSG.chat, { text: t }));
     },
     close() {
       closed = true;

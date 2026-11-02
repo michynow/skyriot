@@ -12,6 +12,27 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@skyriot/client", "dev"],
       "port": 5173
+    },
+    {
+      "name": "netcode-server",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["PORT=2569", "pnpm", "--filter", "@skyriot/server", "dev"],
+      "port": 2569
+    },
+    {
+      "name": "netcode-client",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "VITE_SERVER_URL=ws://localhost:2569",
+        "pnpm",
+        "--filter",
+        "@skyriot/client",
+        "dev",
+        "--port",
+        "5175",
+        "--strictPort"
+      ],
+      "port": 5175
     }
   ]
 }

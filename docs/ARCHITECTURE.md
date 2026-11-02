@@ -105,7 +105,7 @@ Hidden: part catalogue, instanced meshes, nation palette, tier/upgrade → extra
 
 - Messages are compact plain objects encoded with Colyseus' msgpack (`room.send` / `client.send`). We **do not** use Colyseus Schema state sync for Ships — our own snapshot gives control over rate, quantization, and per-client `lastProcessedSeq`. ponytail: full snapshot of all Ships to every client; ~60 Ships × ~40 B × 20 Hz ≈ 48 KB/s. Add interest management (distance-tiered rates) when bandwidth bites.
 - Projectiles: server sends spawn (origin, dir, speed, type, tick). Clients simulate their visuals locally; server sends `hit` / `expire` authoritatively.
-- **Lag compensation**: server keeps 300 ms history ring of Ship positions. A Projectile fired at client-view time `t` is tested against Ships at `t` for the segment of flight that precedes the current tick. Rewind capped at 200 ms.
+- **Lag compensation**: server keeps a ~670 ms history ring of Ship poses. An unguided Projectile fired at client-view tick `V` is tested, for its whole flight, against Ships as the shooter sees them: `rewind = tick − V` ticks back (favor the shooter). Guided missiles follow the live target and are tested live. Rewind capped at 600 ms: at 150 ms each way, round trip + server jitter buffer + 100 ms interpolation delay is ~500 ms. Remote-Ship interpolation trails the newest _received_ snapshot by 100 ms (not the estimated server now), so it never extrapolates at high latency.
 - Own Projectiles appear instantly client-side (cosmetic), reconciled with server spawn by `seq`.
 
 ## 4. Client composition

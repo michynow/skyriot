@@ -780,7 +780,9 @@ export function stepProjectiles(ctx: SimCtx): void {
         structure = ctx.structureByCollider.get(hit.collider.handle) ?? null;
       }
 
-      const testTick = ctx.tick - Math.max(0, p.rewind - age);
+      // Favor the shooter for the whole flight: Ships where the shooter saw them, `rewind` ticks back.
+      // Homing shots follow the live target (and everyone sees them from snapshots): no rewind.
+      const testTick = p.homing > 0 && p.target ? ctx.tick : ctx.tick - p.rewind;
       for (const o of ctx.recList) {
         const os = o.state;
         if (!os.alive || os.nation === p.nation || os.rollTicks > 0 || os.launchPhase !== 'none')

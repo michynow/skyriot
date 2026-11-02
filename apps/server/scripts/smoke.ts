@@ -6,6 +6,7 @@ import {
   generateHeightfield,
   sampleHeight,
   EMPTY_INPUT,
+  TICK_DT,
   type FrameId,
   type PilotInput,
   type ShipId,
@@ -236,6 +237,36 @@ const tally = (roll: boolean) => {
 const rollRes = tally(true);
 const straightRes = tally(false);
 console.log('missile trials (30 each) roll@60m:', rollRes, 'straight:', straightRes);
+
+// 2b'. Lag compensation: a single Needle shot fired when it hits with no lag must still hit when the
+// shooter sees the world VIEW_LAG ticks late and fires that much later (150 ms each way + interp).
+const VIEW_LAG = 15;
+function shotHits(fireTick: number, viewTick: number): boolean {
+  const sim2 = fresh(true);
+  sim2.addShip('t', spawn('wasp', 'concord'), [-500, 600, -450]);
+  // Lagged shooter starts further back so it fires from the same spot (it flies straight at cruise).
+  const back = (fireTick - viewTick) * FRAMES.wasp.cruiseSpeed * TICK_DT;
+  sim2.addShip('sh', spawn('wasp'), [0, 600, 600 + back]);
+  let hit = false;
+  for (let i = 0; i < fireTick + 60 && !hit; i++) {
+    const ev = sim2.step(
+      new Map([
+        ['t', mk(i, { aim: [1, 0, 0] })],
+        ['sh', mk(i, { aim: [0, 0, -1], fire1: i === fireTick, viewTick })],
+      ]),
+    );
+    hit = ev.some((e) => e.type === 'hit' && e.victim === 't');
+  }
+  sim2.dispose();
+  return hit;
+}
+const lagComp = { hitWindow: 0, lagged: 0 };
+for (let f = 0; f < 150; f++) {
+  if (!shotHits(f, f)) continue;
+  lagComp.hitWindow++;
+  if (shotHits(f + VIEW_LAG, f)) lagComp.lagged++;
+}
+console.log(`lag comp (${VIEW_LAG} ticks view lag): hits`, lagComp);
 
 // 2c. Soft boundary, ceiling, teleport, Barrel Roll curve, grounded/docked purity.
 function edgeTest() {
@@ -606,6 +637,10 @@ check(rollRes.hit <= TRIALS * 0.25, 'rolling target should mostly evade');
 check(straightRes.hit >= TRIALS * 0.7, 'straight-flying target should mostly get hit');
 // Reconcile rebuilds hidden lateral velocity from vel, which leaves float rounding (~1e-14).
 for (const [k, v] of Object.entries(eq)) check(v < 1e-6, `prediction mismatch ${k}: ${v}`);
+check(
+  lagComp.hitWindow > 0 && lagComp.lagged === lagComp.hitWindow,
+  'lag comp: shots that hit unlagged must hit at the same view time',
+);
 check(spawned > 0, 'no projectiles spawned');
 check(hits > 0, 'no projectile hit anything');
 sim.dispose();
