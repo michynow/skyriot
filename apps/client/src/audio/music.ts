@@ -6,8 +6,12 @@ import { MAP_THEMES, THEMES, type N, type SectionDef, type ThemeDef } from './sc
  * note is placed on the AudioContext clock) renders one bar at a time of the current section. The lobby plays
  * the nation's title theme, the game plays the loaded Map's theme (opening with its 2-bar sting). Intensity
  * (0 idle, ~0.5 enemies near, 1 combat) works twice: layer gains crossfade continuously, and the form jumps
- * into its fight sections (pre-chorus, chorus, bridge, key-lifted chorus) when combat starts and back out to
- * the calm ones when it ends.
+ * into its fight sections (pre-chorus, chorus, breakdown, key-lifted finale) when combat starts and back out
+ * to the verses when it ends.
+ *
+ * Performance is humanised so it doesn't sound sequenced: per-note velocity and timing jitter, swing, a
+ * legato lead with portamento slides and bends, vibrato that blooms on long notes, and section dynamics.
+ * Everything runs through a gentle tape-style saturator before the music bus.
  */
 export type MusicMode = 'lobby' | 'game';
 
@@ -16,10 +20,14 @@ const TICK_MS = 25;
 /** Intensity the lobby plays at (title themes have no fight sections; this sets drum/lead levels). */
 const LOBBY_I = 0.6;
 const HOT_I = 0.75;
+/** Notes closer than this to the previous lead note's end play legato (glide, no re-attack). */
+const LEGATO_GAP_S = 0.08;
 const DEFAULT_ARP = [0, 1, 2, 3, 4, 3, 2, 1, 0, 1, 2, 3, 4, 3, 2, 1];
 const hz = (m: number) => 440 * 2 ** ((m - 69) / 12);
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const ramp = (v: number, a: number, b: number) => clamp01((v - a) / (b - a));
+/** ±`amount` random spread, for humanising timing and velocity. */
+const jitter = (amount: number) => (Math.random() * 2 - 1) * amount;
 
 export interface Music {
   start(): void;
@@ -33,13 +41,18 @@ export interface Music {
 interface Voice {
   type?: OscillatorType;
   cut?: number;
+  /** Filter envelope: cutoff starts at cut * open and settles to cut (>1 bright attack, <1 swells open). */
+  open?: number;
   atk?: number;
   rel?: number;
   det?: number[];
   /** Filter closes over the note (plucks, palm mutes). */
   pluck?: boolean;
-  /** Delayed vibrato depth in cents. */
+  /** Vibrato depth in cents; it blooms in over the note, and only on notes long enough to sing. */
   vib?: number;
+  /** Portamento: start at this MIDI pitch and glide to the note over `glide` seconds. */
+  from?: number;
+  glide?: number;
   /** Echo / reverb send amounts. */
   dly?: number;
   rev?: number;
@@ -55,11 +68,29 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
   let barInSection = 0;
   let nextBar = 0;
   let steps = 0;
+  let level = 1;
   /** Layers play at fight level during a sting, whatever the intensity. */
   let stingBoost = false;
+  /** Last lead note, for legato and portamento across bars. */
+  let lastLead = { m: 0, end: 0 };
   let timer: ReturnType<typeof setInterval> | null = null;
 
-  // Shared FX: tempo-synced dotted-8th echo and a long noise-tail reverb.
+  // Master chain: section-level gain -> soft tape saturation -> gentle top roll-off -> music bus.
+  const mix = ac.createGain();
+  const tape = ac.createWaveShaper();
+  const tapeCurve = new Float32Array(2048);
+  for (let i = 0; i < tapeCurve.length; i++) {
+    const x = (i / (tapeCurve.length - 1)) * 2 - 1;
+    tapeCurve[i] = Math.tanh(1.4 * x) / Math.tanh(1.4);
+  }
+  tape.curve = tapeCurve;
+  tape.oversample = '2x';
+  const tapeTone = ac.createBiquadFilter();
+  tapeTone.type = 'lowpass';
+  tapeTone.frequency.value = 11000;
+  mix.connect(tape).connect(tapeTone).connect(out);
+
+  // Shared FX: tempo-synced dotted-8th echo and a generated 3 s hall impulse.
   const delay = ac.createDelay(2);
   const fb = ac.createGain();
   const dlp = ac.createBiquadFilter();
@@ -68,21 +99,27 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
   dlp.frequency.value = 2600;
   delayOut.gain.value = 0.5;
   delay.connect(dlp).connect(fb).connect(delay);
-  dlp.connect(delayOut).connect(out);
+  dlp.connect(delayOut).connect(mix);
   const verb = ac.createConvolver();
   const ir = ac.createBuffer(2, Math.floor(ac.sampleRate * 3), ac.sampleRate);
   for (let ch = 0; ch < 2; ch++) {
     const d = ir.getChannelData(ch);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length) ** 3;
+    // Darkening tail: the noise is smoothed more as it decays, like air absorbing the highs.
+    let lp = 0;
+    for (let i = 0; i < d.length; i++) {
+      const k = i / d.length;
+      lp += (Math.random() * 2 - 1 - lp) * (1 - 0.85 * k);
+      d[i] = lp * (1 - k) ** 2.5;
+    }
   }
   verb.buffer = ir;
   const verbOut = ac.createGain();
-  verbOut.gain.value = 0.6;
-  verb.connect(verbOut).connect(out);
+  verbOut.gain.value = 0.7;
+  verb.connect(verbOut).connect(mix);
 
   // Pads, strings, arps and bass sit on a bus that ducks on every kick (theme.pump), so drums punch through.
   const pumpBus = ac.createGain();
-  pumpBus.connect(out);
+  pumpBus.connect(mix);
   const mk = (dest: AudioNode) => {
     const g = ac.createGain();
     g.gain.value = 0;
@@ -94,9 +131,9 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     orch: mk(pumpBus),
     bass: mk(pumpBus),
     arp: mk(pumpBus),
-    drums: mk(out),
-    gtr: mk(out),
-    lead: mk(out),
+    drums: mk(mix),
+    gtr: mk(mix),
+    lead: mk(mix),
   };
   type Layer = keyof typeof layers;
 
@@ -126,7 +163,7 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
   };
   // Rhythm guitar: voices sum *before* the drive so power chords intermodulate. The lead guitar has its own amp.
   const gtrDrive = amp(9, 0.12, layers.gtr);
-  const leadDrive = amp(6, 0.16, layers.lead);
+  const leadDrive = amp(5, 0.18, layers.lead);
   // Gritty themes push the bass through mild drive.
   const bassGrit = shaperOf(3);
   bassGrit.connect(layers.bass);
@@ -141,7 +178,7 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
       drums: 0.3 + 0.8 * ramp(I, 0.3, 0.9),
       gtr: 0.25 + 0.75 * ramp(I, 0.1, 0.9),
       arp: 0.55 + 0.45 * ramp(I, 0.1, 0.6),
-      lead: 0.6 + 0.5 * ramp(I, 0.4, 1),
+      lead: 0.7 + 0.4 * ramp(I, 0.4, 1),
     };
     const now = ac.currentTime;
     for (const k of Object.keys(layers) as Layer[]) layers[k].gain.setTargetAtTime(tgt[k], now, tc);
@@ -162,7 +199,8 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     const g = ac.createGain();
     const lp = ac.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(cut, t);
+    lp.frequency.setValueAtTime(cut * (v.open ?? 1), t);
+    if (v.open) lp.frequency.exponentialRampToValueAtTime(cut, t + Math.max(0.25, atk));
     if (v.pluck) lp.frequency.exponentialRampToValueAtTime(Math.max(150, cut * 0.25), t + dur);
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(peak, t + atk);
@@ -173,12 +211,13 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     send(g, verb, v.rev ?? 0);
     const end = hold + rel + 0.05;
     let lfoGain: GainNode | null = null;
-    if (v.vib && dur > 0.3) {
+    if (v.vib && dur > 0.4) {
       const lfo = ac.createOscillator();
       lfoGain = ac.createGain();
-      lfo.frequency.value = 5.5;
+      lfo.frequency.value = 5 + Math.random();
       lfoGain.gain.setValueAtTime(0, t);
-      lfoGain.gain.linearRampToValueAtTime(v.vib, t + Math.min(0.5, dur * 0.6));
+      lfoGain.gain.setValueAtTime(0, t + dur * 0.3);
+      lfoGain.gain.linearRampToValueAtTime(v.vib, t + dur * 0.85);
       lfo.connect(lfoGain);
       lfo.start(t);
       lfo.stop(end);
@@ -186,8 +225,11 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     for (const det of v.det ?? [0]) {
       const o = ac.createOscillator();
       o.type = v.type ?? 'sawtooth';
-      o.frequency.value = hz(m);
-      o.detune.value = det;
+      if (v.from !== undefined && v.from !== m) {
+        o.frequency.setValueAtTime(hz(v.from), t);
+        o.frequency.exponentialRampToValueAtTime(hz(m), t + (v.glide ?? 0.06));
+      } else o.frequency.value = hz(m);
+      o.detune.value = det + jitter(2);
       if (lfoGain) lfoGain.connect(o.detune);
       o.connect(lp);
       o.start(t);
@@ -214,6 +256,40 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
       o.stop(t + d + 0.05);
     }
   }
+  /** Felt piano: two detuned triangles and a soft 2nd harmonic, a velocity-bright filter that darkens as the note
+   *  rings, a long natural decay (longer in the bass), a damper at note-off and a faint hammer knock. */
+  function piano(dest: AudioNode, m: number, t: number, dur: number, vel: number, rev: number) {
+    const decay = 0.8 + 2.4 * clamp01((84 - m) / 44);
+    const g = ac.createGain();
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(900 + 4500 * vel, t);
+    lp.frequency.exponentialRampToValueAtTime(500 + 900 * vel, t + decay * 0.6);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.13 * vel, t + 0.004);
+    g.gain.setTargetAtTime(0.0001, t + 0.004, decay / 3);
+    g.gain.setTargetAtTime(0.0001, t + Math.max(dur, 0.15), 0.12);
+    lp.connect(g).connect(dest);
+    send(g, verb, rev);
+    send(g, delay, rev * 0.25);
+    const end = t + Math.max(dur, 0.15) + 0.6;
+    for (const [mul, det, lvl, type] of [
+      [1, -3, 1, 'triangle'],
+      [1, 4, 1, 'triangle'],
+      [2, 0, 0.25, 'sine'],
+    ] as const) {
+      const o = ac.createOscillator();
+      const og = ac.createGain();
+      o.type = type;
+      o.frequency.value = hz(m) * mul;
+      o.detune.value = det;
+      og.gain.value = lvl;
+      o.connect(og).connect(lp);
+      o.start(t);
+      o.stop(end);
+    }
+    hit(t, 0.025, 0.02 * vel, 'bandpass', 2500, 0, 0, dest);
+  }
   function hit(
     t: number,
     dur: number,
@@ -222,6 +298,7 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     f: number,
     rev = 0,
     sweepTo = 0,
+    dest: AudioNode = layers.drums,
   ) {
     const s = ac.createBufferSource();
     const g = ac.createGain();
@@ -233,7 +310,7 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(peak, t + (sweepTo ? dur * 0.95 : 0.002));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    s.connect(flt).connect(g).connect(layers.drums);
+    s.connect(flt).connect(g).connect(dest);
     send(g, verb, rev);
     s.start(t, Math.random() * 1.5);
     s.stop(t + dur + 0.05);
@@ -285,6 +362,7 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     sec: SectionDef,
     t: number,
     s16: number,
+    swing: number,
     I: number,
     lastBar: boolean,
     rev: number,
@@ -292,37 +370,39 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     const style = sec.drums;
     const hot = I > 0.85;
     for (let i = 0; i < 16; i++) {
-      const ti = t + i * s16;
+      const ti = t + i * s16 + (i % 2 ? swing : 0) + jitter(0.004);
+      // Velocity humanisation: every hit a little different, ghost-ish on the off-beats.
+      const v = (p: number) => p * (0.85 + Math.random() * 0.25) * (i % 4 ? 0.85 : 1);
       if (style === 'half') {
-        if (i === 0 || i === 10) kick(ti, 0.9);
-        if (i === 8) snare(ti, 0.8, rev);
-        if (i % 2 === 0 || hot) hit(ti, 0.05, i % 4 === 0 ? 0.35 : 0.22, 'highpass', 8000);
+        if (i === 0 || i === 10) kick(ti, v(0.9));
+        if (i === 8) snare(ti, v(0.8), rev);
+        if (i % 2 === 0 || hot) hit(ti, 0.05, v(i % 4 === 0 ? 0.35 : 0.22), 'highpass', 8000);
       } else if (style === 'drive') {
-        if ([0, 8, 10].includes(i) || (hot && [3, 6, 14].includes(i))) kick(ti, 1);
-        if (i === 4 || i === 12) snare(ti, 0.9, rev * 0.5);
-        if (i === 14) hit(ti, 0.18, 0.35, 'highpass', 6500);
-        else if (i % 2 === 0 || hot) hit(ti, 0.05, i % 4 === 2 ? 0.4 : 0.25, 'highpass', 8000);
+        if ([0, 8, 10].includes(i) || (hot && [3, 6, 14].includes(i))) kick(ti, v(1));
+        if (i === 4 || i === 12) snare(ti, v(0.9), rev * 0.5);
+        if (i === 14) hit(ti, 0.18, v(0.35), 'highpass', 6500);
+        else if (i % 2 === 0 || hot) hit(ti, 0.05, v(i % 4 === 2 ? 0.4 : 0.25), 'highpass', 8000);
       } else if (style === 'build') {
-        if (i % 4 === 0) kick(ti, 0.85);
+        if (i % 4 === 0) kick(ti, v(0.85));
         if (lastBar ? true : i === 8 || i === 12)
-          snare(ti, lastBar ? 0.2 + (0.7 * i) / 15 : 0.7, rev);
+          snare(ti, lastBar ? 0.2 + (0.7 * i) / 15 : v(0.7), rev);
       } else if (style === 'roll') {
         if (i === 0) kick(ti, 1);
-        if (i >= 8 || lastBar) tom(ti, 52 - (i % 8) * 2, 0.6);
+        if (i >= 8 || lastBar) tom(ti, 52 - (i % 8) * 2, v(0.6));
       } else if (style === 'pulse') {
-        if (i % 4 === 0) kick(ti, 0.85);
-        if (i % 4 === 2) hit(ti, 0.14, 0.32, 'highpass', 7000, 0.2);
+        if (i % 4 === 0) kick(ti, v(0.85));
+        if (i % 4 === 2) hit(ti, 0.14, v(0.32), 'highpass', 7000, 0.2);
         if (I > 0.6 && (i === 4 || i === 12)) {
-          hit(ti, 0.16, 0.7, 'bandpass', 1300, rev);
+          hit(ti, 0.16, v(0.7), 'bandpass', 1300, rev);
           hit(ti + 0.012, 0.1, 0.4, 'bandpass', 1500);
         }
-        if (hot && i % 2 === 1) hit(ti, 0.03, 0.15, 'highpass', 9000);
+        if (hot && i % 2 === 1) hit(ti, 0.03, v(0.15), 'highpass', 9000);
       } else if (style === 'taiko') {
         // Big low drums in a hall instead of a kit: accents on 1 and the "and" of 3.
-        if (i === 0 || i === 10) tom(ti, 33, 1);
-        if (i === 3 || i === 6) tom(ti, 36, 0.6);
-        if (i === 8 || i === 12) tom(ti, 43, 0.75);
-        if (hot && (i === 13 || i === 14 || i === 15)) tom(ti, 48, 0.45);
+        if (i === 0 || i === 10) tom(ti, 33, v(1));
+        if (i === 3 || i === 6) tom(ti, 36, v(0.6));
+        if (i === 8 || i === 12) tom(ti, 43, v(0.75));
+        if (hot && (i === 13 || i === 14 || i === 15)) tom(ti, 48, v(0.45));
         if (i === 0 || i === 10) kick(ti, 0.6);
       } else if (style === 'hits') {
         if (i === 0 || i === 6 || i === 8) {
@@ -334,60 +414,88 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     }
   }
 
-  /** Hook notes falling in [w0, w0 + 4) beats of the hook timeline scaled by `scale`. */
-  function hookBar(
-    hook: N[],
-    w0: number,
-    scale: number,
-    each: (n: N, beatInBar: number, durBeats: number) => void,
-  ) {
-    for (const n of hook) {
-      const b = n[1] * scale - w0;
-      if (b >= 0 && b < 4) each(n, b, n[2] * scale);
+  /** Notes of `line` falling in [w0, w0 + 4) beats of its 32-beat timeline. */
+  function lineBar(line: N[], w0: number, each: (n: N, beatInBar: number) => void) {
+    for (const n of line) {
+      const b = n[1] - w0;
+      if (b >= 0 && b < 4) each(n, b);
     }
   }
-  /** The theme's signature lead voice. */
-  function leadNote(th: ThemeDef, m: number, t: number, dur: number, gain: number, I: number) {
+  /** One lead note in the theme's voice, played legato with glides and bends where the phrase calls for it. */
+  function leadNote(
+    th: ThemeDef,
+    n: N,
+    m: number,
+    t: number,
+    dur: number,
+    gain: number,
+    I: number,
+    double: boolean,
+  ) {
     const sp = th.space;
+    const vel = n[3] ?? 0.8;
+    const g = gain * (vel / 0.8) * (0.92 + Math.random() * 0.16);
+    const legato = lastLead.m > 0 && Math.abs(t - lastLead.end) < LEGATO_GAP_S;
+    let from: number | undefined;
+    let glide = 0.06;
+    if (n[4] === 'bend') {
+      from = m - 2;
+      glide = 0.16;
+    } else if ((n[4] === 'slide' || legato) && lastLead.m > 0) {
+      from = lastLead.m;
+      glide = n[4] === 'slide' ? 0.14 : 0.05;
+    }
+    // Legato notes ease in instead of re-attacking.
+    const atk = (base: number) => (legato ? Math.max(base, 0.04) : base);
+    lastLead = { m, end: t + dur };
     if (th.voice === 'guitar') {
-      tone(leadDrive, m, t, dur, 0.3 * gain, {
-        cut: 2600,
-        atk: 0.008,
-        rel: 0.2,
-        det: [-4, 4],
-        vib: 22,
-        rev: 0.25,
-        dly: 0.15,
+      tone(leadDrive, m, t, dur, 0.3 * g, {
+        cut: 2400,
+        open: 1.8,
+        atk: atk(0.006),
+        rel: 0.25,
+        det: [-5, 5],
+        vib: 30,
+        from,
+        glide,
+        rev: 0.3,
+        dly: 0.18,
       });
-    } else if (th.voice === 'choir') {
-      bell(layers.lead, m + 12, t, 0.05 * gain, 0.8);
-      tone(layers.lead, m, t, dur, 0.1 * gain, {
-        type: 'triangle',
-        cut: 1800,
-        atk: 0.12,
-        rel: 0.8,
-        det: [-8, 8],
-        vib: 10,
-        rev: 0.8,
-        dly: 0.25,
-      });
-    } else if (th.voice === 'synth') {
-      tone(layers.lead, m, t, dur, 0.06 * gain, {
-        type: 'square',
-        cut: 2400 + 1600 * I,
-        atk: 0.01,
-        rel: 0.3,
-        det: [-6, 6],
-        vib: 16,
-        dly: 0.45 + 0.2 * sp,
-        rev: 0.35,
+    } else if (th.voice === 'piano') {
+      piano(layers.lead, m, t, dur, clamp01(0.75 * g), 0.75);
+      // In the chorus, strings double the piano so the melody sings over the band.
+      if (double)
+        tone(layers.lead, m, t, dur, 0.035 * g, {
+          det: [-8, 8],
+          cut: 1600,
+          open: 0.6,
+          atk: 0.25,
+          rel: 0.8,
+          vib: 12,
+          rev: 0.7,
+        });
+    } else if (th.voice === 'soar') {
+      tone(layers.lead, m, t, dur, 0.04 * g, {
+        det: [-14, -5, 5, 14],
+        cut: 2600 + 1500 * I,
+        open: 2,
+        atk: atk(0.03),
+        rel: 0.5,
+        vib: 20,
+        from,
+        glide: glide * 1.5,
+        dly: 0.5,
+        rev: 0.5,
       });
     } else {
-      tone(layers.lead, m, t, dur, 0.045 * gain, {
+      tone(layers.lead, m, t, dur, 0.045 * g, {
         cut: 3200 + 1500 * I,
         atk: 0.015,
         rel: 0.25,
         det: [-14, 0, 14],
+        vib: 12,
+        from,
+        glide,
         dly: 0.25 + 0.2 * sp,
         rev: 0.25 + 0.3 * sp,
       });
@@ -422,14 +530,24 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
       stingBoost = !stingBoost;
       retarget(stingBoost ? 0.1 : 0.7);
     }
+    // Section dynamics: lifts land on the downbeat, drops ease down.
+    const targetLevel = sec.level ?? 1;
+    if (targetLevel !== level) {
+      mix.gain.setTargetAtTime(targetLevel, t, targetLevel > level ? 0.04 : 0.6);
+      level = targetLevel;
+    }
     const beat = 60 / th.bpm;
     const barDur = beat * 4;
     const s16 = beat / 4;
-    const at = (b: number) => t + b * beat;
+    const swing = th.swing * s16;
+    /** Beat position in this bar -> time, with swing on off-beat 16ths. */
+    const at = (b: number) => t + b * beat + (Math.round(b * 4) % 2 ? swing : 0);
+    const human = (b: number) => at(b) + jitter(0.008);
     const I = effI();
     const sp = th.space;
     const lift = sec.lift ?? 0;
-    const chord = th.chords[((sec.chordOffset ?? 0) + barInSection) % th.chords.length]!;
+    const prog = sec.chords ?? th.chords;
+    const chord = prog[((sec.chordOffset ?? 0) + barInSection) % prog.length]!;
     const root = chord.root + lift;
     const tones = chord.tones.map((m) => m + lift);
     const lastBar = barInSection === sec.bars - 1;
@@ -438,23 +556,26 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
 
     if (sec.pad) {
       for (const m of tones)
-        tone(layers.pad, m, t, barDur, 0.05, {
-          cut: 500 + 1500 * I * (1 - 0.5 * sp),
+        tone(layers.pad, m, t, barDur, 0.045, {
+          cut: 600 + 1400 * I * (1 - 0.5 * sp),
+          open: 0.4,
           atk: 0.08 + sp * 0.9,
           rel: 0.5 + sp * 1.5,
-          det: [-9, 9],
+          det: [-10, -3, 4, 11],
           dly: 0.2 + 0.2 * sp,
-          rev: 0.25 + 0.5 * sp,
+          rev: 0.3 + 0.5 * sp,
         });
     }
     if (sec.strings) {
       for (const m of tones)
-        tone(layers.orch, m + 12, t, barDur, 0.035, {
+        tone(layers.orch, m + 12, human(0), barDur, 0.035, {
           cut: 2600,
+          open: 0.5,
           atk: 0.35,
           rel: 0.6,
           det: [-12, 0, 12],
-          rev: 0.4,
+          vib: 8,
+          rev: 0.45,
         });
     }
     if (sec.choir) {
@@ -465,13 +586,14 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
           atk: 0.6,
           rel: 1.2,
           det: [-6, 6],
+          vib: 6,
           rev: 0.7,
         });
     }
-    if (sec.brass === 'stabs') {
+    if (sec.brass) {
       for (const b of [0, 2.5])
         for (const m of tones)
-          tone(layers.orch, m, at(b), beat * 0.6, 0.06, {
+          tone(layers.orch, m, human(b), beat * 0.6, 0.06, {
             cut: 2200,
             atk: 0.02,
             rel: 0.15,
@@ -482,14 +604,33 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     }
     if (sec.bells) {
       [0, 1.5, 3].forEach((b, i) =>
-        bell(layers.orch, tones[i % tones.length]! + 24, at(b), 0.07, 0.4 + 0.4 * sp),
+        bell(
+          layers.orch,
+          tones[i % tones.length]! + 24,
+          human(b),
+          0.07 * (0.8 + Math.random() * 0.3),
+          0.4 + 0.4 * sp,
+        ),
       );
+    }
+    if (sec.keys) {
+      // Left-hand broken chord: bass note, then the voicing rolled upwards and back.
+      const pattern: [number, number, number][] = [
+        [0, root + 12, 0.55],
+        [1, tones[0]!, 0.4],
+        [1.5, tones[1]!, 0.38],
+        [2, tones[2]!, 0.42],
+        [3, tones[1]!, 0.35],
+      ];
+      for (const [b, m, v] of pattern)
+        piano(layers.orch, m, human(b), beat * 1.5, v * (0.85 + Math.random() * 0.3), 0.6);
     }
     if (sec.arp) {
       const ext = [...tones, ...tones.map((m) => m + 12), ...tones.map((m) => m + 24)];
       (th.arp ?? DEFAULT_ARP).forEach((idx, i) => {
         if (idx < 0) return;
-        tone(layers.arp, ext[idx % ext.length]!, t + i * s16, s16 * 0.9, 0.1, {
+        const accent = i % 4 === 0 ? 1.15 : 0.85 + Math.random() * 0.2;
+        tone(layers.arp, ext[idx % ext.length]!, at(i / 4), s16 * 0.9, 0.09 * accent, {
           type: th.gritty ? 'sawtooth' : 'square',
           cut: 1500 + 2500 * I,
           pluck: true,
@@ -505,8 +646,14 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     const bassDest = th.gritty ? bassGrit : layers.bass;
     const bassCut = 400 + 1100 * I;
     const bassNote = (m: number, b: number, d: number, peak = 0.32) => {
-      tone(bassDest, m, at(b), d * beat * 0.9, peak, { cut: bassCut, pluck: true, rel: 0.06 });
-      tone(layers.bass, m - 12, at(b), d * beat * 0.9, peak * 0.8, {
+      const p = peak * (0.9 + Math.random() * 0.15);
+      tone(bassDest, m, at(b), d * beat * 0.9, p, {
+        cut: bassCut,
+        open: 1.6,
+        pluck: true,
+        rel: 0.06,
+      });
+      tone(layers.bass, m - 12, at(b), d * beat * 0.9, p * 0.8, {
         type: 'sine',
         cut: 400,
         rel: 0.06,
@@ -535,16 +682,20 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
     if (sec.gtr) {
       const r = root < 40 ? root + 12 : root;
       const power = (m: number, b: number, d: number, peak: number, cut: number) => {
-        for (const p of [m, m + 7, m + 12])
-          tone(gtrDrive, p, at(b), d * beat, peak, {
+        const tb = human(b);
+        // Strummed: each string a few ms after the last.
+        [m, m + 7, m + 12].forEach((p, s) =>
+          tone(gtrDrive, p, tb + s * 0.006, d * beat, peak * (0.9 + Math.random() * 0.2), {
             cut,
             pluck: true,
             det: [-7, 7],
             rel: 0.08,
             rev: 0.12,
-          });
+          }),
+        );
       };
-      if (sec.gtr === 'chug') for (let i = 0; i < 8; i++) power(r, i / 2, 0.35, 0.09, 900);
+      if (sec.gtr === 'chug')
+        for (let i = 0; i < 8; i++) power(r, i / 2, 0.35, i % 2 ? 0.07 : 0.09, 900);
       else if (sec.gtr === 'riff')
         for (const n of th.riff ?? []) power(r + n[0], n[1], n[2] * 0.85, 0.08, n[3] ? 2600 : 1200);
       else {
@@ -553,57 +704,60 @@ export function createMusic(ac: AudioContext, out: AudioNode, noise: AudioBuffer
       }
     }
 
-    // Lead: the hook, positioned by the section bar on the 32-beat hook timeline.
-    if (sec.lead || sec.brass === 'hook') {
-      const sting = sec.lead === 'sting';
-      const double = sec.lead === 'hook2x';
-      const scale = double ? 0.5 : 1;
-      const w0 = (barInSection * 4) % (double ? 16 : 32);
-      // Teases only play the call (hook bars 1-2 and 5-6) so the verse hints at what the chorus delivers.
-      const tease = sec.lead === 'tease' && (w0 / 4) % 4 >= 2;
-      hookBar(sting ? (th.sting ?? []) : th.hook, w0, scale, (n, b, d) => {
-        if (tease) return;
-        const m = n[0] + lift;
-        const accent = n[3] ? 1.3 : 1;
-        const len = d * beat * 0.95;
-        if (sec.lead === 'solo')
-          tone(layers.lead, m, at(b), len, 0.12 * accent, {
-            type: 'triangle',
-            cut: 2400,
-            atk: 0.04,
-            rel: 0.4,
-            vib: 8,
-            dly: 0.35 + 0.2 * sp,
-            rev: 0.4 + 0.3 * sp,
-          });
-        else if (sec.lead === 'bells') bell(layers.lead, m, at(b), 0.12 * accent, 0.6 + 0.3 * sp);
-        else if (sec.lead === 'tease') leadNote(th, m, at(b), len, 0.6 * accent, I);
-        else if (sec.lead) {
-          leadNote(th, m, at(b), len, accent, I);
-          // Chorus and sting get an octave double on top: the lift you feel when the hook arrives.
-          tone(layers.lead, m + 12, at(b), len, 0.022 * accent, {
-            type: 'square',
-            cut: 4000,
-            atk: 0.01,
-            rel: 0.2,
-            vib: 12,
-            dly: 0.3,
-            rev: 0.3,
-          });
-        }
-        if (sec.brass === 'hook' || sting)
-          tone(layers.orch, m - 12, at(b), len, 0.05, {
-            cut: 1800,
-            atk: 0.04,
-            rel: 0.2,
-            det: [-6, 6],
-            rev: 0.3,
-          });
-      });
+    // Lead and countermelody, positioned by the section bar on their 32-beat timelines.
+    const w0 = (barInSection * 4) % 32;
+    if (sec.lead) {
+      const part = sec.lead;
+      const line =
+        part === 'sting' ? (th.sting ?? []) : part === 'verse' ? (th.verse ?? th.hook) : th.hook;
+      // Teases only play the call (hook bars 1-2 and 5-6), quietly: the breakdown remembers the chorus.
+      const skip = part === 'tease' && (w0 / 4) % 4 >= 2;
+      if (!skip)
+        lineBar(line, w0, (n, b) => {
+          const m = n[0] + lift;
+          const tn = human(b);
+          const len = n[2] * beat * 0.97;
+          if (part === 'solo')
+            tone(layers.lead, m, tn, len, 0.12 * ((n[3] ?? 0.8) / 0.8), {
+              type: 'triangle',
+              cut: 2400,
+              atk: 0.04,
+              rel: 0.4,
+              vib: 10,
+              dly: 0.35 + 0.2 * sp,
+              rev: 0.4 + 0.3 * sp,
+            });
+          else if (part === 'bells') bell(layers.lead, m, tn, 0.12, 0.6 + 0.3 * sp);
+          else {
+            const gain = part === 'verse' ? 0.8 : part === 'tease' ? 0.5 : 1.05;
+            leadNote(th, n, m, tn, len, gain, I, part === 'hook' || part === 'sting');
+          }
+          if (part === 'sting')
+            tone(layers.orch, m - 12, tn, len, 0.05, {
+              cut: 1800,
+              atk: 0.04,
+              rel: 0.2,
+              det: [-6, 6],
+              rev: 0.3,
+            });
+        });
+    }
+    if (sec.counter && th.counter) {
+      lineBar(th.counter, w0, (n, b) =>
+        tone(layers.orch, n[0] + lift, human(b), n[2] * beat, 0.05 * (0.9 + Math.random() * 0.2), {
+          det: [-6, 6],
+          cut: 1300,
+          open: 0.5,
+          atk: 0.2,
+          rel: 0.6,
+          vib: 14,
+          rev: 0.5,
+        }),
+      );
     }
 
     const drumsOn = sec.drums !== 'none' && I >= (sec.drumsMinI ?? 0);
-    if (drumsOn) drums(sec, t, s16, I, lastBar, 0.1 + 0.3 * sp);
+    if (drumsOn) drums(sec, t, s16, swing, I, lastBar, 0.1 + 0.3 * sp);
     if (sec.crash && barInSection === 0) impact(t);
     if (sec.riser && barInSection === Math.max(0, sec.bars - 2))
       hit(t, barDur * 2, 0.25, 'bandpass', 300, 0.5, 6000);
