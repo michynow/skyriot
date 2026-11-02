@@ -34,8 +34,6 @@ const FAR_BOOST_DISTANCE = 1200;
 const DODGE_CHANCE = 0.3;
 const ROLL_CHANCE = 0.08;
 const HEAL_HP_FRACTION = 0.4;
-const HEAL_SLOT = 7;
-const SHIELD_SLOT = 8;
 const SKILL_CHANCE = 0.01;
 const RESUPPLY_AMMO_FRACTION = 0.05;
 const DECK_APPROACH_HEIGHT = 20;
@@ -334,7 +332,7 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       input.hotbar = flareSlot;
     }
   } else if (me.hp < me.maxHp * HEAL_HP_FRACTION && mem.rng() < SKILL_CHANCE * 10) {
-    input.hotbar = mem.rng() < 0.5 ? HEAL_SLOT : SHIELD_SLOT;
+    input.hotbar = fd.hotbar.indexOf(mem.rng() < 0.5 ? 'repair-kit' : 'shield-kit');
   }
   // Engagement: use buff Skills off cooldown, and pick the Anvil bombing mode by target.
   if (input.hotbar === -1 && enemy && dist < BUFF_ENGAGE_DIST && !me.docked) {

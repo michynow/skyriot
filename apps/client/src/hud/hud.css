@@ -2245,3 +2245,32 @@
   text-shadow: 0 0 6px #000;
   zoom: var(--hud-scale, 1);
 }
+
+.hotbar-tabs {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font:
+    700 10px 'Orbitron',
+    sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.hotbar-tabs span {
+  padding: 2px 8px;
+  color: #d8f4ff99;
+  background: #06101ab3;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+}
+.hotbar-tabs span.on {
+  color: #06101a;
+  background: #7fe7ff;
+}
+.hotbar-tabs kbd {
+  margin-left: 4px;
+  color: #d8f4ffaa;
+}

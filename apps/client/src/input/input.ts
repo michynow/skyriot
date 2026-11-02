@@ -2,6 +2,8 @@ import type { Camera } from 'three';
 import {
   EMPTY_INPUT,
   FRAMES,
+  HOTBAR_BARS,
+  HOTBAR_BAR_SLOTS,
   STRUCTURES,
   TICK_HZ,
   type PilotInput,
@@ -21,6 +23,8 @@ export const inputState = {
   haltPromptUntil: 0,
   /** performance.now() of the last double-tap made while the Barrel Roll was still recharging. */
   rollDeniedAt: 0,
+  /** Hotbar bar the number keys fire (0-based); C cycles, F1-F3 pick. */
+  hotbarBar: 0,
   /** Last aim direction sent (unit, world space); HUD range feedback raycasts along it from the Ship. */
   aim: [0, 0, -1] as [number, number, number],
 };
@@ -216,9 +220,14 @@ export function attachInput(canvas: HTMLElement): () => void {
     else if (e.code.startsWith('Alt')) {
       world.freeLook = true;
       world.cursor.x = world.cursor.y = 0;
+    } else if (e.code === 'KeyC' && !e.repeat) {
+      inputState.hotbarBar = (inputState.hotbarBar + 1) % HOTBAR_BARS;
+    } else if (/^F[1-9]$/.test(e.code) && Number(e.code.slice(1)) <= HOTBAR_BARS) {
+      e.preventDefault();
+      inputState.hotbarBar = Number(e.code.slice(1)) - 1;
     } else if (e.code.startsWith('Digit')) {
       const n = Number(e.code.slice(5));
-      hotbar = n === 0 ? 9 : n - 1;
+      hotbar = inputState.hotbarBar * HOTBAR_BAR_SLOTS + (n === 0 ? 9 : n - 1);
       const own = world.ownId ? world.ships.get(world.ownId) : undefined;
       // Pivot Flip turns the steering aim around; the sim only lifts the turn-rate cap.
       if (own && FRAMES[own.frame].hotbar[hotbar] === 'pivot-flip' && !own.cooldowns[hotbar]) {

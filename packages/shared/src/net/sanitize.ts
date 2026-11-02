@@ -1,3 +1,4 @@
+import { HOTBAR_BARS, HOTBAR_BAR_SLOTS } from '../content/frames';
 import type { PilotInput, Vec3 } from '../types';
 
 const MAX_SEQ = 2 ** 31 - 1;
@@ -19,7 +20,7 @@ export function sanitizeInput(raw: unknown): PilotInput | null {
   const strafe = num(r.strafe, -1, 1);
   const vertical = num(r.vertical, -1, 1);
   const viewTick = num(r.viewTick, 0, MAX_SEQ);
-  const hotbar = num(r.hotbar, -1, 9);
+  const hotbar = num(r.hotbar, -1, HOTBAR_BARS * HOTBAR_BAR_SLOTS - 1);
   const a = r.aim;
   if (seq === null || throttle === null || strafe === null || vertical === null) return null;
   if (!Array.isArray(a) || a.length !== 3) return null;

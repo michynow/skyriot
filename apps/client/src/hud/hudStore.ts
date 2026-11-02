@@ -106,6 +106,8 @@ export interface HudState {
   impactText: string;
   impactNonce: number;
   hotbar: (SkillId | null)[];
+  /** Hotbar bar the number keys fire (0-based). */
+  hotbarBar: number;
   /** 0..1 remaining fraction per slot, plus seconds. */
   cooldownFrac: number[];
   cooldownSec: number[];
@@ -194,6 +196,7 @@ export const useHud = create<HudState>(() => ({
   impactText: '',
   impactNonce: 0,
   hotbar: Array(10).fill(null),
+  hotbarBar: 0,
   cooldownFrac: Array(10).fill(0),
   cooldownSec: Array(10).fill(0),
   killfeed: [],
@@ -566,6 +569,7 @@ export function startHudFeed(): () => void {
         })),
         toggles: own.toggles,
         hotbar,
+        hotbarBar: inputState.hotbarBar,
         cooldownFrac: cd.map((c, i) => Math.min(1, c / total[i]!)),
         cooldownSec: cd.map((c) => c / TICK_HZ),
         halted: own.halted === true,

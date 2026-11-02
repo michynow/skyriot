@@ -385,7 +385,7 @@ export interface FrameDef extends Omit<EngineDef, 'id' | 'name'> {
   primary: WeaponId;
   secondary: WeaponId;
   /**
-   * Default hotbar, 10 entries; null = empty. The Frame's full kit is every SKILLS entry listing it
+   * Default hotbar: HOTBAR_BARS bars of HOTBAR_BAR_SLOTS slots, flattened; null = empty. The Frame's full kit is every SKILLS entry listing it
    * (or 'all'); kit Skills off the hotbar wait for Loadout editing.
    */
   hotbar: (SkillId | null)[];

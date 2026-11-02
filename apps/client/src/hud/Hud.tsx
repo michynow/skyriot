@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ENGINES, FRAMES, SKILLS, WEAPONS } from '@skyriot/shared';
+import { ENGINES, FRAMES, HOTBAR_BAR_SLOTS, SKILLS, WEAPONS } from '@skyriot/shared';
 import { useShallow } from 'zustand/react/shallow';
 import { session } from '../net/session';
 import { inputState, setTyping } from '../input/input';
@@ -189,10 +189,13 @@ function Status() {
 const mmss = (sec: number) =>
   `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
+const BAR_NAMES = ['Core', 'Kit', 'Utility'];
+
 function Hotbar() {
-  const { hotbar, frac, sec, toggles, fx } = useHud(
+  const { all, bar, frac, sec, toggles, fx } = useHud(
     useShallow((h) => ({
-      hotbar: h.hotbar,
+      all: h.hotbar,
+      bar: h.hotbarBar,
       frac: h.cooldownFrac,
       sec: h.cooldownSec,
       toggles: h.toggles,
@@ -200,10 +203,22 @@ function Hotbar() {
     })),
   );
   const [tip, setTip] = useState<{ i: number; left: number } | null>(null);
-  const tipSkill = tip ? SKILLS[hotbar[tip.i] ?? ''] : undefined;
+  // Slots are flattened bars; i below is the absolute slot, i - first the key on this bar.
+  const first = bar * HOTBAR_BAR_SLOTS;
+  const hotbar = all.slice(first, first + HOTBAR_BAR_SLOTS);
+  const tipSkill = tip ? SKILLS[all[tip.i] ?? ''] : undefined;
   return (
     <div className="hotbar" data-ui>
-      {hotbar.map((id, i) => {
+      <div className="hotbar-tabs">
+        {Array.from({ length: Math.ceil(all.length / HOTBAR_BAR_SLOTS) }, (_, b) => (
+          <span key={b} className={b === bar ? 'on' : ''}>
+            F{b + 1} {BAR_NAMES[b]}
+          </span>
+        ))}
+        <kbd>C</kbd>
+      </div>
+      {hotbar.map((id, k) => {
+        const i = first + k;
         const skill = id ? SKILLS[id] : undefined;
         const cd = frac[i] ?? 0;
         const on =
@@ -215,6 +230,7 @@ function Hotbar() {
         return (
           <div
             key={`${i}-${punched ? fx!.nonce : 0}`}
+            data-slot={i}
             className={`slot ${skill ? '' : 'empty'} ${skill?.kind ?? ''} ${cd > 0 ? 'cooling' : ''} ${on ? 'on' : ''} ${punched ? 'punch' : ''}`}
             onMouseEnter={(e) =>
               skill &&
@@ -224,7 +240,7 @@ function Hotbar() {
             onMouseLeave={() => setTip(null)}
           >
             {id && <SkillIcon id={id} />}
-            <span className="slot-k">{(i + 1) % 10}</span>
+            <span className="slot-k">{(k + 1) % 10}</span>
             {on && <span className="slot-on">ON</span>}
             <div className="slot-cd" style={{ ['--p' as string]: `${cd * 360}deg` }} />
             {(sec[i] ?? 0) > 0.05 && <span className="slot-t">{(sec[i] ?? 0).toFixed(1)}</span>}
@@ -276,7 +292,9 @@ function SkillFx() {
   );
   useEffect(() => {
     if (!fx) return;
-    const slot = document.querySelectorAll('.hotbar .slot')[fx.slot]?.getBoundingClientRect();
+    const slot = document
+      .querySelector(`.hotbar .slot[data-slot="${fx.slot}"]`)
+      ?.getBoundingClientRect();
     if (slot)
       setFly({
         nonce: fx.nonce,
@@ -508,7 +526,8 @@ function Loadout() {
               <div key={i} title={SKILLS[id]?.description}>
                 <SkillIcon id={id} />
                 <small>
-                  {(i + 1) % 10} {SKILLS[id]?.name}
+                  F{Math.floor(i / HOTBAR_BAR_SLOTS) + 1}·{((i % HOTBAR_BAR_SLOTS) + 1) % 10}{' '}
+                  {SKILLS[id]?.name}
                 </small>
               </div>
             ),
