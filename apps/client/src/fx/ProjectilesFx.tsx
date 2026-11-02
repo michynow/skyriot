@@ -14,6 +14,7 @@ import { PALETTES } from '../frames/palette';
 import { MODEL_SCALE, getModel } from '../frames/models';
 import { camSnap } from '../scene/ChaseCamera';
 import { rollAngle, rollDirs } from '../frames/roll';
+import { takeLocalShot } from '../net/ownShots';
 import { world } from '../state/world';
 import { skillActivation, updateBeams } from './skillFx';
 import { ShellSet } from './shells';
@@ -314,6 +315,26 @@ function handleEvents(fx: Fx, _dt: number) {
     }
     switch (e.type) {
       case 'projectileSpawned': {
+        const localId = takeLocalShot(e.id);
+        if (localId !== undefined) {
+          // Already drawn when fired locally: move it onto the server's id and path, same distance out.
+          const i = fx.proj.find(localId);
+          if (i >= 0) {
+            const o = i * PS,
+              f = fx.proj.f;
+            const d = Math.hypot(
+              f[o]! - e.origin[0],
+              f[o + 1]! - e.origin[1],
+              f[o + 2]! - e.origin[2],
+            );
+            fx.proj.id[i] = e.id;
+            for (let k = 0; k < 3; k++) {
+              f[o + k] = e.origin[k]! + e.dir[k]! * d;
+              f[o + 3 + k] = e.dir[k]! * e.speed;
+            }
+          }
+          break;
+        }
         const nation = world.ships.get(e.owner)?.nation ?? 'concord';
         fx.proj.add(e, TRACER[nation]);
         // muzzle flash
