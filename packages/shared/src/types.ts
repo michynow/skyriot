@@ -312,6 +312,9 @@ export interface MapDef {
   launchDecks: Record<NationId, LaunchDeck[]>;
   /** One Base per Nation: Launch Tunnels, Shield Stations, Turrets, Core. */
   bases: Record<NationId, BaseDef>;
+  /** City: safe zone (no damage), hosts the shop/hangar; owned by this Nation. */
+  city?: NationId;
+  gates?: GateDef[];
 }
 
 export interface BaseDef {
@@ -473,6 +476,11 @@ export const MSG = {
   snapshot: 'snapshot', // S→C Snapshot
   events: 'events', // S→C SimEvent[]
   console: 'console', // S→C { text: string } dev command replies
+  profile: 'profile', // S→C PilotProfile (on join and after every economy change)
+  buy: 'buy', // C→S BuyRequest (city only)
+  upgrade: 'upgrade', // C→S UpgradeRequest (city only)
+  equip: 'equip', // C→S EquipRequest (city only)
+  travel: 'travel', // S→C TravelOrder: leave this room, join `mapId`
 } as const;
 
 export interface JoinOptions {
@@ -480,6 +488,81 @@ export interface JoinOptions {
   nation: NationId;
   frame: FrameId;
   name: string;
+  /** Session token from the auth endpoint; absent = guest (profile not persisted). */
+  token?: string;
+  /** Signed travel token when arriving through a Gate. */
+  travel?: string;
+}
+
+// ---- Economy (M2) ----
+
+export type ItemDefId = WeaponId | EngineId;
+export type ItemId = string;
+
+/** One owned piece of gear. Upgrade +0..+10 never fails (ADR 0004). */
+export interface ItemInstance {
+  id: ItemId;
+  def: ItemDefId;
+  kind: 'weapon' | 'engine';
+  upgrade: number;
+}
+
+export interface Wallet {
+  credits: number;
+  scrap: number;
+  glory: number;
+}
+
+/** Equipped item per slot; absent = the Frame's stock part. */
+export interface Loadout {
+  primary?: ItemId;
+  secondary?: ItemId;
+  engine?: ItemId;
+}
+
+/** What the server tells a Pilot about themselves. Server is the only writer. */
+export interface PilotProfile {
+  name: string;
+  nation: NationId;
+  level: number;
+  xp: number;
+  wallet: Wallet;
+  items: ItemInstance[];
+  /** Per Frame. */
+  loadouts: Partial<Record<FrameId, Loadout>>;
+  guest: boolean;
+}
+
+export interface BuyRequest {
+  def: ItemDefId;
+}
+export interface UpgradeRequest {
+  item: ItemId;
+}
+export interface EquipRequest {
+  frame: FrameId;
+  slot: keyof Loadout;
+  /** null = back to stock. */
+  item: ItemId | null;
+}
+export interface TravelOrder {
+  mapId: MapId;
+  travel: string;
+}
+
+/** A shop listing; cities sell every unlocked tier. */
+export interface ShopEntry {
+  def: ItemDefId;
+  kind: ItemInstance['kind'];
+  tier: number;
+  credits: number;
+}
+
+/** Map-to-map portal. Flying into it sends a TravelOrder. */
+export interface GateDef {
+  pos: Vec3;
+  radius: number;
+  to: MapId;
 }
 
 export interface Welcome {
