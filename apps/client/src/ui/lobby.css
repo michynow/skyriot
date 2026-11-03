@@ -357,6 +357,29 @@
   text-transform: uppercase;
   color: #ffffff88;
 }
+.lb-auth-form {
+  display: flex;
+  gap: 8px;
+}
+.lb-auth {
+  cursor: pointer;
+  padding: 9px 14px;
+  font:
+    700 14px 'Rajdhani',
+    sans-serif;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--a);
+  background: #00000055;
+  border: 1px solid var(--line);
+}
+.lb-auth-note {
+  max-width: 320px;
+  font:
+    500 13px 'Rajdhani',
+    sans-serif;
+  color: #ffffffaa;
+}
 .lobby input {
   width: 240px;
   padding: 9px 14px;

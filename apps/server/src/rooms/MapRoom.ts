@@ -22,12 +22,14 @@ import {
   type MapDef,
   type NationId,
   type PilotInput,
+  type PilotProfile,
   type Sim,
   type ShipId,
   type Snapshot,
   type Welcome,
 } from '@skyriot/shared';
 import { botBrain, createBotMemory, type BotMemory } from '../bots/botBrain';
+import { loadProfile, saveProfile } from '../profiles';
 import { runDevCommand } from './devCommands';
 import { packShared, snapshotFrame } from './snapshotFrame';
 
@@ -43,6 +45,7 @@ const MAX_INPUT_QUEUE = 30;
 const SLOW_TICK_MS = 8;
 const SLOW_LOG_INTERVAL_MS = 5000;
 const MAX_NAME_LENGTH = 16;
+const PROFILE_FLUSH_MS = 60_000;
 const NATIONS: NationId[] = ['concord', 'vex'];
 const FRAME_IDS = Object.keys(FRAMES) as FrameId[];
 
@@ -80,6 +83,8 @@ export class MapRoom extends Room {
   private lastSlowLog = 0;
   private frozen = new Set<ShipId>();
   private stepInputs = new Map<ShipId, PilotInput>();
+  /** Live Pilot profile per human Ship. Mutate in place, then send MSG.profile; saved on leave + every 60 s. */
+  private profiles = new Map<ShipId, PilotProfile>();
 
   onCreate(options: { mapId?: string }) {
     this.map = MAPS[options.mapId ?? ''] ?? RUSTWATER_CANYONS;
@@ -116,10 +121,11 @@ export class MapRoom extends Room {
     });
 
     this.setSimulationInterval((deltaMs) => this.loop(deltaMs), LOOP_INTERVAL_MS);
+    this.clock.setInterval(() => this.profiles.forEach(saveProfile), PROFILE_FLUSH_MS);
     console.log(`[MapRoom] created map=${this.map.id}`);
   }
 
-  onJoin(client: Client, options: Partial<JoinOptions>) {
+  async onJoin(client: Client, options: Partial<JoinOptions>) {
     const nation: NationId = options.nation === 'vex' ? 'vex' : 'concord';
     const frame: FrameId = FRAME_IDS.includes(options.frame as FrameId)
       ? (options.frame as FrameId)
@@ -127,9 +133,21 @@ export class MapRoom extends Room {
     const name =
       (typeof options.name === 'string' ? options.name : 'Pilot').slice(0, MAX_NAME_LENGTH) ||
       'Pilot';
-    this.makeSlot(nation);
+    const profile = await loadProfile(options.token, name, nation).catch((err: Error) => {
+      console.warn(`[MapRoom] profile load failed, joining as guest: ${err.message}`);
+      return loadProfile(undefined, name, nation);
+    });
+    this.makeSlot(profile.nation);
     const id = client.sessionId;
-    this.sim.addShip(id, { nation, frame, name, isBot: false, tier: 1, upgrade: 0 });
+    this.profiles.set(id, profile);
+    this.sim.addShip(id, {
+      nation: profile.nation,
+      frame,
+      name: profile.name,
+      isBot: false,
+      tier: 1,
+      upgrade: 0,
+    });
     this.humans.set(id, { queue: [], last: null, ack: 0, buffering: true });
     this.byId.set(id, client);
     const welcome: Welcome = {
@@ -140,7 +158,10 @@ export class MapRoom extends Room {
       dev: isDevAllowed(client),
     };
     client.send(MSG.welcome, welcome);
-    console.log(`[MapRoom] join ${id} ${nation}/${frame} ships=${[...this.sim.ships()].length}`);
+    client.send(MSG.profile, profile);
+    console.log(
+      `[MapRoom] join ${id} ${profile.nation}/${frame}${profile.guest ? ' guest' : ''} ships=${[...this.sim.ships()].length}`,
+    );
   }
 
   onLeave(client: Client, code?: number) {
@@ -149,6 +170,9 @@ export class MapRoom extends Room {
     this.sim.removeShip(id);
     this.humans.delete(id);
     this.byId.delete(id);
+    const profile = this.profiles.get(id);
+    this.profiles.delete(id);
+    if (profile) void saveProfile(profile);
     this.fillBots();
   }
 

@@ -13,6 +13,27 @@ import { HangarCanvas, ShipStage } from './FramePreview';
 import './lobby.css';
 
 const KEY = 'skyriot.lobby';
+const TOKEN_KEY = 'skyriot.token';
+const AUTH_URL = (import.meta.env.VITE_SERVER_URL ?? 'ws://localhost:2567').replace(/^ws/, 'http');
+
+// The sign-in link lands here as `#token=…`: keep it, then drop it from the address bar.
+const linked = new URLSearchParams(location.hash.slice(1)).get('token');
+if (linked) {
+  try {
+    localStorage.setItem(TOKEN_KEY, linked);
+  } catch {
+    /* ignore */
+  }
+  history.replaceState(null, '', location.pathname + location.search);
+}
+
+function readToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
 const NATIONS: Record<NationId, { name: string; motto: string; blurb: string }> = {
   concord: {
     name: 'Aurelian Concord',
@@ -77,6 +98,9 @@ function Stat({ label, value, max }: { label: string; value: number; max: number
 
 export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
   const [sel, setSel] = useState(load);
+  const [token, setToken] = useState(readToken);
+  const [email, setEmail] = useState('');
+  const [authNote, setAuthNote] = useState('');
   const stage = useRef<HTMLDivElement>(null);
   const thumbs = useRef(
     Object.fromEntries(FRAME_IDS.map((id) => [id, createRef<HTMLDivElement>()])) as Record<
@@ -99,7 +123,37 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
     } catch {
       /* ignore */
     }
-    onLaunch({ mapId: RUSTWATER_CANYONS.id, nation: sel.nation, frame: sel.frame, name });
+    onLaunch({
+      mapId: RUSTWATER_CANYONS.id,
+      nation: sel.nation,
+      frame: sel.frame,
+      name,
+      ...(token && { token }),
+    });
+  };
+
+  const requestLink = async () => {
+    setAuthNote('Sending…');
+    const res = await fetch(`${AUTH_URL}/auth/link`, { method: 'POST', body: email }).catch(
+      () => null,
+    );
+    setAuthNote(
+      res?.ok
+        ? 'Sign-in link sent. Check your inbox (dev: server console).'
+        : res?.status === 400
+          ? 'That email looks wrong.'
+          : 'Sign-in unavailable. Launch as guest.',
+    );
+  };
+
+  const signOut = () => {
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      /* ignore */
+    }
+    setToken(null);
+    setAuthNote('');
   };
 
   return (
@@ -211,6 +265,33 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
           <summary>Controls</summary>
           <Controls frame={sel.frame} compact />
         </details>
+        <div className="lb-callsign">
+          <span>{token ? 'Signed in' : 'Sign in to save progress'}</span>
+          {token ? (
+            <button className="lb-auth" onClick={signOut}>
+              Sign out
+            </button>
+          ) : (
+            <form
+              className="lb-auth-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void requestLink();
+              }}
+            >
+              <input
+                type="email"
+                required
+                value={email}
+                placeholder="you@example.com"
+                aria-label="Email"
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <button className="lb-auth">Send link</button>
+            </form>
+          )}
+          {authNote && <em className="lb-auth-note">{authNote}</em>}
+        </div>
         <label className="lb-callsign">
           <span>Callsign</span>
           <input

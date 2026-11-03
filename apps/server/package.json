@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "NODE_ENV=development tsx watch src/index.ts",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p .",
+    "db:generate": "drizzle-kit generate"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
