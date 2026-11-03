@@ -5,6 +5,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { generateHeightfield, type MapDef } from '@skyriot/shared';
 import { setShipEnv } from '../frames/palette';
 import { world } from '../state/world';
+import { Gates } from './Gates';
 import { LaunchDecks } from './LaunchDecks';
 import { Scatter } from './Scatter';
 import { SkyDome, SUN_DIR } from './SkyDome';
@@ -94,6 +95,7 @@ export function MapScene({ map }: { map: MapDef }) {
       <SkyDome env={map.env} />
       <Lights map={map} />
       <LaunchDecks map={map} />
+      <Gates map={map} />
       {atmos && (
         <Suspense fallback={null}>
           <Terrain map={map} hf={hf} />

@@ -19,8 +19,10 @@ export function enemyOf(nation: NationId): NationId {
 
 /** Build every Base structure from the MapDef. Same on client and server, so colliders agree. */
 export function createStructures(ctx: SimCtx): void {
+  const bases = ctx.map.bases;
+  if (!bases) return;
   for (const nation of NATIONS) {
-    const base = ctx.map.bases[nation];
+    const base = bases[nation];
     ctx.coreIndex[nation] = ctx.structures.length;
     addStructure(ctx, nation, 'core', `${nation}-core`, base.core);
     base.shieldStations.forEach((p, i) =>
@@ -45,7 +47,7 @@ function addStructure(
       .setTranslation(pos[0], pos[1] + def.height / 2, pos[2])
       .setCollisionGroups(TERRAIN_GROUPS),
   );
-  const base = ctx.map.bases[nation];
+  const base = ctx.map.bases![nation];
   const rec: StructureRec = {
     state: {
       id,
@@ -189,7 +191,7 @@ export function domeEntry(
   if (!ctx.match.shielded[enemy]) return Infinity;
   const core = coreOf(ctx, enemy);
   const c = core.state.pos;
-  const r = ctx.map.bases[enemy].shieldRadius;
+  const r = ctx.map.bases![enemy].shieldRadius;
   const ox = px - c[0],
     oy = py - c[1],
     oz = pz - c[2];
@@ -214,7 +216,7 @@ export function pushOutOfDomes(ctx: SimCtx, rec: ShipRec): void {
   const enemy = enemyOf(s.nation);
   if (!ctx.match.shielded[enemy]) return;
   const c = coreOf(ctx, enemy).state.pos;
-  const r = ctx.map.bases[enemy].shieldRadius + ctx.frames[s.frame].radius;
+  const r = ctx.map.bases![enemy].shieldRadius + ctx.frames[s.frame].radius;
   const ox = s.pos[0] - c[0],
     oy = s.pos[1] - c[1],
     oz = s.pos[2] - c[2];
@@ -250,7 +252,7 @@ export function stepBattle(ctx: SimCtx): boolean {
     setSolid(ctx, st, true);
   }
   for (const nation of NATIONS) {
-    ctx.match.shielded[nation] = ctx.map.bases[nation].shieldStations.length > 0;
+    ctx.match.shielded[nation] = (ctx.map.bases?.[nation].shieldStations.length ?? 0) > 0;
     ctx.match.queues[nation].length = 0;
     ctx.tunnelFreeTick[nation].fill(0);
     ctx.formationSlot[nation] = 0;

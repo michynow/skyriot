@@ -324,6 +324,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     ctx.list.push(rec.state);
     ctx.recList.push(rec);
     if (at) placeAndLaunch(rec, at, false);
+    else if (!map.bases) placeAndLaunch(rec, map.spawns[spawn.nation][0]!, false);
     else {
       resetVitals(rec);
       // Bots joining fill the sky in front of their Base; only humans go through the hangar.
@@ -348,7 +349,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
   /** Full vitals, then into the Launch Queue (or, for Bots at a Battle start, straight into formation). */
   function respawn(rec: ShipRec, battleStart = false): void {
     resetVitals(rec);
-    if (battleStart && rec.state.isBot) deployInFormation(ctx, rec);
+    if (!map.bases) placeAndLaunch(rec, map.spawns[rec.state.nation][0]!, false);
+    else if (battleStart && rec.state.isBot) deployInFormation(ctx, rec);
     else enterHangar(ctx, rec);
     ctx.events.push({
       type: 'shipRespawned',
@@ -379,7 +381,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     tickTimers(rec);
     useHotbar(ctx, rec, input.hotbar, predictOnly);
     if (!predictOnly) {
-      stepWeapons(ctx, rec, input);
+      if (!map.city) stepWeapons(ctx, rec, input);
       if (rec.shieldDelay > 0) rec.shieldDelay -= ctx.dt;
       else
         s.shield = Math.min(

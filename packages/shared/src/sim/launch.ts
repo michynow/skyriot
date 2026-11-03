@@ -9,10 +9,10 @@ const STAGING_TICKS = Math.ceil(LAUNCH.stagingSec * TICK_HZ);
 const READY_TIMEOUT_TICKS = Math.ceil(LAUNCH.readyTimeoutSec * TICK_HZ);
 const TUNNEL_COOLDOWN_TICKS = Math.ceil(LAUNCH.tunnelCooldownSec * TICK_HZ);
 
-/** Put a (reset) Ship into its Base's hangar, at the back of the Launch Queue. */
+/** Put a (reset) Ship into its Base's hangar, at the back of the Launch Queue. Maps with Bases only. */
 export function enterHangar(ctx: SimCtx, rec: ShipRec): void {
   const s = rec.state;
-  const base = ctx.map.bases[s.nation];
+  const base = ctx.map.bases![s.nation];
   s.launchPhase = 'hangar';
   s.tunnel = -1;
   s.launchTicks = 0;
@@ -33,11 +33,11 @@ export function enterHangar(ctx: SimCtx, rec: ShipRec): void {
   s.queuePos = queue.indexOf(s.id);
 }
 
-/** Skip the queue: start flying at cruise speed in the next formation slot ahead of the Base. */
+/** Skip the queue: start flying at cruise speed in the next formation slot ahead of the Base. Maps with Bases only. */
 export function deployInFormation(ctx: SimCtx, rec: ShipRec): void {
   const s = rec.state;
   leaveQueue(ctx, rec);
-  const base = ctx.map.bases[s.nation];
+  const base = ctx.map.bases![s.nation];
   const slot = ctx.formationSlot[s.nation]++;
   const row = Math.floor(slot / FORMATION.perRow);
   const column = (slot % FORMATION.perRow) - (FORMATION.perRow - 1) / 2;
@@ -70,9 +70,11 @@ export function leaveQueue(ctx: SimCtx, rec: ShipRec): void {
 
 /** Authoritative: stage the head of each Launch Queue into a free Launch Tunnel. */
 export function stepLaunchQueue(ctx: SimCtx): void {
+  const bases = ctx.map.bases;
+  if (!bases) return;
   for (const nation of NATIONS) {
     const queue = ctx.match.queues[nation];
-    const tunnels = ctx.map.bases[nation].tunnels;
+    const tunnels = bases[nation].tunnels;
     const free = ctx.tunnelFreeTick[nation];
     for (let i = 0; i < tunnels.length && queue.length > 0; i++) {
       if (ctx.tick < free[i]! || tunnelBusy(ctx, nation, i)) continue;
@@ -125,7 +127,7 @@ export function stepLaunch(ctx: SimCtx, rec: ShipRec, input: PilotInput): void {
       }
       return;
     case 'catapult': {
-      const tunnel = ctx.map.bases[s.nation].tunnels[s.tunnel];
+      const tunnel = ctx.map.bases?.[s.nation].tunnels[s.tunnel];
       if (!tunnel) {
         s.launchPhase = 'none';
         return;
@@ -154,7 +156,7 @@ export function stepLaunch(ctx: SimCtx, rec: ShipRec, input: PilotInput): void {
 /** Catapult stroke: uniform acceleration from rest to boost speed over the tunnel length. */
 function strokeTicks(ctx: SimCtx, rec: ShipRec): number {
   const s = rec.state;
-  const tunnel = ctx.map.bases[s.nation].tunnels[s.tunnel];
+  const tunnel = ctx.map.bases?.[s.nation].tunnels[s.tunnel];
   const length = tunnel ? tunnel.length : 0;
   return Math.max(1, Math.round((2 * length) / rec.fd.boostSpeed / TICK_DT));
 }

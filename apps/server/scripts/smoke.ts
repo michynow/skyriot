@@ -1,6 +1,7 @@
 import * as RAPIER from '@dimforge/rapier3d-compat';
 import {
   FRAMES,
+  GILDSPIRE,
   RUSTWATER_CANYONS,
   createSim,
   generateHeightfield,
@@ -14,6 +15,7 @@ import {
   type SimEvent,
 } from '@skyriot/shared';
 import { botBrain, createBotMemory } from '../src/bots/botBrain';
+import { signTravel, verifyTravel } from '../src/travel';
 
 const SHIPS = 40;
 const TICKS = 900;
@@ -594,6 +596,62 @@ const eq = {
 };
 console.log('prediction max |server-local| diff:', eq);
 
+// 4. City: no Bases, humans spawn flying (not in a hangar), terrain dives and weapons are harmless.
+function cityTest() {
+  const city = createSim(GILDSPIRE, { rapier: RAPIER, authoritative: true });
+  const s = city.addShip('h', {
+    nation: 'vex',
+    frame: 'wasp',
+    name: 'h',
+    isBot: false,
+    tier: 1,
+    upgrade: 0,
+  });
+  const spawnOk = s.launchPhase === 'none' && s.alive;
+  let fired = 0;
+  for (let i = 0; i < 300; i++) {
+    const ev = city.step(
+      new Map([
+        [
+          'h',
+          {
+            ...EMPTY_INPUT,
+            seq: i + 1,
+            viewTick: 0,
+            aim: [0, -1, -0.2],
+            throttle: 1,
+            fire1: true,
+            fire2: true,
+          },
+        ],
+      ]),
+    );
+    fired += ev.filter((e) => e.type === 'projectileSpawned').length;
+  }
+  const res = {
+    spawnOk,
+    fired,
+    alive: s.alive,
+    hp: s.hp === s.maxHp,
+    structures: city.structures().length,
+  };
+  city.dispose();
+  return res;
+}
+const cityRes = cityTest();
+console.log('city:', cityRes);
+const tok = signTravel({
+  shipId: 'x',
+  name: 'n',
+  nation: 'vex',
+  frame: 'halo',
+  from: 'a',
+  to: 'b',
+});
+const tamper = tok.slice(0, -2) + (tok.endsWith('A') ? 'BB' : 'AA');
+const travelOk =
+  verifyTravel(tok, 'b')?.frame === 'halo' && !verifyTravel(tok, 'a') && !verifyTravel(tamper, 'b');
+
 let failed = false;
 const check = (ok: boolean, msg: string) => {
   if (!ok) {
@@ -643,6 +701,11 @@ check(
 );
 check(spawned > 0, 'no projectiles spawned');
 check(hits > 0, 'no projectile hit anything');
+check(
+  cityRes.spawnOk && cityRes.fired === 0 && cityRes.alive && cityRes.hp && cityRes.structures === 0,
+  'city safe zone: ' + JSON.stringify(cityRes),
+);
+check(travelOk, 'travel token sign/verify/tamper');
 sim.dispose();
 if (failed) process.exit(1);
 console.log('smoke OK');

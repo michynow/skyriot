@@ -310,8 +310,8 @@ export interface MapDef {
   ceiling: number;
   /** Floating platforms where Ships Dock to resupply. */
   launchDecks: Record<NationId, LaunchDeck[]>;
-  /** One Base per Nation: Launch Tunnels, Shield Stations, Turrets, Core. */
-  bases: Record<NationId, BaseDef>;
+  /** One Base per Nation: Launch Tunnels, Shield Stations, Turrets, Core. Absent on Cities. */
+  bases?: Record<NationId, BaseDef>;
   /** City: safe zone (no damage), hosts the shop/hangar; owned by this Nation. */
   city?: NationId;
   gates?: GateDef[];

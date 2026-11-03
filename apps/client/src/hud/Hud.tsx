@@ -15,6 +15,7 @@ import { EscMenu, openEscMenu } from '../ui/EscMenu';
 import { FlightTapes } from './FlightTapes';
 import { Launch } from './Launch';
 import { BattleBanner, BattleEnd, Objectives, StructureMarkers } from './Objectives';
+import { world } from '../state/world';
 import './hud.css';
 
 const ARC = 0.75; // 270-degree gauges
@@ -582,7 +583,7 @@ export function Hud({ onLeave }: { onLeave(): void }) {
       <Warnings />
       <Floaters />
       <Status />
-      <Objectives />
+      {!world.map?.city && <Objectives />}
       <BattleBanner />
       <Launch />
       <BattleEnd />
