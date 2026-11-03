@@ -10,8 +10,9 @@ import {
   type ShipId,
   type SimEvent,
 } from '@skyriot/shared';
-import { PALETTES } from '../frames/palette';
+import { PALETTES, trailRgb } from '../frames/palette';
 import { MODEL_SCALE, getModel } from '../frames/models';
+import { lookOf } from '../frames/look';
 import { camSnap } from '../scene/ChaseCamera';
 import { rollAngle, rollDirs } from '../frames/roll';
 import { world } from '../state/world';
@@ -1356,7 +1357,8 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
       dy = s.pos[1] - cam.y,
       dz = s.pos[2] - cam.z;
     if (dx * dx + dy * dy + dz * dz > TRAIL_CULL_DIST * TRAIL_CULL_DIST) continue;
-    const engines = getModel(s.frame, s.tier, s.upgrade).engines;
+    const look = lookOf(s);
+    const engines = getModel(s.frame, look.tier, look.upgrade).engines;
     let tr = fx.trails.get(s.id);
     if (!tr) {
       tr = engines.map(() => ({ x: 0, y: 0, z: 0, has: false }));
@@ -1365,7 +1367,8 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
     q.set(s.rot[0], s.rot[1], s.rot[2], s.rot[3]);
     const boost = world.boosting.has(s.id);
     const sp = dx * dx + dy * dy + dz * dz > 500 * 500 ? TRAIL_SPACING * 3 : TRAIL_SPACING;
-    const [ar, ag, ab] = ACCENT[s.nation];
+    const [ar, ag, ab] = trailRgb(s.nation, look.upgrade);
+    const ub = 1 + look.upgrade * 0.03; // higher upgrades leave fatter, longer, brighter trails
     for (let i = 0; i < engines.length; i++) {
       const e = engines[i]!;
       const t = tr[i];
@@ -1385,8 +1388,8 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
           const n = Math.min(24, Math.floor(d / sp));
           for (let k = 1; k <= n; k++) {
             const u = k / (n + 1);
-            const life = boost ? 0.65 : 0.4;
-            const sz = e.r * MODEL_SCALE * (boost ? 3.4 : 2.4);
+            const life = (boost ? 0.65 : 0.4) * (1 + look.upgrade * 0.03);
+            const sz = e.r * MODEL_SCALE * (boost ? 3.4 : 2.4) * ub;
             if (boost && k % 3 === 0)
               fx.puffs.emit(
                 t.x + mx * u,
@@ -1434,7 +1437,24 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
                 ar * 1.3,
                 ag * 1.3,
                 ab * 1.3,
-                0.16,
+                0.16 + look.upgrade * 0.02,
+              );
+            if (look.upgrade >= 8 && k % 4 === 0)
+              // ember sparks shed off high-upgrade trails
+              fx.glow.emit(
+                t.x + mx * u,
+                t.y + my * u,
+                t.z + mz * u,
+                rr(-4, 4),
+                rr(-4, 4),
+                rr(-4, 4),
+                life * 0.8,
+                sz * 0.35,
+                0,
+                ar * 2,
+                ag * 2,
+                ab * 2,
+                0.5,
               );
           }
           if (n > 0) {

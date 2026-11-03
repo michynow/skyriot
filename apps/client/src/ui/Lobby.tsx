@@ -1,4 +1,4 @@
-import { createRef, useRef, useState, type RefObject } from 'react';
+import { createRef, lazy, Suspense, useRef, useState, type RefObject } from 'react';
 import {
   FRAMES,
   MAPS,
@@ -12,6 +12,8 @@ import { initAudio, music, playSfx } from '../audio/engine';
 import { Controls } from './Controls';
 import { HangarCanvas, ShipStage } from './FramePreview';
 import './lobby.css';
+
+const LookPreview = import.meta.env.DEV ? lazy(() => import('../dev/LookPreview')) : null;
 
 const KEY = 'skyriot.lobby';
 const TOKEN_KEY = 'skyriot.token';
@@ -173,6 +175,11 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
         if (b && b !== e.relatedTarget && !b.contains(e.relatedTarget as Node)) playSfx('ui-hover');
       }}
     >
+      {LookPreview && (
+        <Suspense fallback={null}>
+          <LookPreview />
+        </Suspense>
+      )}
       <div className="lb-grid" />
       <div className="lb-glow" />
       <HangarCanvas>

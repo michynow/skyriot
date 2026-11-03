@@ -12,6 +12,7 @@ import {
   type SimEvent,
 } from '@skyriot/shared';
 import { getModel, MODEL_SCALE } from '../frames/models';
+import { lookOf } from '../frames/look';
 import { PALETTES } from '../frames/palette';
 import { world } from '../state/world';
 import type { Fx } from './ProjectilesFx';
@@ -181,7 +182,7 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
   const ncol: RGB = nat === PALETTES.concord.accent ? [0.3, 1.5, 2.4] : [2.6, 0.9, 0.25];
   switch (e.skill) {
     case 'overdrive': {
-      for (const en of getModel(s.frame, s.tier, s.upgrade).engines) {
+      for (const en of getModel(s.frame, lookOf(s).tier, lookOf(s).upgrade).engines) {
         v.set(en.pos[0], en.pos[1], en.pos[2] + 0.5)
           .multiplyScalar(MODEL_SCALE)
           .applyQuaternion(q);
