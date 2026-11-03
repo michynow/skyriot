@@ -25,6 +25,7 @@ import { view } from './hud/view';
 import { attachInput, inputState, sampleInput, trackAim } from './input/input';
 import { connect, type Connection } from './net/connection';
 import { createInterpolator } from './net/interpolator';
+import { matchOwnShot, predictOwnShot } from './net/ownShots';
 import { createPredictor } from './net/predictor';
 import { session } from './net/session';
 import { QUALITY_DPR, useSettings } from './ui/settings';
@@ -95,6 +96,12 @@ function GameLoop() {
       if (session.predictor) {
         try {
           session.predictor.applyLocal(input);
+          const own = session.sim?.getShip(ownId);
+          const shot = own && predictOwnShot(own, input);
+          if (shot) {
+            world.fxQueue.push(shot);
+            handleAudioEvent(shot);
+          }
         } catch (err) {
           disablePrediction(err);
         }
@@ -185,7 +192,14 @@ export function Game({
         for (const ev of events) {
           world.fxQueue.push(ev);
           handleHudEvent(ev);
-          handleAudioEvent(ev);
+          // Own tracers already shown (and heard) when fired locally.
+          const shown =
+            ev.type === 'projectileSpawned' &&
+            ev.owner === world.ownId &&
+            ev.kind === 'tracer' &&
+            session.predictor !== null &&
+            matchOwnShot(ev);
+          if (!shown) handleAudioEvent(ev);
           if (ev.type === 'teleport' && ev.id === world.ownId) session.predictor?.teleport();
         }
         if (world.fxQueue.length > FX_QUEUE_MAX)
