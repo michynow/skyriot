@@ -182,7 +182,7 @@ export function stepFlight(
   const s = rec.state;
   if (!s.alive) return;
   const dt = ctx.dt;
-  const fd = ctx.frames[s.frame];
+  const fd = rec.fd;
   const env = ctx.map.env;
   const space = env.kind === 'space';
 

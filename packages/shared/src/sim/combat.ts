@@ -335,8 +335,8 @@ export function interceptTime(
 /** Lock-on progress and Primary/Secondary fire for one Ship. */
 export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void {
   const s = rec.state;
-  const fd = ctx.frames[s.frame];
-  const weapons = [WEAPONS[fd.primary]!, WEAPONS[fd.secondary]!];
+  const fd = rec.fd;
+  const weapons = rec.gear ? rec.gear.weapons : [WEAPONS[fd.primary]!, WEAPONS[fd.secondary]!];
   const sec = weapons[1]!;
   updateLock(ctx, rec, input, sec);
   const rewind = Math.min(Math.max(ctx.tick - input.viewTick, 0), MAX_REWIND_TICKS);

@@ -42,6 +42,8 @@ import {
 } from './structures';
 import { deployInFormation, enterHangar, leaveQueue, stepLaunch, stepLaunchQueue } from './launch';
 import { stepTurrets } from './turrets';
+import { resolveGear } from './gear';
+import type { ShipGear } from '../content/economy';
 
 const IDLE_INPUT: PilotInput = { seq: 0, viewTick: 0, ...EMPTY_INPUT };
 const HALF_SQRT = Math.SQRT1_2;
@@ -125,6 +127,30 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
   /** Events raised between steps (teleports); flushed into the next step's result. */
   let pending: SimEvent[] = [];
   const discard: SimEvent[] = [];
+  /** Equipped gear per Ship id; kept across addShip so it can be set before the Ship exists (client). */
+  const gears = new Map<ShipId, ShipGear>();
+
+  /** Lay the Ship's gear over its tuned Frame; gearless Ships share the Frame record. */
+  function applyGear(rec: ShipRec): void {
+    const base = frames[rec.state.frame];
+    if (!rec.gear) {
+      rec.fd = base;
+      return;
+    }
+    if (rec.fd === base) rec.fd = { ...base };
+    Object.assign(rec.fd, base, rec.gear.over);
+  }
+
+  function setGear(id: ShipId, gear: ShipGear): void {
+    gears.set(id, gear);
+    const rec = ctx.ships.get(id);
+    if (!rec) return;
+    const resolved = resolveGear(rec.state.frame, gear);
+    rec.gear = resolved;
+    rec.state.tier = resolved.tier;
+    rec.state.upgrade = resolved.upgrade;
+    applyGear(rec);
+  }
 
   function refreshFrames(): void {
     ctx.dt = TICK_DT * Math.min(Math.max(tuning.timescale, TIMESCALE_MIN), TIMESCALE_MAX);
@@ -134,6 +160,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       Object.assign(dst, baseFrames[id]);
       if (over) Object.assign(dst, over);
     }
+    for (const rec of ctx.recList) applyGear(rec);
   }
 
   /** Face the map centre, level: yaw a maps forward (0,0,-1) to (-sin a, 0, -cos a). */
@@ -147,7 +174,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
 
   function resetVitals(rec: ShipRec): void {
     const s = rec.state;
-    const fd = frames[s.frame];
+    const fd = rec.fd;
     s.maxHp = fd.maxHp;
     s.hp = fd.maxHp;
     s.maxShield = fd.maxShield;
@@ -272,6 +299,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     return {
       mods: createMods(),
       state,
+      fd,
+      gear: null,
       body,
       collider,
       lat: [0, 0, 0],
@@ -286,10 +315,12 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
   }
 
   function addShip(id: ShipId, spawn: ShipSpawn, at?: Vec3): ShipState {
+    const gear = gears.get(id);
     if (ctx.ships.has(id)) removeShip(id);
     refreshFrames();
     const rec = makeRec(id, spawn, at ?? [0, 0, 0]);
     ctx.ships.set(id, rec);
+    if (gear) setGear(id, gear);
     ctx.list.push(rec.state);
     ctx.recList.push(rec);
     if (at) placeAndLaunch(rec, at, false);
@@ -311,6 +342,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     ctx.list.splice(ctx.list.indexOf(rec.state), 1);
     ctx.recList.splice(ctx.recList.indexOf(rec), 1);
     tuning.god.delete(id);
+    gears.delete(id);
   }
 
   /** Full vitals, then into the Launch Queue (or, for Bots at a Battle start, straight into formation). */
@@ -352,10 +384,10 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       else
         s.shield = Math.min(
           s.maxShield,
-          s.shield + frames[s.frame].shieldRegenPerSec * rec.mods.shieldRegenMul * ctx.dt,
+          s.shield + rec.fd.shieldRegenPerSec * rec.mods.shieldRegenMul * ctx.dt,
         );
     }
-    syncVelocity(rec, frames[s.frame]);
+    syncVelocity(rec, rec.fd);
   }
 
   return {
@@ -365,6 +397,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     tuning,
     addShip,
     removeShip,
+    setGear,
 
     step(inputs, frozen) {
       const events: SimEvent[] = pending;
@@ -425,7 +458,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       for (const b of buffsCopy) s.buffs.push(b);
       for (const k of Object.keys(s.toggles)) delete s.toggles[k];
       Object.assign(s.toggles, togglesCopy);
-      deriveLateral(rec, frames[s.frame]);
+      deriveLateral(rec, rec.fd);
       syncBody(ctx, rec);
     },
 
@@ -449,7 +482,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       s.launchPhase = 'none';
       s.tunnel = -1;
       s.launchTicks = 0;
-      s.speed = Math.max(s.speed, frames[s.frame].cruiseSpeed);
+      s.speed = Math.max(s.speed, rec.fd.cruiseSpeed);
       s.angVel[0] = s.angVel[1] = s.angVel[2] = 0;
       rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;
       const f = [0, 0, 0];

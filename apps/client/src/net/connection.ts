@@ -1,11 +1,15 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
   MSG,
+  type BuyRequest,
+  type EquipRequest,
   type JoinOptions,
   type PilotInput,
+  type PilotProfile,
   type ShipState,
   type SimEvent,
   type Snapshot,
+  type UpgradeRequest,
   type Vec3,
   type Welcome,
 } from '@skyriot/shared';
@@ -16,12 +20,16 @@ export interface ConnectionHandlers {
   onSnapshot(snapshot: Snapshot): void;
   onEvents(events: SimEvent[]): void;
   onConsole(text: string): void;
+  onProfile(profile: PilotProfile): void;
   onClose(reason: string): void;
 }
 
 export interface Connection {
   sendInput(input: PilotInput): void;
   sendChat(text: string): void;
+  buy(req: BuyRequest): void;
+  upgrade(req: UpgradeRequest): void;
+  equip(req: EquipRequest): void;
   close(): void;
   /** Smoothed round-trip estimate in ms (input send -> snapshot ack). */
   readonly rtt: number;
@@ -172,6 +180,12 @@ export async function connect(options: JoinOptions, h: ConnectionHandlers): Prom
       if (isObj(m) && typeof m.text === 'string') h.onConsole(m.text);
     }),
   );
+  room.onMessage(MSG.profile, (m: unknown) =>
+    throughLag('down', () => {
+      if (isObj(m) && isObj(m.wallet) && Array.isArray(m.items) && isObj(m.loadouts))
+        h.onProfile(m as unknown as PilotProfile);
+    }),
+  );
   room.onLeave((code: number) => {
     clearTimeout(timeout);
     if (!closed) h.onClose(`Disconnected (code ${code}).`);
@@ -195,6 +209,9 @@ export async function connect(options: JoinOptions, h: ConnectionHandlers): Prom
       const t = text.trim().slice(0, 200);
       if (t) throughLag('up', () => !closed && room.send(MSG.chat, { text: t }));
     },
+    buy: (req) => !closed && room.send(MSG.buy, req),
+    upgrade: (req) => !closed && room.send(MSG.upgrade, req),
+    equip: (req) => !closed && room.send(MSG.equip, req),
     close() {
       closed = true;
       clearTimeout(timeout);

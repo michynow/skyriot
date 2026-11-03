@@ -19,6 +19,7 @@ import type {
   StructureState,
 } from '../types';
 import type { SimTuning } from './index';
+import type { ResolvedGear } from './gear';
 
 /** Resolved buff modifiers (derived from ShipState.buffs once per tick). */
 export interface BuffMods {
@@ -41,6 +42,9 @@ export interface BuffMods {
 export interface ShipRec {
   mods: BuffMods;
   state: ShipState;
+  /** Effective FrameDef of this Ship: the tuned Frame, with equipped gear laid over it. */
+  fd: FrameDef;
+  gear: ResolvedGear | null;
   body: RigidBody;
   collider: Collider;
   /** World-space velocity not along the nose (strafe, vertical, roll, stall fall). Derivable from state. */

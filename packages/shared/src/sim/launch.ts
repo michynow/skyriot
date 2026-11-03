@@ -56,7 +56,7 @@ export function deployInFormation(ctx: SimCtx, rec: ShipRec): void {
   s.tunnel = -1;
   s.launchTicks = 0;
   hold(ctx, rec, f);
-  s.speed = ctx.frames[s.frame].cruiseSpeed;
+  s.speed = rec.fd.cruiseSpeed;
   for (let i = 0; i < 3; i++) s.vel[i] = f[i]! * s.speed;
 }
 
@@ -131,7 +131,7 @@ export function stepLaunch(ctx: SimCtx, rec: ShipRec, input: PilotInput): void {
         return;
       }
       const stroke = strokeTicks(ctx, rec);
-      const exitSpeed = ctx.frames[s.frame].boostSpeed;
+      const exitSpeed = rec.fd.boostSpeed;
       s.launchTicks--;
       const p = Math.min(1 - s.launchTicks / stroke, 1);
       const d = tunnel.length * p * p;
@@ -156,7 +156,7 @@ function strokeTicks(ctx: SimCtx, rec: ShipRec): number {
   const s = rec.state;
   const tunnel = ctx.map.bases[s.nation].tunnels[s.tunnel];
   const length = tunnel ? tunnel.length : 0;
-  return Math.max(1, Math.round((2 * length) / ctx.frames[s.frame].boostSpeed / TICK_DT));
+  return Math.max(1, Math.round((2 * length) / rec.fd.boostSpeed / TICK_DT));
 }
 
 /** Stationary, nose along `dir`. */

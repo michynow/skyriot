@@ -11,6 +11,7 @@ import {
   SNAPSHOT_HZ,
   TICK_HZ,
   createSim,
+  gearOf,
   generateHeightfield,
   isCloaked,
   mulberry32,
@@ -22,12 +23,14 @@ import {
   type MapDef,
   type NationId,
   type PilotInput,
+  type PilotProfile,
   type Sim,
   type ShipId,
   type Snapshot,
   type Welcome,
 } from '@skyriot/shared';
 import { botBrain, createBotMemory, type BotMemory } from '../bots/botBrain';
+import { awardKill, buy, canTrade, equip, loadProfile, upgrade } from '../economy';
 import { runDevCommand } from './devCommands';
 import { packShared, snapshotFrame } from './snapshotFrame';
 
@@ -80,6 +83,7 @@ export class MapRoom extends Room {
   private lastSlowLog = 0;
   private frozen = new Set<ShipId>();
   private stepInputs = new Map<ShipId, PilotInput>();
+  private profiles = new Map<ShipId, PilotProfile>();
 
   onCreate(options: { mapId?: string }) {
     this.map = MAPS[options.mapId ?? ''] ?? RUSTWATER_CANYONS;
@@ -108,12 +112,35 @@ export class MapRoom extends Room {
             this.fillBots();
             return this.botsPerNation;
           },
+          grant: (credits, scrap) => {
+            const p = this.profiles.get(client.sessionId);
+            if (!p) return false;
+            p.wallet.credits = Math.max(0, p.wallet.credits + credits);
+            p.wallet.scrap = Math.max(0, p.wallet.scrap + scrap);
+            this.sendProfile(client.sessionId);
+            return true;
+          },
         },
         client.sessionId,
         text,
       );
       client.send(MSG.console, { text: reply });
     });
+
+    for (const [type, handler] of [
+      [MSG.buy, buy],
+      [MSG.upgrade, upgrade],
+      [MSG.equip, equip],
+    ] as const) {
+      this.onMessage(type, (client, raw: unknown) => {
+        const profile = this.profiles.get(client.sessionId);
+        if (!profile) return;
+        if (!canTrade(this.map)) return client.send(MSG.console, { text: 'trade only in a city' });
+        const error = handler(profile, raw);
+        if (error) return client.send(MSG.console, { text: error });
+        this.sendProfile(client.sessionId);
+      });
+    }
 
     this.setSimulationInterval((deltaMs) => this.loop(deltaMs), LOOP_INTERVAL_MS);
     console.log(`[MapRoom] created map=${this.map.id}`);
@@ -129,9 +156,11 @@ export class MapRoom extends Room {
       'Pilot';
     this.makeSlot(nation);
     const id = client.sessionId;
+    this.profiles.set(id, loadProfile(name, nation));
     this.sim.addShip(id, { nation, frame, name, isBot: false, tier: 1, upgrade: 0 });
     this.humans.set(id, { queue: [], last: null, ack: 0, buffering: true });
     this.byId.set(id, client);
+    this.sendProfile(id);
     const welcome: Welcome = {
       shipId: id,
       mapId: this.map.id,
@@ -149,7 +178,17 @@ export class MapRoom extends Room {
     this.sim.removeShip(id);
     this.humans.delete(id);
     this.byId.delete(id);
+    this.profiles.delete(id);
     this.fillBots();
+  }
+
+  /** Re-equip the Ship from the profile (gear applies at once, vitals on the next spawn) and send it. */
+  private sendProfile(id: ShipId): void {
+    const profile = this.profiles.get(id);
+    const ship = this.sim.getShip(id);
+    if (!profile || !ship) return;
+    this.sim.setGear(id, gearOf(profile, ship.frame));
+    this.byId.get(id)?.send(MSG.profile, profile);
   }
 
   onDispose() {
@@ -262,6 +301,13 @@ export class MapRoom extends Room {
       this.broadcast(MSG.events, events);
       // Humans' deaths/respawns are logged so a "mystery" return to deck can be traced.
       for (const e of events) {
+        if (e.type === 'shipDestroyed' && e.killer && this.profiles.has(e.killer)) {
+          const victim = this.sim.getShip(e.victim);
+          if (victim && victim.nation !== this.sim.getShip(e.killer)?.nation) {
+            awardKill(this.profiles.get(e.killer)!);
+            this.sendProfile(e.killer);
+          }
+        }
         if (e.type === 'shipDestroyed' && this.humans.has(e.victim))
           console.log(`[MapRoom] ${e.victim} destroyed by ${e.killer ?? 'terrain'}`);
         else if (e.type === 'shipRespawned' && this.humans.has(e.id))

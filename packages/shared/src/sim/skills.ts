@@ -56,7 +56,7 @@ export function castSkill(
   predictOnly: boolean,
 ): boolean {
   const s = rec.state;
-  const fd = ctx.frames[s.frame];
+  const fd = rec.fd;
   const def = SKILLS[id];
   if (!def || !s.alive) return false;
   if (def.frames !== 'all' && !def.frames.includes(s.frame)) return false;

@@ -5,6 +5,7 @@ import {
   MAPS,
   TICK_DT,
   createSim,
+  gearOf,
   generateHeightfield,
   type JoinOptions,
   type ShipId,
@@ -26,6 +27,7 @@ import { createInterpolator } from './net/interpolator';
 import { createPredictor } from './net/predictor';
 import { session } from './net/session';
 import { QUALITY_DPR, useSettings } from './ui/settings';
+import { useProfile } from './state/profile';
 import { music, setListener } from './audio/engine';
 import { handleAudioEvent, resetAudioSession, updateAudio } from './audio/sfxDriver';
 import './ui/lobby.css';
@@ -36,9 +38,16 @@ const PhysicsDebug = import.meta.env.DEV ? lazy(() => import('./dev/PhysicsDebug
 const FX_QUEUE_MAX = 600;
 
 /** Start local prediction. Falls back to snapshot-only rendering if the shared sim can't be created. */
+/** Prediction must run the own Ship with the same gear the server resolved from the same profile. */
+function applyOwnGear(ownId: ShipId, frame: JoinOptions['frame']) {
+  const profile = useProfile.getState().profile;
+  if (profile) session.sim?.setGear(ownId, gearOf(profile, frame));
+}
+
 async function startPrediction(
   map: NonNullable<typeof world.map>,
   ownId: ShipId,
+  frame: JoinOptions['frame'],
   isCurrent: () => boolean,
 ) {
   try {
@@ -47,6 +56,7 @@ async function startPrediction(
     const sim = createSim(map, { rapier, authoritative: false });
     if (!isCurrent()) return sim.dispose();
     session.sim = sim;
+    applyOwnGear(ownId, frame);
     session.predictor = createPredictor(sim, ownId);
   } catch (err) {
     console.warn('[predict] disabled, rendering own Ship from snapshots:', err);
@@ -142,7 +152,7 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
         setMap(mapDef);
         useHud.setState({ status: 'playing' });
         addChatLine(`Deployed to ${mapDef.name}. Enter = chat.`, 'sys');
-        void startPrediction(mapDef, w.shipId, () => current).then(() => {
+        void startPrediction(mapDef, w.shipId, options.frame, () => current).then(() => {
           if (current && lastSnap && session.predictor)
             session.predictor.onServerSnapshot(lastSnap);
         });
@@ -173,6 +183,10 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
           world.fxQueue.splice(0, world.fxQueue.length - FX_QUEUE_MAX);
       },
       onConsole: addConsoleLine,
+      onProfile(profile) {
+        useProfile.setState({ profile });
+        if (world.ownId) applyOwnGear(world.ownId, options.frame);
+      },
       onClose: fail,
     })
       .then((c) => {
@@ -195,6 +209,7 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
       world.fxQueue.length = 0;
       world.boosting.clear();
       world.ownId = null;
+      useProfile.setState({ profile: null });
       world.map = null;
       world.heightfield = null;
       inputState.targetId = null;

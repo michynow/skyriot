@@ -198,3 +198,49 @@
   color: #fff;
   background: #ffffff18;
 }
+
+.hangar-wallet {
+  display: flex;
+  gap: 32px;
+  font-size: 17px;
+}
+.hangar-wallet b,
+.hangar-row b {
+  font:
+    700 16px 'Orbitron',
+    sans-serif;
+  color: var(--a);
+}
+.hangar-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 16px;
+  font-weight: 600;
+}
+.hangar-row > span {
+  flex: 1;
+}
+.hangar-row em {
+  display: block;
+  font-size: 13px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffffff77;
+}
+.hangar-row .ui-btn {
+  padding: 8px 14px;
+  font-size: 11px;
+}
+.hangar-row .ui-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.hangar-row i,
+.hangar-note {
+  color: #ffffff66;
+  font-size: 14px;
+}
