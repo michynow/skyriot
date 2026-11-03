@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { FrameId, NationId, ShipId } from '@skyriot/shared';
 import { world } from '../state/world';
 import { FrameModel } from './FrameModel';
+import { lookOf } from './look';
 import { rollAngle } from './roll';
 
 interface Entry {
@@ -28,12 +29,13 @@ export function Ships() {
     if (!changed) {
       for (const s of world.ships.values()) {
         const k = known.current.get(s.id);
+        const l = lookOf(s);
         if (
           !k ||
           k.frame !== s.frame ||
           k.nation !== s.nation ||
-          k.tier !== s.tier ||
-          k.upgrade !== s.upgrade
+          k.tier !== l.tier ||
+          k.upgrade !== l.upgrade
         ) {
           changed = true;
           break;
@@ -44,7 +46,8 @@ export function Ships() {
       const next: Entry[] = [];
       known.current.clear();
       for (const s of world.ships.values()) {
-        const e = { id: s.id, frame: s.frame, nation: s.nation, tier: s.tier, upgrade: s.upgrade };
+        const { tier, upgrade } = lookOf(s);
+        const e = { id: s.id, frame: s.frame, nation: s.nation, tier, upgrade };
         known.current.set(s.id, e);
         next.push(e);
       }

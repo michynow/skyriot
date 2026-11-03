@@ -1,15 +1,18 @@
 import { Canvas } from '@react-three/fiber';
 import * as THREE from 'three';
 import { DemoScene } from './DemoScene';
+import { useLookOverride } from '../frames/look';
 import type { Quality } from './PostFx';
 
 /**
  * Network-free render preview. Open /?demo=render
- * Params: q=low|med|high, view=showcase&focus=0..7&dist=14&yaw=0.6&pitch=0.25
+ * Params: q=low|med|high, view=showcase&focus=0..7&dist=14&yaw=0.6&pitch=0.25, look=tier,upgrade
  */
 export function RenderDemo() {
   const p = new URLSearchParams(location.search);
   const num = (k: string, d: number) => (p.has(k) ? Number(p.get(k)) : d);
+  const look = p.get('look')?.split(',').map(Number);
+  if (look) useLookOverride.setState({ apply: 'all', tier: look[0] ?? 1, upgrade: look[1] ?? 0 });
   const quality = (p.get('q') as Quality | null) ?? 'med';
   const opts = {
     showcase: p.get('view') === 'showcase',

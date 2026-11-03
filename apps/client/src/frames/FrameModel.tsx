@@ -7,7 +7,7 @@ import { SLOTS } from './bricks';
 import { BuffVisuals } from './BuffVisuals';
 import { fpv } from './fpv';
 import { MODEL_SCALE, getModel } from './models';
-import { getFlameMaterials, getMaterials } from './palette';
+import { getAuraMaterial, getFlameMaterials, getMaterials } from './palette';
 
 export interface FrameModelProps {
   frame: FrameId;
@@ -46,7 +46,8 @@ export function FrameModel({
 }: FrameModelProps) {
   const data = useMemo(() => getModel(frame, tier, upgrade), [frame, tier, upgrade]);
   const mats = useMemo(() => getMaterials(nation, upgrade), [nation, upgrade]);
-  const flame = useMemo(() => getFlameMaterials(nation), [nation]);
+  const flame = useMemo(() => getFlameMaterials(nation, upgrade), [nation, upgrade]);
+  const aura = upgrade >= 10 ? getAuraMaterial(nation) : null;
 
   const flames = useRef<(THREE.Group | null)[]>([]);
   const spinner = useRef<THREE.Group>(null);
@@ -129,6 +130,7 @@ export function FrameModel({
     if (hover.current) hover.current.position.y = -0.55 * s.ground;
     const hv = !(shipId && fpv.id === shipId && fpv.amount > 0.6);
     if (hull.current) hull.current.visible = hv;
+    if (aura) aura.opacity = 0.1 + 0.06 * Math.sin(performance.now() * 0.004); // shared, same value for all
     for (const g of legs.current) if (g) g.visible = hv;
     for (const g of flames.current) if (g) g.visible = hv;
     for (const g of fins.current) if (g) g.visible = hv;
@@ -156,6 +158,9 @@ export function FrameModel({
             <mesh key={slot} geometry={g} material={mats[slot]} castShadow receiveShadow />
           ) : null;
         })}
+        {aura && data.body.primary && (
+          <mesh geometry={data.body.primary} material={aura} scale={1.05} renderOrder={4} />
+        )}
         {data.hover && (
           <group ref={hover}>
             {SLOTS.map((slot) => {

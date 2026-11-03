@@ -6,6 +6,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { FRAMES, type FrameId, type NationId } from '@skyriot/shared';
 import { FrameModel } from '../frames/FrameModel';
 import { setShipEnv } from '../frames/palette';
+import { useLookOverride } from '../frames/look';
 
 function ShipEnv() {
   const gl = useThree((s) => s.gl);
@@ -50,6 +51,8 @@ export function ShipStage({
   speed?: number;
 }) {
   const def = FRAMES[frame];
+  const look = useLookOverride();
+  const [tier, upgrade] = look.apply === 'off' ? [1, 0] : [look.tier, look.upgrade];
   const dist = Math.max(def.halfLength, def.radius) * 3.1;
   return (
     <View track={track as RefObject<HTMLElement>}>
@@ -63,7 +66,7 @@ export function ShipStage({
       <directionalLight position={[-6, 10, -8]} intensity={2.2} color="#fff2dc" />
       <directionalLight position={[8, 2, 6]} intensity={0.8} color="#5fe3ff" />
       <Turntable speed={speed}>
-        <FrameModel frame={frame} nation={nation} tier={1} upgrade={0} boosting={false} />
+        <FrameModel frame={frame} nation={nation} tier={tier} upgrade={upgrade} boosting={false} />
       </Turntable>
     </View>
   );

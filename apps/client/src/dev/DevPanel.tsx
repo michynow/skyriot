@@ -7,6 +7,7 @@ import { session } from '../net/session';
 import { audioStats } from '../audio/engine';
 import { useSettings, type Quality } from '../ui/settings';
 import { addConsoleLine, useHud } from '../hud/hudStore';
+import LookPreview from './LookPreview';
 import { hudMock, mockEvent, type MockBattle, type MockScenario } from './hudMock';
 
 /** Latest slider values per Frame, for "Export tuning JSON". */
@@ -177,7 +178,12 @@ function Controls() {
     'battle begins': button(() => mockEvent('battleStarted')),
     catapult: button(() => mockEvent('catapult')),
   });
-  return frame ? <Tuning frame={frame} /> : null;
+  return (
+    <>
+      <LookPreview />
+      {frame && <Tuning frame={frame} />}
+    </>
+  );
 }
 
 function Console() {
