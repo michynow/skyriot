@@ -357,7 +357,8 @@
   text-transform: uppercase;
   color: #ffffff88;
 }
-.lobby input {
+.lobby input,
+.lobby select {
   width: 240px;
   padding: 9px 14px;
   font:
@@ -371,7 +372,11 @@
   transition: border-color 0.15s;
   caret-color: var(--a);
 }
-.lobby input:focus {
+.lobby select option {
+  background: #05080d;
+}
+.lobby input:focus,
+.lobby select:focus {
   border-color: var(--a);
 }
 .lobby input::placeholder {
@@ -512,4 +517,16 @@
   to {
     transform: rotate(360deg);
   }
+}
+.travel-fade {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+  z-index: 50;
+}
+.travel-fade.on {
+  opacity: 1;
 }

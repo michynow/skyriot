@@ -85,8 +85,55 @@ export const RUSTWATER_CANYONS: MapDef = {
       [1000, 480, 1200],
     ],
   },
+  // Above the ridgelines behind each Base, inside the boundary warning (|x|, |z| < 1350): Concord side to Gildspire, Vex side to Rivet Harbor.
+  gates: [
+    { pos: [-1150, 620, -1200], radius: 45, to: 'gildspire' },
+    { pos: [1250, 620, 1150], radius: 45, to: 'rivet-harbor' },
+  ],
 };
+
+/** City Maps: small, low rolling ground, no Bases. Safe zone (sim skips damage and firing). */
+function city(
+  id: string,
+  name: string,
+  nation: 'concord' | 'vex',
+  seed: number,
+  fog: string,
+): MapDef {
+  return {
+    id,
+    name,
+    seed,
+    // Soft boundary starts 450 m in from the edge; 2400 leaves a ±750 m open bowl.
+    size: 2400,
+    resolution: 129,
+    maxHeight: 60,
+    ceiling: 700,
+    city: nation,
+    env: {
+      kind: 'atmosphere',
+      gravity: 9.8,
+      groundMode: 'terrain',
+      fogColor: fog,
+      fogNear: 500,
+      fogFar: 2200,
+      sky: 'desert-dusk',
+    },
+    launchDecks: { concord: [], vex: [] },
+    spawns: {
+      concord: [[0, 260, 300]],
+      vex: [[0, 260, 300]],
+    },
+    // Off the spawn's heading (spawns face the centre), so a fresh Pilot doesn't drift straight in.
+    gates: [{ pos: [-450, 260, -350], radius: 45, to: RUSTWATER_CANYONS.id }],
+  };
+}
+
+export const GILDSPIRE = city('gildspire', 'Gildspire', 'concord', 4242, '#e3c38a');
+export const RIVET_HARBOR = city('rivet-harbor', 'Rivet Harbor', 'vex', 6161, '#a8705a');
 
 export const MAPS: Record<string, MapDef> = {
   [RUSTWATER_CANYONS.id]: RUSTWATER_CANYONS,
+  [GILDSPIRE.id]: GILDSPIRE,
+  [RIVET_HARBOR.id]: RIVET_HARBOR,
 };

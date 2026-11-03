@@ -9,6 +9,7 @@ import {
   type JoinOptions,
   type ShipId,
   type ShipState,
+  type TravelOrder,
 } from '@skyriot/shared';
 import { world } from './state/world';
 import { MapScene } from './scene/MapScene';
@@ -111,7 +112,15 @@ function GameLoop() {
   return null;
 }
 
-export function Game({ options, onExit }: { options: JoinOptions; onExit(): void }) {
+export function Game({
+  options,
+  onExit,
+  onTravel,
+}: {
+  options: JoinOptions;
+  onExit(): void;
+  onTravel(order: TravelOrder): void;
+}) {
   const status = useHud((h) => h.status);
   const error = useHud((h) => h.error);
   const quality = useSettings((s) => s.quality);
@@ -174,6 +183,7 @@ export function Game({ options, onExit }: { options: JoinOptions; onExit(): void
       },
       onConsole: addConsoleLine,
       onClose: fail,
+      onTravel: (order) => current && onTravel(order),
     })
       .then((c) => {
         if (!current) return c.close();

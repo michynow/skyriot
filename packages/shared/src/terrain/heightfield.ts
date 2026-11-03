@@ -47,6 +47,7 @@ export function generateHeightfield(map: MapDef): Heightfield {
 
 /** Base plateau: flat at the Core's height within plateauRadius, smoothstep back to terrain over the next 30%. */
 function flattenForBases(map: MapDef, x: number, z: number, h: number): number {
+  if (!map.bases) return h;
   for (const nation of ['concord', 'vex'] as const) {
     const base = map.bases[nation];
     const r = base.plateauRadius;

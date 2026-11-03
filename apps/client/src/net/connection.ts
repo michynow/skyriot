@@ -6,6 +6,7 @@ import {
   type ShipState,
   type SimEvent,
   type Snapshot,
+  type TravelOrder,
   type Vec3,
   type Welcome,
 } from '@skyriot/shared';
@@ -17,6 +18,8 @@ export interface ConnectionHandlers {
   onEvents(events: SimEvent[]): void;
   onConsole(text: string): void;
   onClose(reason: string): void;
+  /** Flew into a Gate: the server already removed our Ship; join `mapId` with the token. */
+  onTravel(order: TravelOrder): void;
 }
 
 export interface Connection {
@@ -172,6 +175,13 @@ export async function connect(options: JoinOptions, h: ConnectionHandlers): Prom
       if (isObj(m) && typeof m.text === 'string') h.onConsole(m.text);
     }),
   );
+  room.onMessage(MSG.travel, (m: unknown) => {
+    if (!isObj(m) || typeof m.mapId !== 'string' || typeof m.travel !== 'string') return;
+    closed = true;
+    clearTimeout(timeout);
+    void room.leave();
+    h.onTravel({ mapId: m.mapId, travel: m.travel });
+  });
   room.onLeave((code: number) => {
     clearTimeout(timeout);
     if (!closed) h.onClose(`Disconnected (code ${code}).`);

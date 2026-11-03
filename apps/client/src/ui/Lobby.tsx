@@ -1,6 +1,7 @@
 import { createRef, useRef, useState, type RefObject } from 'react';
 import {
   FRAMES,
+  MAPS,
   RUSTWATER_CANYONS,
   WEAPONS,
   type FrameId,
@@ -31,16 +32,17 @@ const FRAME_IDS = Object.keys(FRAMES) as FrameId[];
 const maxOf = (pick: (f: (typeof FRAMES)[FrameId]) => number) =>
   Math.max(...Object.values(FRAMES).map(pick));
 
-function load(): { nation: NationId; frame: FrameId; name: string } {
+function load(): { nation: NationId; frame: FrameId; name: string; map: string } {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? '{}');
     return {
       nation: v.nation === 'vex' ? 'vex' : 'concord',
       frame: v.frame in FRAMES ? v.frame : 'wasp',
       name: typeof v.name === 'string' ? v.name.slice(0, 16) : '',
+      map: v.map in MAPS ? v.map : RUSTWATER_CANYONS.id,
     };
   } catch {
-    return { nation: 'concord', frame: 'wasp', name: '' };
+    return { nation: 'concord', frame: 'wasp', name: '', map: RUSTWATER_CANYONS.id };
   }
 }
 
@@ -99,7 +101,7 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
     } catch {
       /* ignore */
     }
-    onLaunch({ mapId: RUSTWATER_CANYONS.id, nation: sel.nation, frame: sel.frame, name });
+    onLaunch({ mapId: sel.map, nation: sel.nation, frame: sel.frame, name });
   };
 
   return (
@@ -136,7 +138,7 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
         <h1>
           SKY<span>RIOT</span>
         </h1>
-        <p>Hangar — {RUSTWATER_CANYONS.name}</p>
+        <p>Hangar — {MAPS[sel.map]?.name}</p>
       </header>
 
       <aside className="lb-rail">
@@ -220,6 +222,17 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
             onChange={(e) => set({ name: e.target.value })}
             onKeyDown={(e) => e.key === 'Enter' && launch()}
           />
+        </label>
+        <label className="lb-callsign">
+          <span>Destination</span>
+          <select value={sel.map} onChange={(e) => set({ map: e.target.value })}>
+            {Object.values(MAPS).map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+                {m.city ? ' (City)' : ''}
+              </option>
+            ))}
+          </select>
         </label>
         <button className="lb-launch" onClick={launch}>
           Launch

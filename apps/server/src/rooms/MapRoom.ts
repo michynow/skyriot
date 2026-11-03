@@ -25,11 +25,14 @@ import {
   type Sim,
   type ShipId,
   type Snapshot,
+  type TravelOrder,
+  type Vec3,
   type Welcome,
 } from '@skyriot/shared';
 import { botBrain, createBotMemory, type BotMemory } from '../bots/botBrain';
 import { runDevCommand } from './devCommands';
 import { packShared, snapshotFrame } from './snapshotFrame';
+import { signTravel, verifyTravel } from '../travel';
 
 const TICK_MS = 1000 / TICK_HZ;
 const SNAPSHOT_MS = 1000 / SNAPSHOT_HZ;
@@ -45,6 +48,8 @@ const SLOW_LOG_INTERVAL_MS = 5000;
 const MAX_NAME_LENGTH = 16;
 const NATIONS: NationId[] = ['concord', 'vex'];
 const FRAME_IDS = Object.keys(FRAMES) as FrameId[];
+/** Arrivals appear this far past the Gate's rim, toward the map centre, so they don't fly straight back. */
+const GATE_EXIT_M = 80;
 
 await RAPIER.init();
 
@@ -86,6 +91,7 @@ export class MapRoom extends Room {
     this.hf = generateHeightfield(this.map);
     this.sim = createSim(this.map, { rapier: RAPIER, authoritative: true });
     this.rng = mulberry32(this.map.seed);
+    if (this.map.city) this.botsPerNation = 0;
     this.fillBots();
 
     this.onMessage(MSG.input, (client, raw: unknown) => {
@@ -120,16 +126,23 @@ export class MapRoom extends Room {
   }
 
   onJoin(client: Client, options: Partial<JoinOptions>) {
-    const nation: NationId = options.nation === 'vex' ? 'vex' : 'concord';
-    const frame: FrameId = FRAME_IDS.includes(options.frame as FrameId)
-      ? (options.frame as FrameId)
+    // A valid travel token carries the Pilot over unchanged and lands them at the Gate they came through.
+    const claim = verifyTravel(options.travel, this.map.id);
+    const opts = claim ?? options;
+    const nation: NationId = opts.nation === 'vex' ? 'vex' : 'concord';
+    const frame: FrameId = FRAME_IDS.includes(opts.frame as FrameId)
+      ? (opts.frame as FrameId)
       : 'wasp';
     const name =
-      (typeof options.name === 'string' ? options.name : 'Pilot').slice(0, MAX_NAME_LENGTH) ||
-      'Pilot';
+      (typeof opts.name === 'string' ? opts.name : 'Pilot').slice(0, MAX_NAME_LENGTH) || 'Pilot';
     this.makeSlot(nation);
     const id = client.sessionId;
-    this.sim.addShip(id, { nation, frame, name, isBot: false, tier: 1, upgrade: 0 });
+    const gate = claim && this.map.gates?.find((g) => g.to === claim.from);
+    this.sim.addShip(
+      id,
+      { nation, frame, name, isBot: false, tier: 1, upgrade: 0 },
+      gate ? gateExit(gate.pos, gate.radius) : undefined,
+    );
     this.humans.set(id, { queue: [], last: null, ack: 0, buffering: true });
     this.byId.set(id, client);
     const welcome: Welcome = {
@@ -140,7 +153,9 @@ export class MapRoom extends Room {
       dev: isDevAllowed(client),
     };
     client.send(MSG.welcome, welcome);
-    console.log(`[MapRoom] join ${id} ${nation}/${frame} ships=${[...this.sim.ships()].length}`);
+    console.log(
+      `[MapRoom] join ${id} ${nation}/${frame}${claim ? ` via gate from ${claim.from}` : ''} ships=${[...this.sim.ships()].length}`,
+    );
   }
 
   onLeave(client: Client, code?: number) {
@@ -251,6 +266,7 @@ export class MapRoom extends Room {
     }
     for (const [id, mem] of this.bots) inputs.set(id, botBrain(this.sim, id, mem));
     const events = this.sim.step(inputs, frozen);
+    this.checkGates();
     for (const [id, slot] of this.humans) {
       if (slot.queue.length > CATCHUP_BUFFER) {
         const extra = slot.queue.shift()!;
@@ -283,6 +299,38 @@ export class MapRoom extends Room {
         // cpu << wall means the process was descheduled (machine load), not slow code.
         `[MapRoom] slow tick ${ms.toFixed(1)} ms, cpu ${((cpu.user + cpu.system) / 1000).toFixed(1)} ms (ships=${[...this.sim.ships()].length})`,
       );
+    }
+  }
+
+  /** A human flying into a Gate gets a TravelOrder and leaves this Map Instance. */
+  private checkGates(): void {
+    const gates = this.map.gates;
+    if (!gates) return;
+    for (const id of this.humans.keys()) {
+      const s = this.sim.getShip(id);
+      if (!s || !s.alive || s.launchPhase !== 'none') continue;
+      const gate = gates.find(
+        (g) =>
+          (s.pos[0] - g.pos[0]) ** 2 + (s.pos[1] - g.pos[1]) ** 2 + (s.pos[2] - g.pos[2]) ** 2 <=
+          g.radius ** 2,
+      );
+      if (!gate || !MAPS[gate.to]) continue;
+      const order: TravelOrder = {
+        mapId: gate.to,
+        travel: signTravel({
+          shipId: id,
+          name: s.name,
+          nation: s.nation,
+          frame: s.frame,
+          from: this.map.id,
+          to: gate.to,
+        }),
+      };
+      this.byId.get(id)?.send(MSG.travel, order);
+      console.log(`[MapRoom] ${id} through gate to ${gate.to}`);
+      this.sim.removeShip(id);
+      this.humans.delete(id);
+      this.byId.delete(id);
     }
   }
 
@@ -329,4 +377,11 @@ export class MapRoom extends Room {
       client.raw(snapshotFrame(MSG.snapshot, per, shared, ships));
     }
   }
+}
+
+/** Point just outside a Gate, toward the map centre (the Ship spawns facing the centre). */
+function gateExit(pos: Vec3, radius: number): Vec3 {
+  const d = Math.hypot(pos[0], pos[2]) || 1;
+  const k = (radius + GATE_EXIT_M) / d;
+  return [pos[0] - pos[0] * k, pos[1], pos[2] - pos[2] * k];
 }

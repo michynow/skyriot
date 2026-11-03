@@ -639,7 +639,8 @@ export function stepFlight(
     const nx = -lostX / ll,
       ny = -lostY / ll,
       nz = -lostZ / ll;
-    const god = ctx.tuning.god.has(s.id);
+    // Cities are safe zones: every impact is a harmless bounce.
+    const god = ctx.tuning.god.has(s.id) || !!ctx.map.city;
     if (s.shield > 0 || god) {
       const vdn = vx * nx + vy * ny + vz * nz;
       if (vdn < 0) {

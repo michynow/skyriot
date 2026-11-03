@@ -12,6 +12,7 @@ export function damageShip(
 ): number {
   const s = rec.state;
   if (!s.alive || amount <= 0 || s.rollTicks > 0 || ctx.tuning.god.has(s.id)) return 0;
+  if (ctx.map.city) return 0; // City = safe zone
   if (s.launchPhase !== 'none') return 0;
   rec.shieldDelay = ctx.frames[s.frame].shieldRegenDelaySec;
   let remaining = amount;
