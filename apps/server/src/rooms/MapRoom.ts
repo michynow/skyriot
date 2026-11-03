@@ -11,6 +11,7 @@ import {
   SNAPSHOT_HZ,
   TICK_HZ,
   createSim,
+  gearOf,
   generateHeightfield,
   isCloaked,
   mulberry32,
@@ -29,6 +30,7 @@ import {
   type Welcome,
 } from '@skyriot/shared';
 import { botBrain, createBotMemory, type BotMemory } from '../bots/botBrain';
+import { awardKill, buy, canTrade, equip, upgrade } from '../economy';
 import { loadProfile, saveProfile } from '../profiles';
 import { runDevCommand } from './devCommands';
 import { packShared, snapshotFrame } from './snapshotFrame';
@@ -113,12 +115,35 @@ export class MapRoom extends Room {
             this.fillBots();
             return this.botsPerNation;
           },
+          grant: (credits, scrap) => {
+            const p = this.profiles.get(client.sessionId);
+            if (!p) return false;
+            p.wallet.credits = Math.max(0, p.wallet.credits + credits);
+            p.wallet.scrap = Math.max(0, p.wallet.scrap + scrap);
+            this.sendProfile(client.sessionId);
+            return true;
+          },
         },
         client.sessionId,
         text,
       );
       client.send(MSG.console, { text: reply });
     });
+
+    for (const [type, handler] of [
+      [MSG.buy, buy],
+      [MSG.upgrade, upgrade],
+      [MSG.equip, equip],
+    ] as const) {
+      this.onMessage(type, (client, raw: unknown) => {
+        const profile = this.profiles.get(client.sessionId);
+        if (!profile) return;
+        if (!canTrade(this.map)) return client.send(MSG.console, { text: 'trade only in a city' });
+        const error = handler(profile, raw);
+        if (error) return client.send(MSG.console, { text: error });
+        this.sendProfile(client.sessionId);
+      });
+    }
 
     this.setSimulationInterval((deltaMs) => this.loop(deltaMs), LOOP_INTERVAL_MS);
     this.clock.setInterval(() => this.profiles.forEach(saveProfile), PROFILE_FLUSH_MS);
@@ -150,6 +175,7 @@ export class MapRoom extends Room {
     });
     this.humans.set(id, { queue: [], last: null, ack: 0, buffering: true });
     this.byId.set(id, client);
+    this.sendProfile(id);
     const welcome: Welcome = {
       shipId: id,
       mapId: this.map.id,
@@ -174,6 +200,15 @@ export class MapRoom extends Room {
     this.profiles.delete(id);
     if (profile) void saveProfile(profile);
     this.fillBots();
+  }
+
+  /** Re-equip the Ship from the profile (gear applies at once, vitals on the next spawn) and send it. */
+  private sendProfile(id: ShipId): void {
+    const profile = this.profiles.get(id);
+    const ship = this.sim.getShip(id);
+    if (!profile || !ship) return;
+    this.sim.setGear(id, gearOf(profile, ship.frame));
+    this.byId.get(id)?.send(MSG.profile, profile);
   }
 
   onDispose() {
@@ -286,6 +321,13 @@ export class MapRoom extends Room {
       this.broadcast(MSG.events, events);
       // Humans' deaths/respawns are logged so a "mystery" return to deck can be traced.
       for (const e of events) {
+        if (e.type === 'shipDestroyed' && e.killer && this.profiles.has(e.killer)) {
+          const victim = this.sim.getShip(e.victim);
+          if (victim && victim.nation !== this.sim.getShip(e.killer)?.nation) {
+            awardKill(this.profiles.get(e.killer)!);
+            this.sendProfile(e.killer);
+          }
+        }
         if (e.type === 'shipDestroyed' && this.humans.has(e.victim))
           console.log(`[MapRoom] ${e.victim} destroyed by ${e.killer ?? 'terrain'}`);
         else if (e.type === 'shipRespawned' && this.humans.has(e.id))

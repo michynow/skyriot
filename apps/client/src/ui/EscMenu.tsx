@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { useHud } from '../hud/hudStore';
 import { inputSettings, inputState, saveInputSettings, setTyping } from '../input/input';
 import { Controls } from './Controls';
+import { Hangar } from './Hangar';
 import { useSettings, type Quality } from './settings';
 import './escMenu.css';
 
@@ -103,7 +104,7 @@ export function EscMenu({ onLeave }: { onLeave(): void }) {
   const open = useEscMenu((s) => s.open);
   const frame = useHud((h) => h.frame);
   const nation = useHud((h) => h.nation);
-  const [tab, setTab] = useState<'settings' | 'controls'>('settings');
+  const [tab, setTab] = useState<'settings' | 'controls' | 'hangar'>('settings');
   const [confirmLeave, setConfirmLeave] = useState(false);
 
   useEffect(() => {
@@ -170,6 +171,13 @@ export function EscMenu({ onLeave }: { onLeave(): void }) {
           </button>
           <button
             type="button"
+            className={`esc-tab ${tab === 'hangar' ? 'on' : ''}`}
+            onClick={() => setTab('hangar')}
+          >
+            HANGAR
+          </button>
+          <button
+            type="button"
             className={`ui-btn danger esc-leave ${confirmLeave ? 'confirm' : ''}`}
             onClick={() => (confirmLeave ? onLeave() : setConfirmLeave(true))}
             onBlur={() => setConfirmLeave(false)}
@@ -178,7 +186,13 @@ export function EscMenu({ onLeave }: { onLeave(): void }) {
           </button>
         </nav>
         <section className="esc-body">
-          {tab === 'settings' ? <Settings /> : <Controls frame={frame} />}
+          {tab === 'settings' ? (
+            <Settings />
+          ) : tab === 'controls' ? (
+            <Controls frame={frame} />
+          ) : (
+            <Hangar />
+          )}
         </section>
       </div>
     </div>

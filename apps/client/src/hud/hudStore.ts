@@ -7,6 +7,7 @@ import {
   STRUCTURES,
   TICK_HZ,
   WEAPONS,
+  gearOf,
   sampleHeight,
   type FrameId,
   type LaunchPhase,
@@ -17,6 +18,7 @@ import {
   type StructureState,
 } from '@skyriot/shared';
 import { world } from '../state/world';
+import { useProfile } from '../state/profile';
 import { session } from '../net/session';
 import { view } from './view';
 import { inputState } from '../input/input';
@@ -531,6 +533,10 @@ export function startHudFeed(): () => void {
       for (const s of world.ships.values()) if (s.alive && s.lockTarget === own.id) locked = true;
       const tick = session.interp?.latestTick(now) ?? own.respawnAtTick;
       const grounded = isGrounded(own);
+      const profile = useProfile.getState().profile;
+      const gear = profile ? gearOf(profile, own.frame) : {};
+      const weaponId1 = gear.primary?.def ?? def.primary;
+      const weaponId2 = gear.secondary?.def ?? def.secondary;
       Object.assign(patch, {
         frame: own.frame,
         nation: own.nation,
@@ -555,10 +561,10 @@ export function startHudFeed(): () => void {
         ammo2: own.ammo2,
         ammoMax1: def.ammo1Max,
         ammoMax2: def.ammo2Max,
-        weapon1: WEAPONS[def.primary]?.name ?? '',
-        weapon2: WEAPONS[def.secondary]?.name ?? '',
-        weaponId1: def.primary,
-        weaponId2: def.secondary,
+        weapon1: WEAPONS[weaponId1]?.name ?? '',
+        weapon2: WEAPONS[weaponId2]?.name ?? '',
+        weaponId1,
+        weaponId2,
         docked: own.docked,
         resupply: Math.min(1, (own.ammo1 / def.ammo1Max + own.ammo2 / def.ammo2Max) / 2),
         buffs: own.buffs.map((b) => ({

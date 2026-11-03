@@ -25,6 +25,55 @@ export const WEAPONS: Record<string, WeaponDef> = {
   'mortar-battery': w('mortar-battery', 'Mortar Battery', 'shell', 380, 2.6, 220, 1600, 0.02, {
     splashRadius: 10,
   }),
+  // ---- Shop variants (tiers 2–3); each sits in the line of the stock weapon above it ----
+  'quill-repeater': w('quill-repeater', 'Quill Repeater', 'tracer', 31, 0.076, 920, 1150, 0.012),
+  'lancet-cannon': w('lancet-cannon', 'Lancet Cannon', 'tracer', 35, 0.072, 950, 1200, 0.011),
+  'burst-flak': w('burst-flak', 'Burst Flak', 'tracer', 62, 0.17, 660, 830, 0.03, {
+    splashRadius: 4.5,
+  }),
+  'thunder-flak': w('thunder-flak', 'Thunder Flak', 'tracer', 70, 0.16, 680, 860, 0.03, {
+    splashRadius: 5,
+  }),
+  'arc-blaster': w('arc-blaster', 'Arc Blaster', 'tracer', 38, 0.105, 820, 980, 0.015),
+  'prism-blaster': w('prism-blaster', 'Prism Blaster', 'tracer', 43, 0.1, 840, 1010, 0.014),
+  'twin-hammer': w('twin-hammer', 'Twin Hammer', 'tracer', 54, 0.115, 760, 1030, 0.02),
+  'quad-autocannon': w('quad-autocannon', 'Quad Autocannon', 'tracer', 60, 0.11, 770, 1060, 0.02),
+  'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 540, 1.55, 260, 1550, 0, {
+    homingTurnRate: 2.6,
+    lockConeRad: 0.45,
+    lockTimeSec: 1.1,
+    splashRadius: 5,
+  }),
+  'talon-missile': w('talon-missile', 'Talon Missile', 'missile', 600, 1.5, 270, 1600, 0, {
+    homingTurnRate: 2.8,
+    lockConeRad: 0.47,
+    lockTimeSec: 1,
+    splashRadius: 5.5,
+  }),
+  'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 380, 1.55, 250, 1350, 0, {
+    homingTurnRate: 2.6,
+    lockConeRad: 0.5,
+    lockTimeSec: 0.9,
+    splashRadius: 5,
+  }),
+  'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 430, 1.5, 260, 1400, 0, {
+    homingTurnRate: 2.7,
+    lockConeRad: 0.52,
+    lockTimeSec: 0.8,
+    splashRadius: 5.5,
+  }),
+  'slab-bomb': w('slab-bomb', 'Slab Bomb', 'rocket', 590, 2.9, 145, 920, 0.01, {
+    splashRadius: 15,
+  }),
+  'monolith-bomb': w('monolith-bomb', 'Monolith Bomb', 'rocket', 660, 2.8, 150, 950, 0.01, {
+    splashRadius: 16,
+  }),
+  'howler-battery': w('howler-battery', 'Howler Battery', 'shell', 430, 2.5, 225, 1650, 0.02, {
+    splashRadius: 11,
+  }),
+  'quake-battery': w('quake-battery', 'Quake Battery', 'shell', 480, 2.4, 230, 1700, 0.02, {
+    splashRadius: 12,
+  }),
   // Base Turret gun (not a Frame weapon).
   'turret-flak': w('turret-flak', 'Turret Flak', 'tracer', 24, 0.2, 700, 950, 0.02, {
     splashRadius: 5,

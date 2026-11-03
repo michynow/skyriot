@@ -12,6 +12,7 @@ import type {
   StructureState,
   Vec3,
 } from '../types';
+import type { ShipGear } from '../content/economy';
 
 // Contract for the shared simulation (docs/ARCHITECTURE.md §2.1). Implementation owned by the sim agent.
 
@@ -27,6 +28,11 @@ export interface Sim {
   readonly tuning: SimTuning;
   addShip(id: ShipId, spawn: ShipSpawn, at?: Vec3): ShipState;
   removeShip(id: ShipId): void;
+  /**
+   * Equip a Ship (engine stats, upgraded weapons, visual tier/upgrade). Kept by id, so it may be set before
+   * addShip; removeShip clears it. Server and client prediction must pass the same gear.
+   */
+  setGear(id: ShipId, gear: ShipGear): void;
   /**
    * Advance exactly one tick. Missing input for a Ship = EMPTY_INPUT. Ships in `frozen` skip their own
    * logic this tick (a human whose input is late: stays in lockstep with client prediction).

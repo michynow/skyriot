@@ -10,6 +10,8 @@ const STRUCTURE_KINDS: Record<string, StructureKind> = {
 export interface DevHost {
   sim: Sim;
   setBotsPerNation(n: number): number;
+  /** Add to the caller's wallet (negative takes away). False if they have no profile. */
+  grant(credits: number, scrap: number): boolean;
 }
 
 const STUB_M2 = 'stored (M2 persistence)';
@@ -67,6 +69,13 @@ export function runDevCommand(host: DevHost, shipId: ShipId, line: string): stri
         ? `cast ${SKILLS[skill]!.name}`
         : `can't cast ${skill} (not in the ${me.frame} kit, or dead)`;
     }
+    case 'credits': {
+      const credits = Number(args[0]);
+      const scrap = Number(args[1] ?? 0);
+      if (!Number.isInteger(credits) || !Number.isInteger(scrap))
+        return 'usage: /credits <n> [scrap]';
+      return host.grant(credits, scrap) ? `+${credits} credits, +${scrap} scrap` : 'no profile';
+    }
     case 'level':
     case 'glory':
     case 'spawn':
@@ -74,7 +83,7 @@ export function runDevCommand(host: DevHost, shipId: ShipId, line: string): stri
     case 'event':
       return 'events: not yet implemented';
     case 'help':
-      return '/god, /bots <n>, /timescale <x>, /cast <skill>, /tp <x> <y> <z>, /base <nation> <stations|core|turrets>, /battle end <winner>, /level <n>, /glory <n>, /spawn <item> [+n], /event start <type>, /help';
+      return '/god, /bots <n>, /credits <n> [scrap], /timescale <x>, /cast <skill>, /tp <x> <y> <z>, /base <nation> <stations|core|turrets>, /battle end <winner>, /level <n>, /glory <n>, /spawn <item> [+n], /event start <type>, /help';
     default:
       return `unknown command: /${cmd} (try /help)`;
   }

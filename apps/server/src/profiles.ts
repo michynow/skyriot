@@ -1,5 +1,12 @@
 import { eq } from 'drizzle-orm';
-import type { FrameId, ItemInstance, Loadout, NationId, PilotProfile } from '@skyriot/shared';
+import {
+  STARTING_WALLET,
+  type FrameId,
+  type ItemInstance,
+  type Loadout,
+  type NationId,
+  type PilotProfile,
+} from '@skyriot/shared';
 import { accountFromToken } from './auth';
 import { db, schema } from './db';
 
@@ -13,7 +20,7 @@ function guest(name: string, nation: NationId): PilotProfile {
     nation,
     level: 1,
     xp: 0,
-    wallet: { credits: 0, scrap: 0, glory: 0 },
+    wallet: { ...STARTING_WALLET },
     items: [],
     loadouts: {},
     guest: true,
@@ -32,7 +39,7 @@ export async function loadProfile(
 ): Promise<PilotProfile> {
   const accountId = accountFromToken(token);
   if (!db || !accountId) return guest(name, nation);
-  await db.insert(pilot).values({ accountId, name, nation }).onConflictDoNothing();
+  await db.insert(pilot).values({ accountId, name, nation, ...STARTING_WALLET }).onConflictDoNothing();
   const [p] = await db.select().from(pilot).where(eq(pilot.accountId, accountId));
   const items = await db.select().from(item).where(eq(item.pilotId, p!.id));
   const loadouts = await db.select().from(loadout).where(eq(loadout.pilotId, p!.id));
