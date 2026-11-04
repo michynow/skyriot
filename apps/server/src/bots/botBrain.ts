@@ -263,7 +263,7 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     tx = deck.pos[0];
     ty = deck.pos[1] + DECK_APPROACH_HEIGHT;
     tz = deck.pos[2];
-    if (Math.hypot(me.pos[0] - tx, me.pos[2] - tz) < DECK_BRAKE_DISTANCE) input.brake = true;
+    if (Math.hypot(me.pos[0] - tx, me.pos[2] - tz) < DECK_BRAKE_DISTANCE) input.land = !me.landing;
     landing = true;
   }
 
@@ -277,12 +277,12 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       } else {
         if (me.sieged) {
           if (me.cooldowns[SIEGE_SLOT] === 0) input.hotbar = SIEGE_SLOT;
-        } else input.vertical = 1;
+        } else input.land = true;
         mem.siegeBot = mem.rng() < SIEGE_BOT_CHANCE;
       }
     } else if (mem.siegeBot && enemy && dist < SIEGE_BOT_ENGAGE_DISTANCE) {
       siegeMode = true;
-      input.vertical = -1;
+      input.land = !me.landing;
       input.throttle = -1;
     }
   }
@@ -355,7 +355,7 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   // Full throttle when slow or climbing away from terrain; easy throttle in a fight.
   const slow = me.speed < fd.minSpeed * SLOW_SPEED_MUL;
   const fighting = enemy !== undefined && dist < FAR_BOOST_DISTANCE && !retreating;
-  if (!siegeMode || me.grounded)
+  if ((!siegeMode || me.grounded) && !me.landing)
     input.throttle = siegeMode
       ? 0
       : slow || pullUp > 0

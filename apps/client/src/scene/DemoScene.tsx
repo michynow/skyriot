@@ -83,6 +83,8 @@ function mk(
     flipTicks: 0,
     reverseTicks: 0,
     halted: false,
+    landing: false,
+    liftTicks: 0,
   };
 }
 

@@ -139,7 +139,7 @@ export interface HudState {
   /** Why a Barrel Roll double-tap was just denied (boosting / recharge countdown); '' = hide. */
   rollDenied: string;
   /** Over our own Launch Deck's approach (S lands). */
-  overDeck: boolean;
+  deckHint: string;
   /** Distance (m) of the nearest guided missile homing on us; -1 = none. */
   incomingDist: number;
   launchPhase: LaunchPhase;
@@ -225,7 +225,7 @@ export const useHud = create<HudState>(() => ({
   halted: false,
   haltPrompt: false,
   rollDenied: '',
-  overDeck: false,
+  deckHint: '',
   incomingDist: -1,
   launchPhase: 'none',
   queuePos: -1,
@@ -621,14 +621,20 @@ export function startHudFeed(): () => void {
               : own.rollCooldownTicks > 0
                 ? `ROLL RECHARGING ${(own.rollCooldownTicks / TICK_HZ).toFixed(1)}s`
                 : '',
-        overDeck:
-          !own.docked &&
-          !!world.map?.launchDecks[own.nation].some(
-            (d) =>
-              own.pos[1] >= d.pos[1] &&
-              own.pos[1] - d.pos[1] < 120 &&
-              Math.hypot(own.pos[0] - d.pos[0], own.pos[2] - d.pos[2]) < d.radius * 4,
-          ),
+        deckHint: own.docked
+          ? ''
+          : own.landing
+            ? 'LANDING — W / BOOST CANCELS'
+            : now - inputState.landDeniedAt < 1500
+              ? 'NO LANDING PAD IN RANGE'
+              : world.map?.launchDecks[own.nation].some(
+                    (d) =>
+                      own.pos[1] >= d.pos[1] &&
+                      own.pos[1] - d.pos[1] < 120 &&
+                      Math.hypot(own.pos[0] - d.pos[0], own.pos[2] - d.pos[2]) < d.radius * 4,
+                  )
+                ? 'PRESS C TO LAND'
+                : '',
         incomingDist: own.incomingDist ?? -1,
         launchPhase: own.launchPhase ?? 'none',
         queuePos: own.queuePos ?? -1,

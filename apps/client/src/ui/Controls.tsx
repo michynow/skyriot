@@ -4,14 +4,15 @@ import './controls.css';
 const BINDINGS: [key: string, action: string][] = [
   ['MOUSE', 'steer / aim'],
   ['LMB · RMB', 'fire Primary / Secondary'],
-  ['W · S', 'throttle up / down to a stop (hover; S over Launch Deck lands)'],
+  ['W · S', 'throttle up / down to a stop (hover in place)'],
   ['A · D', 'strafe — double-tap to Barrel Roll'],
   ['Q · E', 'descend / climb'],
   ['SPACE', 'boost'],
-  ['SHIFT', 'lock Target nearest crosshair'],
-  ['TAB', 'cycle Target'],
+  ['SHIFT', 'lock / change lock to the Target nearest the crosshair (Siege: drop the gun lock)'],
+  ['TAB', 'next Hotbar set (F1–F3 pick)'],
+  ['C', 'land (Launch Deck in range; Bulwark: ground) · Bulwark: C again lifts off'],
   ['X', 'look behind'],
-  ['B', 'halt in place + Loadout (confirm B / Y)'],
+  ['B', 'engine off, frozen in place + Loadout (confirm B / Y); W or boost restarts'],
   ['1 – 0', 'Hotbar'],
   ['ALT', 'free look'],
   ['R', 'launch from Launch Deck'],
@@ -32,8 +33,8 @@ export function Controls({ frame, compact = false }: { frame: FrameId | null; co
       ))}
       {frame === 'bulwark' && (
         <p className="ctl-note">
-          <b>BULWARK</b> hold S or Q near ground to land · W/S drive while Grounded · E or Space
-          lifts off · Hotbar 1 = Siege Anchor (first-person gunner)
+          <b>BULWARK</b> C lands on the terrain below · WASD drive while Grounded · C lifts off ·
+          Hotbar 1 = Siege Anchor (first-person gunner)
         </p>
       )}
     </div>

@@ -81,6 +81,15 @@ export const DECK_RESPAWN_SPREAD = 0.6;
 
 // Bulwark ground mode
 export const LAND_HEIGHT = 8;
+/** Landing autopilot (C): own Launch Deck must be within this horizontal range (m). */
+export const LAND_DECK_RANGE = 2000;
+/** Approach speed per metre to the Deck (capped at cruise), height above the Deck until over it. */
+export const LAND_APPROACH_GAIN = 0.4;
+export const LAND_APPROACH_HEIGHT = 30;
+/** Vertical speed per metre of height error while landing (capped at the Frame's vertical speed). */
+export const LAND_DESCENT_GAIN = 1;
+/** Within this fraction of the Deck radius the nose holds its heading (no spinning over the pad). */
+export const LAND_HOLD_HEADING_MUL = 0.5;
 export const GROUND_CLEARANCE_EXTRA = 2;
 export const GROUND_STRAFE_MUL = 0.5;
 export const GROUND_REVERSE_MUL = 0.5;
@@ -88,7 +97,8 @@ export const GROUND_MAX_SLOPE_RAD = (40 * Math.PI) / 180;
 export const GROUND_SLIDE_SPEED = 25;
 export const GROUND_NORMAL_TAU_SEC = 0.15;
 export const GROUND_NORMAL_SAMPLE_M = 8;
-export const LIFTOFF_KICK = 10;
+/** Bulwark lift-off (C while Grounded): climb at full vertical speed for this long. */
+export const LIFTOFF_SEC = 1;
 
 // Siege mortar lock
 export const MORTAR_LOCK_CONE_RAD = 0.2;

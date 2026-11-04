@@ -215,7 +215,7 @@ function Hotbar() {
             F{b + 1} {BAR_NAMES[b]}
           </span>
         ))}
-        <kbd>C</kbd>
+        <kbd>TAB</kbd>
       </div>
       {hotbar.map((id, k) => {
         const i = first + k;
@@ -444,7 +444,7 @@ function Warnings() {
       halted: x.halted,
       haltPrompt: x.haltPrompt,
       rollDenied: x.rollDenied,
-      overDeck: x.overDeck,
+      deckHint: x.deckHint,
     })),
   );
   // In the hangar / tunnel the Ship is hidden: no lock, bounds or dock warnings apply.
@@ -464,11 +464,7 @@ function Warnings() {
       )}
       {h.halted && flying && <Loadout />}
       {h.rollDenied && flying && <div className="roll-denied">{h.rollDenied}</div>}
-      {h.overDeck && flying && !h.docked && (
-        <div className="deck-hint">
-          HOLD <kbd>S</kbd> TO LAND
-        </div>
-      )}
+      {h.deckHint && flying && <div className="deck-hint">{h.deckHint}</div>}
       {h.outOfBounds && flying && (
         <div className="oob">
           {world.map?.city ? 'LEAVING CITY AIRSPACE' : 'RETURN TO COMBAT AREA'}
@@ -602,7 +598,10 @@ function FlightTips() {
         <kbd>MOUSE</kbd> steer: the cursor is a stick, centre it to fly straight
       </p>
       <p>
-        <kbd>W</kbd> hold for speed · <kbd>SPACE</kbd> boost · <kbd>S</kbd> slow
+        <kbd>W</kbd> hold for speed · <kbd>SPACE</kbd> boost · <kbd>S</kbd> slow to a hover
+      </p>
+      <p>
+        <kbd>SHIFT</kbd> lock Target · <kbd>TAB</kbd> next hotbar set · <kbd>C</kbd> land
       </p>
       <p>
         <kbd>LMB</kbd> guns · <kbd>RMB</kbd> missile (locks the enemy in the crosshair)

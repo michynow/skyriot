@@ -43,7 +43,9 @@ export interface PilotInput {
   launch: boolean;
   /** Rising edge of a confirmed B: toggle a mid-air halt (Ship stops in place to inspect its Loadout). */
   halt: boolean;
-  /** Currently selected target (Tab). Missiles only lock onto this Ship. */
+  /** Rising edge of C: land (Bulwark: onto the terrain below, or lift off when grounded; others: nearest own Launch Deck). */
+  land: boolean;
+  /** Currently selected target (Shift). Missiles only lock onto this Ship. */
   target: ShipId | null;
   /** Client's estimate of server tick it is viewing remotes at (for lag compensation). */
   viewTick: number;
@@ -63,6 +65,7 @@ export const EMPTY_INPUT: Omit<PilotInput, 'seq' | 'viewTick'> = {
   rollRight: false,
   launch: false,
   halt: false,
+  land: false,
   target: null,
 };
 
@@ -154,8 +157,12 @@ export interface ShipState {
   flipTicks: number;
   /** Ticks left of a Backdraft (burst flying backwards, nose held). */
   reverseTicks: number;
-  /** Halted mid-air (B + confirm): stationary, weapons cold, until throttle/boost or B again. */
+  /** Halted mid-air (B + confirm): engine off, frozen in place, weapons cold, until throttle/boost or B again. */
   halted: boolean;
+  /** Landing autopilot (C): flying onto the nearest own Launch Deck, or (Bulwark) down onto the terrain. */
+  landing: boolean;
+  /** Ticks left of the Bulwark's lift-off climb (C while Grounded). */
+  liftTicks: number;
 }
 
 /**

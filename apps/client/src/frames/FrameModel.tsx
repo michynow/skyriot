@@ -99,7 +99,10 @@ export function FrameModel({
         const g = padFlames.current[i];
         if (!g) continue;
         const len =
-          (0.5 + s.fin * 2.4) * (1 + 0.15 * Math.sin(s.t * 50 + i * 1.7)) * (1 - s.ground * 0.7);
+          (0.5 + s.fin * 2.4) *
+          (1 + 0.15 * Math.sin(s.t * 50 + i * 1.7)) *
+          (1 - s.ground * 0.7) *
+          Math.min(1, s.idle * 2);
         g.scale.set(0.6 + s.fin * 0.3, 0.6 + s.fin * 0.3, len);
       }
     }
@@ -124,11 +127,13 @@ export function FrameModel({
     const me = shipId ? world.ships.get(shipId) : undefined;
     const docked = !!me?.docked;
     const gr = docked || !!(me as { grounded?: boolean } | undefined)?.grounded;
-    const idle = docked
-      ? 0.25
-      : gr
-        ? 0.45 + Math.min(1, Math.hypot(me!.vel[0], me!.vel[2]) / 25) * 0.35
-        : 1;
+    const idle = me?.halted
+      ? 0
+      : docked
+        ? 0.25
+        : gr
+          ? 0.45 + Math.min(1, Math.hypot(me!.vel[0], me!.vel[2]) / 25) * 0.35
+          : 1;
     s.idle += (idle - s.idle) * (1 - Math.exp(-6 * dt));
     s.ground += ((gr ? 1 : 0) - s.ground) * (1 - Math.exp(-5 * dt));
     if (hover.current) hover.current.position.y = -0.55 * s.ground;
@@ -155,7 +160,7 @@ export function FrameModel({
       gg.rotation.x += (pitch - gg.rotation.x) * k;
     }
     if (spinner.current && data.spinner)
-      spinner.current.rotation.z += dt * data.spinner.speed * (1 + s.boost);
+      spinner.current.rotation.z += dt * data.spinner.speed * (1 + s.boost) * s.idle;
     if (data.legs) {
       for (let i = 0; i < data.legs.pivots.length; i++) {
         const g = legs.current[i];

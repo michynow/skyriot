@@ -4,6 +4,7 @@ import {
   FRAMES,
   HOTBAR_BARS,
   HOTBAR_BAR_SLOTS,
+  LAND_DECK_RANGE,
   STRUCTURES,
   TICK_HZ,
   type PilotInput,
@@ -17,7 +18,7 @@ import { useSettings } from '../ui/settings';
 /** Mutable input-side state shared with the HUD (read per frame, never React state). */
 export const inputState = {
   targetId: null as ShipId | null,
-  /** Target picked by hand (Shift or Tab): auto-lock leaves it alone until the next Shift/Tab. */
+  /** Target picked by hand (Shift): auto-lock leaves it alone until the next Shift. */
   manualTarget: false,
   typing: false,
   /** Called when Enter requests the chat line. Set by the HUD. */
@@ -26,9 +27,11 @@ export const inputState = {
   haltPromptUntil: 0,
   /** performance.now() of the last double-tap made while the Barrel Roll was recharging or boosting. */
   rollDeniedAt: 0,
+  /** performance.now() of the last C with no own Launch Deck in landing range. */
+  landDeniedAt: 0,
   /** That denied double-tap came while boosting (no roll during boost). */
   rollDeniedBoost: false,
-  /** Hotbar bar the number keys fire (0-based); C cycles, F1-F3 pick. */
+  /** Hotbar bar the number keys fire (0-based); Tab cycles, F1-F3 pick. */
   hotbarBar: 0,
   /** Last aim direction sent (unit, world space); HUD range feedback raycasts along it from the Ship. */
   aim: [0, 0, -1] as [number, number, number],
@@ -65,6 +68,7 @@ let rollArmDir = 0;
 let hotbar = -1;
 let launch = false;
 let halt = false;
+let land = false;
 const HALT_CONFIRM_MS = 3000;
 let fire1 = false;
 let fire2 = false;
@@ -81,6 +85,11 @@ let aimPitch = 0;
 let stickX = 0;
 let stickY = 0;
 let flipYaw = 0;
+/** Aim baseline (no stick) of the last trackAim; after a Siege lock release the view holds it until the nose arrives. */
+let baseYaw = 0;
+let basePitch = 0;
+let holdYaw: number | null = null;
+let holdPitch = 0;
 let flipUntil = 0;
 const AIM_PITCH_MAX = 1.45;
 /** Shift picks enemies within ~55 degrees of the nose. */
@@ -156,33 +165,18 @@ function nearestToCrosshair(own: ShipState, minCos: number): ShipId | null {
 export function lockNearestToCrosshair(): void {
   const own = world.ownId ? world.ships.get(world.ownId) : undefined;
   if (!own) return;
+  if (own.sieged && own.siegeLock) {
+    // Siege: Shift drops the gun lock cleanly. No auto-lock until the next Shift; the view keeps its aim.
+    inputState.targetId = null;
+    inputState.manualTarget = true;
+    holdYaw = baseYaw;
+    holdPitch = basePitch;
+    return;
+  }
   const best = nearestToCrosshair(own, LOCK_PICK_COS);
   const release = best === null || (inputState.manualTarget && best === inputState.targetId);
   inputState.targetId = release ? null : best;
   inputState.manualTarget = !release;
-}
-
-/** Tab: select the next enemy within radar range, nearest first. Sent as PilotInput.target. */
-export function cycleTarget(): void {
-  const own = world.ownId ? world.ships.get(world.ownId) : undefined;
-  if (!own) return;
-  const range = FRAMES[own.frame].radarRangeM;
-  const enemies = [...world.ships.values()]
-    .filter((s) => s.alive && s.nation !== own.nation)
-    .map((s) => ({
-      id: s.id,
-      d: Math.hypot(s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]),
-    }))
-    .filter((e) => e.d <= range)
-    .sort((a, b) => a.d - b.d);
-  if (!enemies.length) {
-    inputState.targetId = null;
-    inputState.manualTarget = false;
-    return;
-  }
-  const i = enemies.findIndex((e) => e.id === inputState.targetId);
-  inputState.targetId = enemies[(i + 1) % enemies.length]!.id;
-  inputState.manualTarget = true;
 }
 
 export function setTyping(on: boolean): void {
@@ -226,7 +220,7 @@ export function attachInput(canvas: HTMLElement): () => void {
           inputState.rollDeniedBoost = boosting;
         }
       }
-    } else if (e.code === 'Tab') cycleTarget();
+    } else if (e.code === 'Tab') inputState.hotbarBar = (inputState.hotbarBar + 1) % HOTBAR_BARS;
     else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') lockNearestToCrosshair();
     else if (e.code === 'KeyX') world.lookBack = true;
     else if (e.code === 'KeyB' || (e.code === 'KeyY' && inputState.haltPromptUntil > 0)) {
@@ -241,8 +235,18 @@ export function attachInput(canvas: HTMLElement): () => void {
     else if (e.code.startsWith('Alt')) {
       world.freeLook = true;
       world.cursor.x = world.cursor.y = 0;
-    } else if (e.code === 'KeyC' && !e.repeat) {
-      inputState.hotbarBar = (inputState.hotbarBar + 1) % HOTBAR_BARS;
+    } else if (e.code === 'KeyC') {
+      const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+      const inRange =
+        !own ||
+        own.docked ||
+        own.landing ||
+        FRAMES[own.frame].canHover ||
+        !!world.map?.launchDecks[own.nation].some(
+          (d) => Math.hypot(own.pos[0] - d.pos[0], own.pos[2] - d.pos[2]) <= LAND_DECK_RANGE,
+        );
+      if (inRange) land = true;
+      else inputState.landDeniedAt = performance.now();
     } else if (/^F[1-9]$/.test(e.code) && Number(e.code.slice(1)) <= HOTBAR_BARS) {
       e.preventDefault();
       inputState.hotbarBar = Number(e.code.slice(1)) - 1;
@@ -386,7 +390,21 @@ export function trackAim(_camera: Camera, own: ShipState | undefined): void {
       dz = t.pos[2] - own.pos[2];
     yaw = Math.atan2(-dx, -dz);
     pitch = Math.atan2(dy, Math.hypot(dx, dz));
+    holdYaw = null;
+  } else if (holdYaw !== null) {
+    // Just released a Siege lock: the baseline starts where the lock was and eases onto the nose (no snap).
+    // ponytail: per-frame easing (frame-rate dependent); use dt if it ever matters.
+    const dyaw = Math.atan2(Math.sin(yaw - holdYaw), Math.cos(yaw - holdYaw));
+    if (Math.abs(dyaw) < 0.01 && Math.abs(pitch - holdPitch) < 0.01) holdYaw = null;
+    else {
+      holdYaw += dyaw * 0.05;
+      holdPitch += (pitch - holdPitch) * 0.05;
+      yaw = holdYaw;
+      pitch = holdPitch;
+    }
   }
+  baseYaw = yaw;
+  basePitch = pitch;
   if (performance.now() < flipUntil) {
     aimYaw = flipYaw;
     aimPitch = 0;
@@ -422,7 +440,8 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
   // the crosshair and keeps them until someone else is. Either drops when it dies.
   const id = inputState.targetId;
   const alive = id ? (world.ships.get(id) ?? world.structures.get(id))?.alive : false;
-  if (!own || !alive) {
+  // A Siege lock release (manual, no Target) only suppresses auto-lock while sieged.
+  if (!own || (id ? !alive : !own.sieged)) {
     inputState.targetId = null;
     inputState.manualTarget = false;
   }
@@ -449,12 +468,14 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
     rollRight: !typing && rollArm === 1,
     launch: !typing && launch,
     halt: !typing && halt,
+    land: !typing && land,
     target: inputState.targetId,
   };
   if (import.meta.env.DEV && (input.rollLeft || input.rollRight))
     console.debug('[roll] sent', input.rollLeft ? 'left' : 'right', 'seq', seq);
   launch = false;
   halt = false;
+  land = false;
   hotbar = -1;
   tap1 = tap2 = false;
   tapped.clear();

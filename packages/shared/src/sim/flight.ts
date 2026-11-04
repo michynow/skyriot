@@ -26,9 +26,14 @@ import {
   GROUND_REVERSE_MUL,
   GROUND_SLIDE_SPEED,
   HOVER_MAX_SPEED,
+  LAND_APPROACH_GAIN,
+  LAND_APPROACH_HEIGHT,
+  LAND_DECK_RANGE,
+  LAND_DESCENT_GAIN,
   LAND_HEIGHT,
+  LAND_HOLD_HEADING_MUL,
   LAUNCH_KICK,
-  LIFTOFF_KICK,
+  LIFTOFF_SEC,
   ROLL_DISPLACEMENT_PER_IMPULSE,
   ROLL_DURATION_SEC,
   MIN_DIRECTION_LENGTH,
@@ -111,6 +116,22 @@ function resupply(ctx: SimCtx, s: ShipState): void {
   s.fuel = 1;
   s.shield = s.maxShield;
   ctx.events.push({ type: 'resupplied', id: s.id });
+}
+
+/** Nearest own-nation Launch Deck within landing range (horizontal), or null. */
+function landingDeck(ctx: SimCtx, s: ShipState) {
+  const decks = ctx.map.launchDecks[s.nation];
+  let best = null;
+  let bestD = LAND_DECK_RANGE;
+  for (let i = 0; i < decks.length; i++) {
+    const d = decks[i]!;
+    const dist = Math.hypot(s.pos[0] - d.pos[0], s.pos[2] - d.pos[2]);
+    if (dist <= bestD) {
+      bestD = dist;
+      best = d;
+    }
+  }
+  return best;
 }
 
 /** Own-nation deck whose surface the Ship is touching. */
@@ -196,43 +217,64 @@ export function stepFlight(
   const reach = Math.max(Math.abs(s.pos[0]), Math.abs(s.pos[2]));
   s.outOfBounds = reach > edge - BOUNDARY_WARN_M;
 
-  // ---- Bulwark modes: landing, grounded, siege ----
+  // ---- C: land / lift off; Bulwark grounded and siege ----
   s.brakeHeld = input.brake;
-  if (fd.canHover && !s.docked) {
-    if (s.grounded) {
-      if (input.vertical > 0 || input.boost) {
-        s.grounded = false;
-        s.sieged = false;
-        s.siegePending = false;
-        rec.lat[1] = LIFTOFF_KICK;
-      }
-    } else {
-      const ground = sampleHeight(ctx.hf, s.pos[0], s.pos[2]);
-      if (
-        !s.sieged &&
-        s.pos[1] - ground <= fd.radius + LAND_HEIGHT &&
-        s.speed < fd.cruiseSpeed &&
-        (input.brake || input.vertical < 0)
-      ) {
-        s.grounded = true;
-        s.rollPhase = -1;
-        s.rollDir = 0;
-        rec.lat[1] = 0;
-      }
-    }
-    if (s.siegePending && !s.sieged && (s.grounded || s.speed < HOVER_MAX_SPEED)) {
-      s.sieged = true;
-      s.siegePending = false;
-    }
+  let landPress = input.land && !s.docked;
+  if (fd.canHover && s.grounded && landPress) {
+    // Grounded Bulwark: only C lifts it off (WASD just drives).
+    s.grounded = false;
+    s.sieged = false;
+    s.siegePending = false;
+    s.liftTicks = Math.ceil(LIFTOFF_SEC * TICK_HZ);
+    landPress = false;
   }
-  const grounded = s.grounded;
-  const sieged = s.sieged;
 
   if (s.flipTicks > 0) s.flipTicks--;
   if (s.reverseTicks > 0 && --s.reverseTicks === 0) s.speed = fd.minSpeed;
   // Halt (B + confirm) toggles; any throttle or boost also releases it.
   if (input.halt && !s.docked && !s.grounded) s.halted = !s.halted;
   if (s.halted && (input.throttle > 0 || input.boost)) s.halted = false;
+
+  // Landing autopilot: C toggles it; throttle, boost, halt or siege cancel it.
+  const deck = fd.canHover ? null : landingDeck(ctx, s);
+  if (landPress) s.landing = !s.landing && !s.grounded && (fd.canHover || deck !== null);
+  if (
+    s.landing &&
+    (input.throttle > 0 ||
+      input.boost ||
+      s.halted ||
+      s.sieged ||
+      s.siegePending ||
+      (!fd.canHover && !deck))
+  )
+    s.landing = false;
+  if (fd.canHover && !s.docked && !s.grounded) {
+    const ground = sampleHeight(ctx.hf, s.pos[0], s.pos[2]);
+    if (s.landing && s.pos[1] - ground <= fd.radius + LAND_HEIGHT) {
+      s.grounded = true;
+      s.landing = false;
+      s.rollPhase = -1;
+      s.rollDir = 0;
+      rec.lat[1] = 0;
+    }
+  }
+  if (fd.canHover && s.siegePending && !s.sieged && (s.grounded || s.speed < HOVER_MAX_SPEED)) {
+    s.sieged = true;
+    s.siegePending = false;
+  }
+  const grounded = s.grounded;
+  const sieged = s.sieged;
+
+  if (s.halted) {
+    // Engine off: frozen exactly in place (no turn, bank, drift or bob) until W / boost / B.
+    s.speed = 0;
+    s.rollPhase = -1;
+    s.rollDir = 0;
+    for (let i = 0; i < 3; i++) rec.lat[i] = s.vel[i] = s.angVel[i] = 0;
+    s.fuel = clamp(s.fuel + fd.fuelRegenPerSec * rec.mods.fuelRegenMul * dt, 0, 1);
+    syncBody(ctx, rec);
+    return;
+  }
   // Boost: Space with fuel, in normal flight (not sieged, halted, braking, reversing or dashing).
   const boosting =
     input.boost &&
@@ -250,6 +292,23 @@ export function stepFlight(
   let ax = input.aim[0],
     ay = input.aim[1],
     az = input.aim[2];
+  // Landing autopilot steering: level nose, toward the Deck until over it, then hold heading.
+  let landDist = 0;
+  if (s.landing) {
+    ay = 0;
+    if (deck) {
+      const dx = deck.pos[0] - s.pos[0],
+        dz = deck.pos[2] - s.pos[2];
+      landDist = Math.hypot(dx, dz);
+      if (landDist > deck.radius * LAND_HOLD_HEADING_MUL) {
+        ax = dx;
+        az = dz;
+      } else {
+        ax = _f0[0]!;
+        az = _f0[2]!;
+      }
+    }
+  }
   if (!s.docked) {
     const al0 = Math.hypot(ax, ay, az) || 1;
     ax /= al0;
@@ -518,8 +577,11 @@ export function stepFlight(
 
   // ---- forward speed ----
   let target: number;
-  if (sieged || s.halted) {
+  if (sieged) {
     target = 0;
+  } else if (s.landing) {
+    // Approach: ease off as the Deck nears; the Bulwark just stops and sinks.
+    target = Math.min(fd.cruiseSpeed, landDist * LAND_APPROACH_GAIN);
   } else if (s.reverseTicks > 0) {
     target = -fd.boostSpeed * REVERSE_SPEED_MUL;
   } else if (input.brake || s.siegePending) {
@@ -542,7 +604,7 @@ export function stepFlight(
   const rate2 =
     (delta >= 0
       ? 1
-      : input.brake || s.siegePending || sieged || s.halted
+      : input.brake || s.siegePending || sieged || s.landing
         ? BRAKE_DECEL_MUL
         : THROTTLE_DECEL_MUL) * accel;
   if (s.reverseTicks > 0) s.speed = target;
@@ -556,11 +618,24 @@ export function stepFlight(
   let tx = (hrx / hrl) * input.strafe * fd.strafeSpeed;
   let tz = (hrz / hrl) * input.strafe * fd.strafeSpeed;
   // No stall or sink: at any speed a Ship holds its altitude unless Q/E moves it.
-  if (sieged || s.halted) {
-    // Airborne siege / halt: hold position and altitude.
+  if (sieged) {
+    // Airborne siege: hold position and altitude.
     tx = 0;
     tz = 0;
     ty = 0;
+  } else if (s.liftTicks > 0) {
+    s.liftTicks--;
+    ty = fd.verticalSpeed;
+  } else if (s.landing) {
+    // Bulwark sinks onto the terrain; others hold Deck height + margin, then settle once over the Deck.
+    tx = 0;
+    tz = 0;
+    ty = -fd.verticalSpeed;
+    if (deck) {
+      const y =
+        deck.pos[1] + fd.radius + (landDist > deck.radius ? LAND_APPROACH_HEIGHT : DOCK_CLEARANCE);
+      ty = clamp((y - s.pos[1]) * LAND_DESCENT_GAIN, -fd.verticalSpeed, fd.verticalSpeed);
+    }
   }
   const ceilPush = clamp((s.pos[1] - (ctx.map.ceiling - CEILING_SOFT_M)) / CEILING_SOFT_M, 0, 1);
   if (ceilPush > 0) ty = Math.min(ty, -ceilPush * CEILING_PUSH_SPEED);
@@ -598,6 +673,14 @@ export function stepFlight(
   s.pos[0] += m.x;
   s.pos[1] += m.y;
   s.pos[2] += m.z;
+  // Bulwark landing blocked by terrain (a slope under the hull): it has touched down.
+  if (s.landing && fd.canHover && dy < 0 && m.y > dy * 0.5) {
+    s.grounded = true;
+    s.landing = false;
+    s.rollPhase = -1;
+    s.rollDir = 0;
+    rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;
+  }
 
   // ---- Launch Deck docking (before impact so a slow landing is never an impact) ----
   const speedMag = Math.hypot(vx, vy, vz);
@@ -607,6 +690,7 @@ export function stepFlight(
       s.docked = true;
       s.dockTicks = 0;
       s.speed = 0;
+      s.landing = false;
       s.sieged = false;
       s.siegePending = false;
       s.rollPhase = -1;

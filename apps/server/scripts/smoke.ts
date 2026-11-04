@@ -151,7 +151,7 @@ const crash = dive(false);
 console.log('bounce', bounce.impact, `shield=${bounce.shield} hp=${bounce.hp}/${bounce.maxHp}`);
 console.log('crash', crash.impact, `alive=${crash.alive}`);
 
-// 2. Bulwark: land with Q near ground, siege with Shift, lift off with E.
+// 2. Bulwark: land with C, siege, lift off with C.
 function bulwark() {
   const sim2 = fresh(true);
   const g = sampleHeight(hf, 0, 0);
@@ -164,7 +164,8 @@ function bulwark() {
       sim2.step(new Map([['b', mk(++seq, { aim: [0, 0, -1], ...patch })]]));
   };
   run(30, { throttle: -1, brake: false });
-  for (let i = 0; i < 400 && !b.grounded; i++) run(1, { vertical: -1, throttle: -1 });
+  for (let i = 0; i < 400 && !b.grounded; i++)
+    run(1, { vertical: -1, throttle: -1, land: i === 0 });
   log.push(
     `grounded=${b.grounded} y-ground=${(b.pos[1] - sampleHeight(hf, b.pos[0], b.pos[2])).toFixed(1)}`,
   );
@@ -177,7 +178,8 @@ function bulwark() {
   const unsieged = !b.sieged && b.grounded;
   run(60, { throttle: 1 });
   const moved = Math.hypot(b.pos[0], b.pos[2]);
-  run(150, { vertical: 1 });
+  run(1, { land: true }); // C lifts off
+  run(149, { vertical: 1 });
   log.push(
     `unsieged-still-grounded=${unsieged} drove=${moved.toFixed(0)}m liftedOff=${!b.grounded}`,
   );
@@ -240,7 +242,8 @@ function siegeLockTest() {
     t.hp = t.maxHp; // keep the target alive
     t.shield = t.maxShield;
   };
-  for (let i = 0; i < 200 && !b.grounded; i++) step({ vertical: -1, throttle: -1 }, true);
+  for (let i = 0; i < 200 && !b.grounded; i++)
+    step({ vertical: -1, throttle: -1, land: i === 0 }, true);
   step({ hotbar: 0 }, true);
   for (let i = 0; i < 150 && b.siegeLock !== 't'; i++) step({}, true);
   const acquired = b.sieged && b.siegeLock === 't';
@@ -413,7 +416,7 @@ function purity() {
   const b = sim2.getShip('b')!;
   let seq = 0;
   for (let i = 0; i < 400 && !b.grounded; i++)
-    sim2.step(new Map([['b', mk(++seq, { vertical: -1, throttle: -1 })]]));
+    sim2.step(new Map([['b', mk(++seq, { vertical: -1, throttle: -1, land: i === 0 })]]));
   for (let i = 0; i < 40; i++) sim2.step(new Map([['b', mk(++seq, {})]]));
   const x0 = b.pos[0],
     z0 = b.pos[2];
