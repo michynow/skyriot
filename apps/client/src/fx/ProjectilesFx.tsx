@@ -389,6 +389,13 @@ function handleEvents(fx: Fx, _dt: number) {
         }
         const victim = world.ships.get(e.victim);
         sparks(fx, e.pos, e.deflected ? 12 : 8, e.deflected);
+        const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+        if (own && e.attacker === own.id) {
+          // Own hits: a flash that stays a few pixels wide at any range, so you see you're connecting.
+          const d = Math.hypot(e.pos[0] - own.pos[0], e.pos[1] - own.pos[1], e.pos[2] - own.pos[2]);
+          const sz = Math.max(3, d * 0.02);
+          fx.glow.emit(e.pos[0], e.pos[1], e.pos[2], 0, 0, 0, 0.12, sz, sz * 0.3, 3, 2.2, 1, 1);
+        }
         if (k === 1 || k === 2 || k === 3)
           explosion(
             fx,
@@ -407,7 +414,16 @@ function handleEvents(fx: Fx, _dt: number) {
       case 'shipDestroyed': {
         const v = world.ships.get(e.victim);
         if (!boomOnce(fx, e.victim)) break;
-        explosion(fx, e.pos, v ? 1.2 + FRAMES[v.frame].radius * 0.3 : 2.5, true, v?.nation);
+        const k = v ? 1.2 + FRAMES[v.frame].radius * 0.3 : 2.5;
+        // Your kill: heavy boom (bigger ring, flash, shake) so the payoff reads.
+        explosion(
+          fx,
+          e.pos,
+          e.killer === world.ownId ? k * 1.4 : k,
+          true,
+          v?.nation,
+          e.killer === world.ownId,
+        );
         break;
       }
       case 'shipRespawned': {
