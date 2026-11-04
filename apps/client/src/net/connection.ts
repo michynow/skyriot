@@ -84,6 +84,7 @@ function parseSnapshot(m: unknown): Snapshot | null {
     incomingTti: isNum(s.incomingTti) ? s.incomingTti : -1,
     canLock: s.canLock === true,
     lockProgress: isNum(s.lockProgress) ? s.lockProgress : 0,
+    siegeLock: typeof s.siegeLock === 'string' ? s.siegeLock : null,
     rollPhase: isNum(s.rollPhase) ? s.rollPhase : -1,
     rollDir: isNum(s.rollDir) ? s.rollDir : 0,
     outOfBounds: s.outOfBounds === true,

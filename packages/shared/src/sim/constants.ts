@@ -99,6 +99,9 @@ export const LIFTOFF_KICK = 10;
 export const MORTAR_LOCK_CONE_RAD = 0.2;
 export const SIEGE_LOCK_CONE_MUL = 2;
 export const MORTAR_LOCK_SEC = 1.2;
+// Siege gun lock: acquired inside AIM_ASSIST.coneRad of the nose, held until the Target leaves this cone.
+export const SIEGE_GUN_BREAK_CONE_RAD = 0.5;
+export const SIEGE_GUN_SPREAD_MUL = 0.35;
 export const MORTAR_LOFT_RAD = 0.6;
 export const MORTAR_GUIDE_TURN = 0.9;
 
