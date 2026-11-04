@@ -350,8 +350,18 @@ export function trackAim(_camera: Camera, own: ShipState | undefined): void {
   const fx = -2 * (x * z + w * y),
     fy = -2 * (y * z - w * x),
     fz = -(1 - 2 * (x * x + y * y));
-  const yaw = Math.atan2(-fx, -fz);
-  const pitch = Math.asin(Math.max(-1, Math.min(1, fy)));
+  let yaw = Math.atan2(-fx, -fz);
+  let pitch = Math.asin(Math.max(-1, Math.min(1, fy)));
+  // Siege gun lock: the view centre rides the Target (the stick only nudges off it). A Target that out-turns the
+  // Bulwark's Siege turn rate leaves the break cone and the sim drops the lock.
+  const t = own.sieged && own.siegeLock ? world.ships.get(own.siegeLock) : undefined;
+  if (t) {
+    const dx = t.pos[0] - own.pos[0],
+      dy = t.pos[1] - own.pos[1],
+      dz = t.pos[2] - own.pos[2];
+    yaw = Math.atan2(-dx, -dz);
+    pitch = Math.atan2(dy, Math.hypot(dx, dz));
+  }
   if (performance.now() < flipUntil) {
     aimYaw = flipYaw;
     aimPitch = 0;
