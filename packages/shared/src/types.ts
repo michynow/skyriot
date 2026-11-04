@@ -4,7 +4,7 @@ export const TICK_HZ = 30;
 export const TICK_DT = 1 / TICK_HZ;
 export const SNAPSHOT_HZ = 20;
 export const MAX_SHIPS_PER_INSTANCE = 60;
-export const BOTS_PER_NATION = 20;
+export const BOTS_PER_NATION = 5;
 /**
  * Max target rewind (shooter's view tick to the tick its input runs). That is the round trip + server
  * jitter buffer + 100 ms interpolation delay: ~500 ms at 150 ms each way, plus jitter headroom.

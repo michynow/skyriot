@@ -21,6 +21,33 @@ import {
   type StructureState,
 } from '@skyriot/shared';
 
+// Skill: Bots fly like mediocre human pilots. Raise/lower these to make them harder/easier.
+/** Ticks between looks at the enemy: in between, a Bot steers at where it last saw it. */
+const REACTION_TICKS = 7;
+/** Aim error (rad) on a fresh target; shrinks toward the floor only while the target is held. */
+const AIM_ERR_START_RAD = 0.22;
+const AIM_ERR_MIN_RAD = 0.04;
+const AIM_ERR_DECAY = 0.985; // per tick
+/** Wide fire cone plus bursts: Bots spray and waste shots. */
+const FIRE_CONE_RAD = 0.14;
+const BURST_ON_TICKS = 15;
+const BURST_PERIOD_TICKS = 40;
+/** Fraction of the Frame's turn rate a Bot uses, and its throttle while fighting (player max is 1 + boost). */
+const BOT_TURN_MUL = 0.65;
+const COMBAT_THROTTLE = 0.3;
+/** Mirrors the sim's TURN_GAIN (turn rate = aim angle * gain), used to cap the Bot's aim offset. */
+const SIM_TURN_GAIN = 9;
+/** Per-tick chances: Barrel Roll an incoming missile in the break window, use a ready Skill, launch a locked missile. */
+const ROLL_DODGE_CHANCE = 0.1;
+const SKILL_USE_CHANCE = 0.004;
+const MISSILE_FIRE_CHANCE = 0.015;
+/** Hurt below this HP fraction, a Bot may break off and run for a while. */
+const DISENGAGE_HP_FRACTION = 0.35;
+const DISENGAGE_CHANCE = 0.5;
+const DISENGAGE_TICKS = 6 * TICK_HZ;
+/** Extra distance (m) a target costs per other Bot already on it: spreads Bots over targets. */
+const DOGPILE_PENALTY_M = 1000;
+
 // Bot tuning (module constants; no content/ equivalent yet).
 const AVOID_LOOKAHEAD_SEC = 2.2;
 const AVOID_MARGIN = 90;
@@ -29,12 +56,10 @@ const CRUISE_THROTTLE = 0.6;
 /** Below the engine's min speed times this, Bots go full throttle. */
 const SLOW_SPEED_MUL = 1.3;
 const CRUISE_ALTITUDE = 160;
-const FIRE_CONE_RAD = 0.07;
 const FAR_BOOST_DISTANCE = 1200;
 const DODGE_CHANCE = 0.3;
 const ROLL_CHANCE = 0.08;
 const HEAL_HP_FRACTION = 0.4;
-const SKILL_CHANCE = 0.01;
 const RESUPPLY_AMMO_FRACTION = 0.05;
 const DECK_APPROACH_HEIGHT = 20;
 const DECK_BRAKE_DISTANCE = 250;
@@ -43,7 +68,7 @@ const SIEGE_SLOT = 0; // siege-anchor is hotbar slot 0 on the Bulwark
 const ROLL_WINDOW_MIN_M = 30;
 const ROLL_WINDOW_MAX_M = 80;
 const FLARE_INCOMING_M = 700;
-const FLARE_CHANCE = 0.25;
+const FLARE_CHANCE = 0.05;
 const BUFF_ENGAGE_DIST = 900;
 const BOMB_DROP_RADIUS = 60;
 /** Distance to the enemy under which a Bot fires each offensive Skill (roughly its effect reach). */
@@ -86,7 +111,19 @@ export interface BotMemory {
   extending: boolean;
   /** Goes for the enemy Base, fighting only Ships that get very close. */
   raider: boolean;
+  /** Current target and where it was last seen: [x, y, z, vx, vy, vz]. */
+  target: ShipId | null;
+  seen: number[];
+  aimErr: number;
+  errDir: [number, number, number];
+  burstPhase: number;
+  retreatTicks: number;
+  /** Already rolled the dice on running away this time HP dropped low. */
+  disengaged: boolean;
 }
+
+/** Each Bot's current target, per Sim, so Bots can spread over targets. */
+const claims = new WeakMap<Sim, Map<ShipId, ShipId | null>>();
 
 export function createBotMemory(hf: Heightfield, seed: number, decks: LaunchDeck[]): BotMemory {
   const rng = mulberry32(seed);
@@ -102,6 +139,13 @@ export function createBotMemory(hf: Heightfield, seed: number, decks: LaunchDeck
     lastBrake: false,
     raider: rng() < RAIDER_CHANCE,
     extending: false,
+    target: null,
+    seen: [0, 0, 0, 0, 0, 0],
+    aimErr: AIM_ERR_START_RAD,
+    errDir: [0, 0, 0],
+    burstPhase: Math.floor(rng() * BURST_PERIOD_TICKS),
+    retreatTicks: 0,
+    disengaged: false,
   };
 }
 
@@ -118,8 +162,32 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   const fd = FRAMES[me.frame];
   const primary = WEAPONS[fd.primary]!;
   const secondary = WEAPONS[fd.secondary]!;
-  const enemy = nearestEnemy(sim, me);
-  input.target = enemy ? enemy.id : null;
+  let claimed = claims.get(sim);
+  if (!claimed) claims.set(sim, (claimed = new Map()));
+  // Reaction delay: look at the enemy only every REACTION_TICKS; in between, steer at the stale sighting.
+  let enemy = mem.target ? sim.getShip(mem.target) : undefined;
+  if (enemy && (!enemy.alive || enemy.launchPhase !== 'none')) enemy = undefined;
+  if (!enemy || mem.seq % REACTION_TICKS === 0) {
+    enemy = pickEnemy(sim, me, mem.target, claimed) ?? undefined;
+    if ((enemy?.id ?? null) !== mem.target) mem.aimErr = AIM_ERR_START_RAD;
+    mem.target = enemy?.id ?? null;
+    if (enemy) {
+      mem.seen = [...enemy.pos, ...enemy.vel];
+      mem.errDir = norm3(mem.rng() - 0.5, mem.rng() - 0.5, mem.rng() - 0.5);
+    }
+  }
+  claimed.set(id, mem.target);
+  mem.aimErr = Math.max(mem.aimErr * AIM_ERR_DECAY, AIM_ERR_MIN_RAD);
+  input.target = mem.target;
+
+  // Hurt: maybe break off and run for a while.
+  if (me.hp >= me.maxHp * DISENGAGE_HP_FRACTION) mem.disengaged = false;
+  else if (!mem.disengaged && enemy) {
+    mem.disengaged = true;
+    if (mem.rng() < DISENGAGE_CHANCE) mem.retreatTicks = DISENGAGE_TICKS;
+  }
+  if (mem.retreatTicks > 0) mem.retreatTicks--;
+  const retreating = mem.retreatTicks > 0 && enemy !== undefined;
 
   let tx = 0,
     ty = CRUISE_ALTITUDE,
@@ -128,13 +196,27 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   if (enemy) {
     dist = Math.hypot(enemy.pos[0] - me.pos[0], enemy.pos[1] - me.pos[1], enemy.pos[2] - me.pos[2]);
     const lead = Math.min(dist / primary.speed, 2);
-    tx = enemy.pos[0] + enemy.vel[0] * lead;
-    ty = enemy.pos[1] + enemy.vel[1] * lead;
-    tz = enemy.pos[2] + enemy.vel[2] * lead;
+    const miss = mem.aimErr * dist;
+    const [sx, sy, sz, svx, svy, svz] = mem.seen as [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
+    tx = sx + svx * lead + mem.errDir[0] * miss;
+    ty = sy + svy * lead + mem.errDir[1] * miss;
+    tz = sz + svz * lead + mem.errDir[2] * miss;
+    if (retreating) {
+      tx = 2 * me.pos[0] - enemy.pos[0];
+      ty = Math.max(me.pos[1], CRUISE_ALTITUDE);
+      tz = 2 * me.pos[2] - enemy.pos[2];
+    }
   }
   // No Ship close: go for the enemy Base (a Turret shooting at us first, then Shield Stations, then the Core).
   const engage = mem.raider ? RAIDER_ENGAGE_DISTANCE : SHIP_ENGAGE_DISTANCE;
-  const objective = dist > engage ? pickObjective(sim, me) : null;
+  const objective = dist > engage && !retreating ? pickObjective(sim, me) : null;
   let objectiveDist = Infinity;
   if (objective) {
     tx = objective.pos[0];
@@ -256,16 +338,40 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       dz /= dl;
     }
   }
+  // Turn slower than the Frame can: cap how far the aim leads the nose (never when dodging terrain).
+  if (pullUp <= 0 && !landing && !siegeMode && !edgeBot) {
+    const f = noseOf(me);
+    const maxOff = (BOT_TURN_MUL * fd.turnRate) / SIM_TURN_GAIN;
+    const c = dx * f[0] + dy * f[1] + dz * f[2];
+    if (c < Math.cos(maxOff)) {
+      const p = norm3(dx - f[0] * c, dy - f[1] * c, dz - f[2] * c);
+      const [cs, sn] = [Math.cos(maxOff), Math.sin(maxOff)];
+      dx = f[0] * cs + p[0] * sn;
+      dy = f[1] * cs + p[1] * sn;
+      dz = f[2] * cs + p[2] * sn;
+    }
+  }
   input.aim = [dx, dy, dz];
-  // Full throttle when slow or climbing away from terrain.
+  // Full throttle when slow or climbing away from terrain; easy throttle in a fight.
   const slow = me.speed < fd.minSpeed * SLOW_SPEED_MUL;
+  const fighting = enemy !== undefined && dist < FAR_BOOST_DISTANCE && !retreating;
   if (!siegeMode || me.grounded)
-    input.throttle = siegeMode ? 0 : slow || pullUp > 0 ? 1 : CRUISE_THROTTLE;
+    input.throttle = siegeMode
+      ? 0
+      : slow || pullUp > 0
+        ? 1
+        : fighting
+          ? COMBAT_THROTTLE
+          : CRUISE_THROTTLE;
   input.boost =
-    Math.min(dist, objectiveDist) > FAR_BOOST_DISTANCE && danger <= 0 && !landing && !siegeMode;
+    (retreating || Math.min(dist, objectiveDist) > FAR_BOOST_DISTANCE) &&
+    danger <= 0 &&
+    !landing &&
+    !siegeMode;
 
-  // Fire when the nose is on target.
-  if (enemy && danger <= 0 && !landing) {
+  // Fire in bursts when the nose is roughly on target; missiles only now and then once locked.
+  const burst = (mem.seq + mem.burstPhase) % BURST_PERIOD_TICKS < BURST_ON_TICKS;
+  if (enemy && danger <= 0 && !landing && !retreating) {
     const f = noseOf(me);
     const aimAt = norm3(
       enemy.pos[0] - me.pos[0],
@@ -275,11 +381,11 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     const cos = f[0] * aimAt[0] + f[1] * aimAt[1] + f[2] * aimAt[2];
     const angle = Math.acos(Math.min(Math.max(cos, -1), 1));
     const rangeMul = me.sieged ? SIEGE.rangeMul : 1;
-    input.fire1 = angle < FIRE_CONE_RAD && dist < primary.rangeM * rangeMul;
+    input.fire1 = burst && angle < FIRE_CONE_RAD && dist < primary.rangeM * rangeMul;
     input.fire2 =
       secondary.lockConeRad > 0 || (me.sieged && secondary.kind === 'shell')
-        ? me.lockTarget !== null
-        : angle < FIRE_CONE_RAD && dist < secondary.rangeM * 0.6 * rangeMul;
+        ? me.lockTarget !== null && mem.rng() < MISSILE_FIRE_CHANCE
+        : burst && angle < FIRE_CONE_RAD && dist < secondary.rangeM * 0.6 * rangeMul;
   }
   if (objective && !mem.extending && danger <= 0 && !landing) {
     const f = noseOf(me);
@@ -301,7 +407,7 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   ) {
     mem.dodgeTicks = 8 + Math.floor(mem.rng() * 10);
     mem.dodgeDir = mem.rng() < 0.5 ? -1 : 1;
-    if (mem.rng() < ROLL_CHANCE * 5) {
+    if (mem.rng() < ROLL_CHANCE) {
       if (mem.dodgeDir < 0) input.rollLeft = true;
       else input.rollRight = true;
     }
@@ -319,7 +425,8 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       me.incomingDist < ROLL_WINDOW_MAX_M &&
       me.incomingDist > ROLL_WINDOW_MIN_M &&
       me.rollCooldownTicks === 0 &&
-      me.fuel >= fd.rollFuelCost
+      me.fuel >= fd.rollFuelCost &&
+      mem.rng() < ROLL_DODGE_CHANCE
     ) {
       if (mem.rng() < 0.5) input.rollLeft = true;
       else input.rollRight = true;
@@ -331,11 +438,17 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     ) {
       input.hotbar = flareSlot;
     }
-  } else if (me.hp < me.maxHp * HEAL_HP_FRACTION && mem.rng() < SKILL_CHANCE * 10) {
+  } else if (me.hp < me.maxHp * HEAL_HP_FRACTION && mem.rng() < SKILL_USE_CHANCE * 5) {
     input.hotbar = fd.hotbar.indexOf(mem.rng() < 0.5 ? 'repair-kit' : 'shield-kit');
   }
   // Engagement: use buff Skills off cooldown, and pick the Anvil bombing mode by target.
-  if (input.hotbar === -1 && enemy && dist < BUFF_ENGAGE_DIST && !me.docked) {
+  if (
+    input.hotbar === -1 &&
+    enemy &&
+    dist < BUFF_ENGAGE_DIST &&
+    !me.docked &&
+    mem.rng() < SKILL_USE_CHANCE
+  ) {
     const wantMode = enemy.grounded || enemy.docked ? 'ground-strike-mode' : 'air-barrage-mode';
     for (let slot = 0; slot < fd.hotbar.length; slot++) {
       const id = fd.hotbar[slot];
@@ -398,15 +511,29 @@ function pickObjective(sim: Sim, me: ShipState): StructureState | null {
   return turret ?? station ?? core;
 }
 
-function nearestEnemy(sim: Sim, me: ShipState): ShipState | null {
+/** Nearest enemy, but each other Bot already on a Ship makes it look DOGPILE_PENALTY_M farther. */
+function pickEnemy(
+  sim: Sim,
+  me: ShipState,
+  current: ShipId | null,
+  claimed: Map<ShipId, ShipId | null>,
+): ShipState | null {
+  const load = new Map<ShipId, number>();
+  for (const [bot, t] of claimed) {
+    if (bot !== me.id && t && sim.getShip(bot)?.alive) load.set(t, (load.get(t) ?? 0) + 1);
+  }
   let best: ShipState | null = null;
-  let bestD = Infinity;
+  let bestCost = Infinity;
   for (const o of sim.ships()) {
     if (!o.alive || o.nation === me.nation || o.launchPhase !== 'none') continue;
     const d =
       (o.pos[0] - me.pos[0]) ** 2 + (o.pos[1] - me.pos[1]) ** 2 + (o.pos[2] - me.pos[2]) ** 2;
-    if (d < bestD && (d <= CLOAK_REVEAL_M ** 2 || !isCloaked(o))) {
-      bestD = d;
+    if (d > CLOAK_REVEAL_M ** 2 && isCloaked(o)) continue;
+    // Small bias to the current target so Bots don't flip between two at the same range.
+    const cost =
+      Math.sqrt(d) + DOGPILE_PENALTY_M * (load.get(o.id) ?? 0) - (o.id === current ? 100 : 0);
+    if (cost < bestCost) {
+      bestCost = cost;
       best = o;
     }
   }
