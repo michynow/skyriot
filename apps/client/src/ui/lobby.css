@@ -27,14 +27,15 @@
   inset: 0;
   display: grid;
   grid-template-columns: 300px 1fr;
-  grid-template-rows: auto 1fr auto;
+  /* The middle row never shrinks below its content: small windows scroll instead of clipping Launch. */
+  grid-template-rows: auto minmax(min-content, 1fr) auto;
   gap: 24px 44px;
   padding: 28px 52px 26px;
   box-sizing: border-box;
   color: var(--ink);
   font-family: 'Rajdhani', system-ui, sans-serif;
   background: radial-gradient(ellipse at 70% 30%, var(--bg1), var(--bg2) 70%);
-  overflow: hidden;
+  overflow: hidden auto;
   transition: background 0.4s;
   animation: lb-in 0.6s ease-out;
 }
@@ -306,6 +307,11 @@
   align-items: flex-end;
   gap: 28px;
 }
+@media (max-width: 1150px) {
+  .lb-foot {
+    flex-wrap: wrap;
+  }
+}
 .lb-controls {
   flex: 1;
   align-self: stretch;
@@ -382,7 +388,7 @@
 }
 .lobby input,
 .lobby select {
-  width: 240px;
+  width: clamp(140px, 15vw, 240px);
   padding: 9px 14px;
   font:
     700 17px 'Rajdhani',
@@ -407,6 +413,7 @@
 }
 .lb-launch {
   position: relative;
+  flex-shrink: 0;
   cursor: pointer;
   font:
     800 18px 'Orbitron',

@@ -118,6 +118,12 @@ export function Radar() {
           g.fillStyle = '#04101a';
           g.fillRect(x - 2, y - 2, 4, 4);
         });
+      for (const gate of world.map?.gates ?? [])
+        edgeIcon(gate.pos[0], gate.pos[2], '#7fe3c8', (x, y) => {
+          g.beginPath();
+          g.arc(x, y, 6, 0, Math.PI * 2);
+          g.stroke();
+        });
       // Both Cores as nation-coloured hexes (bearing arrows when out of range); live Shield Stations as small squares.
       for (const n of ['concord', 'vex'] as const) {
         const def = world.map?.bases?.[n];

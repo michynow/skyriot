@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ENGINES, FRAMES, HOTBAR_BAR_SLOTS, SKILLS, WEAPONS } from '@skyriot/shared';
+import { ENGINES, FRAMES, HOTBAR_BAR_SLOTS, MAPS, SKILLS, WEAPONS } from '@skyriot/shared';
 import { useShallow } from 'zustand/react/shallow';
 import { session } from '../net/session';
 import { inputState, setTyping } from '../input/input';
@@ -450,7 +450,11 @@ function Warnings() {
           HOLD <kbd>S</kbd> TO LAND
         </div>
       )}
-      {h.outOfBounds && flying && <div className="oob">RETURN TO COMBAT AREA</div>}
+      {h.outOfBounds && flying && (
+        <div className="oob">
+          {world.map?.city ? 'LEAVING CITY AIRSPACE' : 'RETURN TO COMBAT AREA'}
+        </div>
+      )}
       {h.evadedNonce > 0 && (
         <div key={h.evadedNonce} className="evaded">
           EVADED
@@ -535,8 +539,78 @@ function Loadout() {
         )}
       </section>
       <footer>
-        <kbd>B</kbd> or <kbd>W</kbd> to resume
+        <kbd>B</kbd> or <kbd>W</kbd> to resume · <kbd>ESC</kbd> › HANGAR to change parts
       </footer>
+    </div>
+  );
+}
+
+const TIPS_KEY = 'skyriot.tips';
+const TIPS_FLIGHTS = 3;
+const TIPS_MS = 15000;
+
+/** Key card for a new Pilot's first few flights; fades out after a while in the air. */
+function FlightTips() {
+  const flying = useHud(
+    (x) => !!x.frame && x.alive && (x.launchPhase === 'none' || x.launchPhase === 'catapult'),
+  );
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    if (!flying) return;
+    // Wait out the brief 'none' phase a Ship shows on join before the Launch Queue picks it up.
+    const start = setTimeout(() => {
+      let seen = TIPS_FLIGHTS;
+      try {
+        seen = Number(localStorage.getItem(TIPS_KEY)) || 0;
+        localStorage.setItem(TIPS_KEY, String(seen + 1));
+      } catch {
+        /* storage unavailable: skip tips */
+      }
+      if (seen < TIPS_FLIGHTS) setShow(true);
+    }, 1500);
+    const end = setTimeout(() => setShow(false), TIPS_MS);
+    return () => {
+      clearTimeout(start);
+      clearTimeout(end);
+      setShow(false);
+    };
+  }, [flying]);
+  if (!show) return null;
+  return (
+    <div className="tips">
+      <h4>FLIGHT CONTROLS</h4>
+      <p>
+        <kbd>MOUSE</kbd> steer: the cursor is a stick, centre it to fly straight
+      </p>
+      <p>
+        <kbd>W</kbd> hold for speed · <kbd>SPACE</kbd> boost · <kbd>S</kbd> slow
+      </p>
+      <p>
+        <kbd>LMB</kbd> guns · <kbd>RMB</kbd> missile (locks the enemy in the crosshair)
+      </p>
+      <p>
+        <kbd>A</kbd>
+        <kbd>D</kbd> strafe, double-tap to Barrel Roll
+      </p>
+      <p>
+        <kbd>ESC</kbd> menu, controls and Hangar
+      </p>
+    </div>
+  );
+}
+
+/** Cities have no Battle panel: say where we are and where the shop is instead. */
+function CityBanner() {
+  const city = world.map?.city ? world.map : null;
+  if (!city) return null;
+  const gate = city.gates?.[0];
+  return (
+    <div className="city-banner">
+      <b>{city.name.toUpperCase()} · SAFE ZONE</b>
+      <span>
+        Shop and Loadout: <kbd>ESC</kbd> › HANGAR
+        {gate && ` · fly through the Gate to return to ${MAPS[gate.to]?.name ?? gate.to}`}
+      </span>
     </div>
   );
 }
@@ -583,7 +657,8 @@ export function Hud({ onLeave }: { onLeave(): void }) {
       <Warnings />
       <Floaters />
       <Status />
-      {!world.map?.city && <Objectives />}
+      {world.map?.city ? <CityBanner /> : <Objectives />}
+      <FlightTips />
       <BattleBanner />
       <Launch />
       <BattleEnd />
