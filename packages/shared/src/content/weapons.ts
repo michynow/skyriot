@@ -185,6 +185,15 @@ export const SKILLS: Record<string, SkillDef> = {
     6,
     { fireRateMul: 1.4, turnRateMul: 0.9 },
   ),
+  'quiver-surge': b(
+    'quiver-surge',
+    'Quiver Surge',
+    'Racks open: +2 missiles per Secondary salvo.',
+    ['wasp'],
+    30,
+    10,
+    { salvoAdd: 2 },
+  ),
   'snare-tag': d(
     'snare-tag',
     'Snare Tag',

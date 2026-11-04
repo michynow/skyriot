@@ -391,6 +391,17 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
       </>
     ),
   },
+  'quiver-surge': {
+    cat: 'red',
+    art: (
+      <>
+        <path d="M10 14l22 0 6 4-6 4-22 0z" fill={G.red} />
+        <path d="M10 26l22 0 6 4-6 4-22 0z" fill={G.red} />
+        <path d="M6 18h4M6 30h4" stroke={WHITE} strokeWidth="3" strokeLinecap="round" />
+        <path d="M38 8l4 4m0-4l-4 4M38 36l4 4m0-4l-4 4" stroke={WHITE} strokeWidth="2" />
+      </>
+    ),
+  },
   'hot-barrels': {
     cat: 'red',
     art: (

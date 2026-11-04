@@ -320,6 +320,7 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
       burst(fx, P, C.phantom, 26, R * 3, 0.5, 0.8);
       fx.sph.follow(e.id, C.violet, 0.8, 0.6);
       break;
+    case 'quiver-surge':
     case 'hot-barrels':
       v.set(0, 0, -FRAMES[s.frame].halfLength).applyQuaternion(q);
       burst(fx, [P[0]! + v.x, P[1]! + v.y, P[2]! + v.z], C.heat, 30, 22, 0.5, 1.0);

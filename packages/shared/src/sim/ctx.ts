@@ -37,6 +37,7 @@ export interface BuffMods {
   hpRegenPerSec: number;
   cloak: boolean;
   damageAuraDps: number;
+  salvoAdd: number;
 }
 
 export interface ShipRec {

@@ -65,6 +65,9 @@ let halt = false;
 const HALT_CONFIRM_MS = 3000;
 let fire1 = false;
 let fire2 = false;
+/** A press since the last sample, so a click shorter than one tick still fires once. */
+let tap1 = false;
+let tap2 = false;
 let lockFailed = false;
 let pointerX = 0;
 let pointerY = 0;
@@ -108,7 +111,7 @@ function clampCursor() {
 function reset() {
   keys.clear();
   tapped.clear();
-  fire1 = fire2 = false;
+  fire1 = fire2 = tap1 = tap2 = false;
   world.freeLook = false;
   world.lookBack = false;
 }
@@ -283,8 +286,8 @@ export function attachInput(canvas: HTMLElement): () => void {
       void Promise.resolve(canvas.requestPointerLock()).catch(() => (lockFailed = true));
       // the first click also fires
     }
-    if (e.button === 0) fire1 = true;
-    if (e.button === 2) fire2 = true;
+    if (e.button === 0) fire1 = tap1 = true;
+    if (e.button === 2) fire2 = tap2 = true;
   };
   const onMouseUp = (e: MouseEvent) => {
     if (e.button === 0) fire1 = false;
@@ -417,8 +420,8 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
     boost: !!k('Space'),
     // S is the brake: down to the engine's min speed, or onto the Launch Deck when over it.
     brake: !!k('KeyS'),
-    fire1: !typing && fire1,
-    fire2: !typing && fire2,
+    fire1: !typing && (fire1 || tap1),
+    fire2: !typing && (fire2 || tap2),
     hotbar: typing ? -1 : hotbar,
     rollLeft: !typing && rollArm === -1,
     rollRight: !typing && rollArm === 1,
@@ -431,6 +434,7 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
   launch = false;
   halt = false;
   hotbar = -1;
+  tap1 = tap2 = false;
   tapped.clear();
   return input;
 }

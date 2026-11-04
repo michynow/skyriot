@@ -460,6 +460,8 @@ export interface BuffEffect {
   cloak?: boolean;
   /** Damage aura: enemies within DAMAGE_AURA_RADIUS of the holder take this much damage per second. */
   damageAuraDps?: number;
+  /** Extra missiles per Secondary salvo. */
+  salvoAdd?: number;
 }
 
 export interface ActiveBuff {

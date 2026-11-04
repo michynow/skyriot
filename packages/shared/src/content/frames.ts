@@ -51,7 +51,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
       'shroud-veil',
       'snare-tag',
       'hot-barrels',
-      null,
+      'quiver-surge',
       null,
       null,
       null,

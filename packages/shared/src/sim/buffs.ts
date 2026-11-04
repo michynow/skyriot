@@ -18,6 +18,7 @@ export function createMods(): BuffMods {
     hpRegenPerSec: 0,
     cloak: false,
     damageAuraDps: 0,
+    salvoAdd: 0,
   };
 }
 
@@ -30,7 +31,7 @@ export function resolveMods(ctx: SimCtx, rec: ShipRec): void {
   const s = rec.state;
   m.fireRateMul = m.speedMul = m.turnRateMul = m.damageMul = m.damageTakenMul = 1;
   m.maxHpMul = m.shieldRegenMul = m.fuelRegenMul = m.lockTimeMul = m.splashMul = 1;
-  m.deflectAdd = m.hpRegenPerSec = m.damageAuraDps = 0;
+  m.deflectAdd = m.hpRegenPerSec = m.damageAuraDps = m.salvoAdd = 0;
   m.cloak = false;
   for (const b of s.buffs) {
     const e = SKILLS[b.skill]?.buff;
@@ -48,6 +49,7 @@ export function resolveMods(ctx: SimCtx, rec: ShipRec): void {
     m.deflectAdd += e.deflectAdd ?? 0;
     m.hpRegenPerSec += e.hpRegenPerSec ?? 0;
     m.damageAuraDps += e.damageAuraDps ?? 0;
+    m.salvoAdd += e.salvoAdd ?? 0;
     m.cloak ||= e.cloak === true;
   }
   if (!s.alive) return;
