@@ -53,6 +53,8 @@ const ROLL_ARM_MS = 300;
 export const AIM_DISTANCE = 600;
 
 const keys = new Set<string>();
+/** Keys pressed since the last sample: a tap shorter than one tick still counts for one tick. */
+const tapped = new Set<string>();
 const lastUp: Record<string, number> = {};
 /** performance.now() until which a roll request (-1 left / +1 right) is armed. */
 let rollArmUntil = 0;
@@ -105,6 +107,7 @@ function clampCursor() {
 
 function reset() {
   keys.clear();
+  tapped.clear();
   fire1 = fire2 = false;
   world.freeLook = false;
   world.lookBack = false;
@@ -201,6 +204,7 @@ export function attachInput(canvas: HTMLElement): () => void {
     if (e.code === 'Tab' || e.code === 'Space' || e.code.startsWith('Alt')) e.preventDefault();
     if (e.repeat) return;
     keys.add(e.code);
+    tapped.add(e.code);
     if (e.code === 'KeyA' || e.code === 'KeyD') {
       // Roll = second press within DOUBLE_TAP_MS of the first key's release (a held-then-released key counts).
       const up = lastUp[e.code];
@@ -295,6 +299,8 @@ export function attachInput(canvas: HTMLElement): () => void {
   };
   const onLockChange = () => {
     if (!isLocked()) fire1 = fire2 = false;
+    // Start each lock from a centred stick, so a stale offset doesn't keep the Ship circling.
+    stickX = stickY = 0;
   };
   const onLockError = () => (lockFailed = true);
   const onContext = (e: Event) => e.preventDefault();
@@ -333,8 +339,8 @@ export function trackAim(_camera: Camera, own: ShipState | undefined): void {
   if (!own || world.freeLook) return;
   let sx = stickX,
     sy = stickY;
-  if (!isLocked() && lockFailed) {
-    // Pointer lock refused (iframe, headless): the absolute mouse position is the stick.
+  if (!isLocked()) {
+    // No pointer lock (refused, not yet granted, or dropped without an error): the absolute mouse position is the stick.
     sx = pointerX;
     sy = pointerY;
   }
@@ -362,7 +368,7 @@ export function trackAim(_camera: Camera, own: ShipState | undefined): void {
 /** Build this tick's PilotInput. One-shot flags (roll, hotbar) are consumed. */
 export function sampleInput(seq: number, viewTick: number, own: ShipState | undefined): PilotInput {
   const typing = inputState.typing;
-  const k = (code: string) => (!typing && keys.has(code) ? 1 : 0);
+  const k = (code: string) => (!typing && (keys.has(code) || tapped.has(code)) ? 1 : 0);
 
   const cp = Math.cos(aimPitch);
   let aim: [number, number, number] = [
@@ -415,5 +421,6 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
   launch = false;
   halt = false;
   hotbar = -1;
+  tapped.clear();
   return input;
 }

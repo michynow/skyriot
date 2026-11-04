@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { useHud } from '../hud/hudStore';
+import { world } from '../state/world';
 import { inputSettings, inputState, saveInputSettings, setTyping } from '../input/input';
 import { Controls } from './Controls';
 import { Hangar } from './Hangar';
@@ -104,7 +105,9 @@ export function EscMenu({ onLeave }: { onLeave(): void }) {
   const open = useEscMenu((s) => s.open);
   const frame = useHud((h) => h.frame);
   const nation = useHud((h) => h.nation);
-  const [tab, setTab] = useState<'settings' | 'controls' | 'hangar'>('settings');
+  const [tab, setTab] = useState<'settings' | 'controls' | 'hangar'>(() =>
+    world.map?.city ? 'hangar' : 'settings',
+  );
   const [confirmLeave, setConfirmLeave] = useState(false);
 
   useEffect(() => {
@@ -174,7 +177,7 @@ export function EscMenu({ onLeave }: { onLeave(): void }) {
             className={`esc-tab ${tab === 'hangar' ? 'on' : ''}`}
             onClick={() => setTab('hangar')}
           >
-            HANGAR
+            HANGAR · SHOP
           </button>
           <button
             type="button"

@@ -15,6 +15,7 @@ import {
 } from '@skyriot/shared';
 import { useHud } from '../hud/hudStore';
 import { session } from '../net/session';
+import { world } from '../state/world';
 import { useProfile } from '../state/profile';
 
 const SLOTS: (keyof Loadout)[] = ['primary', 'secondary', 'engine'];
@@ -110,24 +111,30 @@ export function Hangar() {
       ))}
 
       <h3>Shop · fits the {fd.name}</h3>
-      {SHOP.filter((e) => slotFor(frame, e.def)).map((e) => (
-        <div className="hangar-row" key={e.def}>
-          <span>
-            {nameOf(e.def)}
-            <em>
-              T{e.tier} · {slotFor(frame, e.def)} · {statOf(e.def, 0)}
-            </em>
-          </span>
-          <button
-            type="button"
-            className="ui-btn"
-            disabled={profile.wallet.credits < e.credits}
-            onClick={() => session.conn?.buy({ def: e.def })}
-          >
-            BUY · {e.credits}c
-          </button>
-        </div>
-      ))}
+      {!world.map?.city && !import.meta.env.DEV && (
+        <p className="hangar-note">
+          The shop opens in Cities: fly through a Gate (marked on radar).
+        </p>
+      )}
+      {(world.map?.city || import.meta.env.DEV) &&
+        SHOP.filter((e) => slotFor(frame, e.def)).map((e) => (
+          <div className="hangar-row" key={e.def}>
+            <span>
+              {nameOf(e.def)}
+              <em>
+                T{e.tier} · {slotFor(frame, e.def)} · {statOf(e.def, 0)}
+              </em>
+            </span>
+            <button
+              type="button"
+              className="ui-btn"
+              disabled={profile.wallet.credits < e.credits}
+              onClick={() => session.conn?.buy({ def: e.def })}
+            >
+              BUY · {e.credits}c
+            </button>
+          </div>
+        ))}
     </>
   );
 }

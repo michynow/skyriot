@@ -2292,3 +2292,95 @@
   margin-left: 4px;
   color: #d8f4ffaa;
 }
+
+/* Gate markers: same shape as structure markers, neutral colour, no health bar. */
+.smk[data-gate='1'] .smk-hp {
+  display: none;
+}
+.smk[data-gate='1'] i {
+  border-color: #7fe3c8;
+  border-bottom-color: #7fe3c8;
+}
+.smk[data-gate='1'][data-off='1'] i {
+  border-color: transparent;
+  border-bottom-color: #7fe3c8;
+}
+.smk[data-gate='1'] span {
+  top: 12px;
+  color: #9ff0da;
+}
+
+/* First-flight key card (right side, clear of tapes and radar). */
+.tips {
+  position: absolute;
+  right: 24px;
+  top: 42%;
+  transform: translateY(-50%);
+  zoom: var(--hud-scale, 1);
+  width: 330px;
+  padding: 12px 16px;
+  background: #06121fcc;
+  border: 1px solid #7fe7ff55;
+  border-left: 3px solid #7fe7ff;
+  color: #e8f4ff;
+  font:
+    600 15px 'Rajdhani',
+    sans-serif;
+  animation: tips-out 1s ease-in 12.5s forwards;
+}
+.tips h4 {
+  margin: 0 0 8px;
+  font:
+    700 12px 'Orbitron',
+    sans-serif;
+  letter-spacing: 0.2em;
+  color: #7fe7ff;
+}
+.tips p {
+  margin: 4px 0;
+}
+.tips kbd,
+.city-banner kbd {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 5px;
+  font:
+    700 12px 'Orbitron',
+    sans-serif;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: #ffd24a;
+}
+@keyframes tips-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* City: replaces the Battle panel at the top. */
+.city-banner {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  zoom: var(--hud-scale, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 28px;
+  background: #06121fcc;
+  border: 1px solid #7fe3c855;
+  color: #e8f4ff;
+  font:
+    600 15px 'Rajdhani',
+    sans-serif;
+  white-space: nowrap;
+}
+.city-banner b {
+  font:
+    700 14px 'Orbitron',
+    sans-serif;
+  letter-spacing: 0.2em;
+  color: #9ff0da;
+}

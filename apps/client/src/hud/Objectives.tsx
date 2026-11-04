@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import type { NationId } from '@skyriot/shared';
+import { MAPS, type NationId } from '@skyriot/shared';
 import { world } from '../state/world';
 import {
   NATION_NAME,
@@ -110,12 +110,13 @@ export function BattleEnd() {
   );
 }
 
-const MARKERS = 3;
+const MARKERS = 5;
 const p = { x: 0, y: 0 };
 
 /**
  * World markers for what the objective line points at: enemy Shield Stations while their shield is up, the enemy
- * Core once it is down. On screen: a thin diamond with name and distance; off screen: a chevron on the edge.
+ * Core once it is down, plus every Gate on the Map. On screen: a thin diamond with name and distance; off screen: a
+ * chevron on the edge.
  */
 export function StructureMarkers() {
   const els = useRef<(HTMLDivElement | null)[]>([]);
@@ -133,17 +134,31 @@ export function StructureMarkers() {
         const shielded = world.match ? world.match.shielded[en] : true;
         const W = window.innerWidth;
         const H = window.innerHeight;
+        const targets: { pos: readonly number[]; lift: number; hp: number; label: string }[] = [];
         for (const st of world.structures.values()) {
-          if (n >= MARKERS || st.nation !== en || !st.alive) continue;
+          if (st.nation !== en || !st.alive) continue;
           if (st.kind === 'turret' || (st.kind === 'core') === shielded) continue;
+          const frac = Math.max(0, st.hp / Math.max(1, st.maxHp));
+          const label = `${structureName(st).toUpperCase()} ${Math.ceil(frac * 100)}%`;
+          targets.push({ pos: st.pos, lift: 30, hp: frac, label });
+        }
+        for (const g of world.map?.gates ?? [])
+          targets.push({
+            pos: g.pos,
+            lift: 0,
+            hp: -1,
+            label: `GATE › ${MAPS[g.to]?.name ?? g.to}`,
+          });
+        for (const t of targets) {
+          if (n >= MARKERS) break;
           const el = els.current[n];
           if (!el) continue;
           const d = Math.hypot(
-            st.pos[0] - own.pos[0],
-            st.pos[1] - own.pos[1],
-            st.pos[2] - own.pos[2],
+            t.pos[0]! - own.pos[0],
+            t.pos[1]! - own.pos[1],
+            t.pos[2]! - own.pos[2],
           );
-          const on = project(st.pos[0], st.pos[1] + 30, st.pos[2], p);
+          const on = project(t.pos[0]!, t.pos[1]! + t.lift, t.pos[2]!, p);
           let dx = p.x - W / 2;
           let dy = p.y - H / 2;
           if (!on) {
@@ -166,16 +181,17 @@ export function StructureMarkers() {
           placedY[n] = y;
           el.style.display = 'block';
           el.dataset.off = offscreen ? '1' : '0';
+          el.dataset.gate = t.hp < 0 ? '1' : '0';
           el.style.transform = `translate(${x}px,${y}px)`;
           const chev = el.firstElementChild as HTMLElement;
           chev.style.transform = offscreen
             ? `rotate(${(Math.atan2(dy, dx) * 180) / Math.PI + 90}deg)`
             : 'rotate(45deg)';
           const hpEl = (el.children[1] as HTMLElement).firstElementChild as HTMLElement;
-          const frac = Math.max(0, st.hp / Math.max(1, st.maxHp));
+          const frac = t.hp;
           hpEl.style.width = `${frac * 100}%`;
           hpEl.style.background = frac < 0.3 ? '#ff3b3b' : frac < 0.6 ? '#ffb347' : '#ff6a6a';
-          const text = `${structureName(st).toUpperCase()} ${Math.ceil(frac * 100)}% · ${d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d)} m`}`;
+          const text = `${t.label} · ${d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d)} m`}`;
           if (texts[n] !== text) {
             texts[n] = text;
             (el.lastElementChild as HTMLElement).textContent = text;
