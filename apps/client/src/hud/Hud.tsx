@@ -463,8 +463,8 @@ function Warnings() {
       {h.sieged && (
         <div className="siege">
           {h.grounded
-            ? 'SIEGE (GROUND) ×1.5 DMG · RANGE ×1.4'
-            : 'SIEGE (AIR) ×1.15 DMG · RANGE ×1.15 · LOCK CONE ×1.4'}
+            ? 'GROUND SIEGE · ×1.5 DMG · RANGE ×1.4'
+            : 'AIR SIEGE · ×1.15 DMG · RANGE ×1.15 · LOCK CONE ×1.4'}
         </div>
       )}
       {h.flashes.map((f) => (

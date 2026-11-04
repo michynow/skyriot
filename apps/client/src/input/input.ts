@@ -10,6 +10,7 @@ import {
   type ShipId,
   type ShipState,
 } from '@skyriot/shared';
+import { showBanner } from '../hud/hudStore';
 import { world } from '../state/world';
 import { useSettings } from '../ui/settings';
 
@@ -241,6 +242,22 @@ export function attachInput(canvas: HTMLElement): () => void {
       const n = Number(e.code.slice(5));
       hotbar = inputState.hotbarBar * HOTBAR_BAR_SLOTS + (n === 0 ? 9 : n - 1);
       const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+      // The sim refuses a Siege Skill in the wrong mode; say why.
+      const sk = own ? FRAMES[own.frame].hotbar[hotbar] : null;
+      if (
+        own &&
+        (sk === 'siege-anchor' || sk === 'air-siege') &&
+        !own.sieged &&
+        !own.siegePending &&
+        (sk === 'siege-anchor') !== own.grounded
+      )
+        showBanner(
+          sk === 'siege-anchor' ? 'LAND FIRST' : 'LIFT OFF FIRST',
+          sk === 'siege-anchor'
+            ? 'Ground Siege needs solid ground'
+            : 'Air Siege needs the Bulwark airborne',
+          'bad',
+        );
       // Pivot Flip turns the steering aim around; the sim only lifts the turn-rate cap.
       if (own && FRAMES[own.frame].hotbar[hotbar] === 'pivot-flip' && !own.cooldowns[hotbar]) {
         const [x, y, z, w] = own.rot;

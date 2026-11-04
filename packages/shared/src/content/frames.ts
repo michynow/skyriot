@@ -230,7 +230,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     hotbar: [
       // Bar 1: core kit
       'siege-anchor',
-      null,
+      'air-siege',
       null,
       null,
       null,

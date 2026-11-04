@@ -28,7 +28,13 @@ const _f = [0, 0, 0];
 const _r = [0, 0, 0];
 
 /** Skills that change movement and therefore must also run in client prediction. */
-const PREDICTED = new Set(['afterburn-dash', 'siege-anchor', 'pivot-flip', 'backdraft']);
+const PREDICTED = new Set([
+  'afterburn-dash',
+  'siege-anchor',
+  'air-siege',
+  'pivot-flip',
+  'backdraft',
+]);
 
 export function tickTimers(rec: ShipRec): void {
   const s = rec.state;
@@ -190,7 +196,8 @@ export function castSkill(
       s.fuel = 1;
       break;
     case 'siege-anchor':
-      toggleSiege(rec);
+    case 'air-siege':
+      if (!toggleSiege(rec, id === 'siege-anchor')) return false;
       break;
     case 'snare-tag': {
       const foe = nearestEnemyInFront(ctx, rec, SNARE_RANGE, SNARE_CONE_RAD);
