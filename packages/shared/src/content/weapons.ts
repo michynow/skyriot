@@ -1,19 +1,19 @@
 import type { SkillDef, WeaponDef } from '../types';
 
 export const WEAPONS: Record<string, WeaponDef> = {
-  'needle-cannon': w('needle-cannon', 'Needle Cannon', 'tracer', 28, 0.08, 900, 1100, 0.012),
-  'flak-repeater': w('flak-repeater', 'Flak Repeater', 'tracer', 55, 0.18, 650, 800, 0.03, {
+  'needle-cannon': w('needle-cannon', 'Needle Cannon', 'tracer', 20, 0.08, 900, 1100, 0.012),
+  'flak-repeater': w('flak-repeater', 'Flak Repeater', 'tracer', 38, 0.18, 650, 800, 0.03, {
     splashRadius: 4,
   }),
-  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 34, 0.11, 800, 950, 0.015),
-  'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 48, 0.12, 750, 1000, 0.02),
-  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 480, 1.6, 250, 1500, 0, {
+  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 24, 0.11, 800, 950, 0.015),
+  'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 34, 0.12, 750, 1000, 0.02),
+  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 384, 1.6, 250, 1500, 0, {
     homingTurnRate: 2.4,
     lockConeRad: 0.45,
     lockTimeSec: 1.2,
     splashRadius: 5,
   }),
-  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 340, 1.6, 240, 1300, 0, {
+  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 272, 1.6, 240, 1300, 0, {
     homingTurnRate: 2.5,
     lockConeRad: 0.5,
     lockTimeSec: 1,
@@ -26,37 +26,37 @@ export const WEAPONS: Record<string, WeaponDef> = {
     splashRadius: 10,
   }),
   // ---- Shop variants (tiers 2–3); each sits in the line of the stock weapon above it ----
-  'quill-repeater': w('quill-repeater', 'Quill Repeater', 'tracer', 31, 0.076, 920, 1150, 0.012),
-  'lancet-cannon': w('lancet-cannon', 'Lancet Cannon', 'tracer', 35, 0.072, 950, 1200, 0.011),
-  'burst-flak': w('burst-flak', 'Burst Flak', 'tracer', 62, 0.17, 660, 830, 0.03, {
+  'quill-repeater': w('quill-repeater', 'Quill Repeater', 'tracer', 22, 0.076, 920, 1150, 0.012),
+  'lancet-cannon': w('lancet-cannon', 'Lancet Cannon', 'tracer', 24, 0.072, 950, 1200, 0.011),
+  'burst-flak': w('burst-flak', 'Burst Flak', 'tracer', 43, 0.17, 660, 830, 0.03, {
     splashRadius: 4.5,
   }),
-  'thunder-flak': w('thunder-flak', 'Thunder Flak', 'tracer', 70, 0.16, 680, 860, 0.03, {
+  'thunder-flak': w('thunder-flak', 'Thunder Flak', 'tracer', 49, 0.16, 680, 860, 0.03, {
     splashRadius: 5,
   }),
-  'arc-blaster': w('arc-blaster', 'Arc Blaster', 'tracer', 38, 0.105, 820, 980, 0.015),
-  'prism-blaster': w('prism-blaster', 'Prism Blaster', 'tracer', 43, 0.1, 840, 1010, 0.014),
-  'twin-hammer': w('twin-hammer', 'Twin Hammer', 'tracer', 54, 0.115, 760, 1030, 0.02),
-  'quad-autocannon': w('quad-autocannon', 'Quad Autocannon', 'tracer', 60, 0.11, 770, 1060, 0.02),
-  'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 540, 1.55, 260, 1550, 0, {
+  'arc-blaster': w('arc-blaster', 'Arc Blaster', 'tracer', 27, 0.105, 820, 980, 0.015),
+  'prism-blaster': w('prism-blaster', 'Prism Blaster', 'tracer', 30, 0.1, 840, 1010, 0.014),
+  'twin-hammer': w('twin-hammer', 'Twin Hammer', 'tracer', 38, 0.115, 760, 1030, 0.02),
+  'quad-autocannon': w('quad-autocannon', 'Quad Autocannon', 'tracer', 42, 0.11, 770, 1060, 0.02),
+  'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 432, 1.55, 260, 1550, 0, {
     homingTurnRate: 2.6,
     lockConeRad: 0.45,
     lockTimeSec: 1.1,
     splashRadius: 5,
   }),
-  'talon-missile': w('talon-missile', 'Talon Missile', 'missile', 600, 1.5, 270, 1600, 0, {
+  'talon-missile': w('talon-missile', 'Talon Missile', 'missile', 480, 1.5, 270, 1600, 0, {
     homingTurnRate: 2.8,
     lockConeRad: 0.47,
     lockTimeSec: 1,
     splashRadius: 5.5,
   }),
-  'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 380, 1.55, 250, 1350, 0, {
+  'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 304, 1.55, 250, 1350, 0, {
     homingTurnRate: 2.6,
     lockConeRad: 0.5,
     lockTimeSec: 0.9,
     splashRadius: 5,
   }),
-  'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 430, 1.5, 260, 1400, 0, {
+  'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 344, 1.5, 260, 1400, 0, {
     homingTurnRate: 2.7,
     lockConeRad: 0.52,
     lockTimeSec: 0.8,
@@ -179,11 +179,11 @@ export const SKILLS: Record<string, SkillDef> = {
   'hot-barrels': b(
     'hot-barrels',
     'Hot Barrels',
-    'Short burst: +55% Primary fire rate, -10% turn rate.',
+    'Short burst: +40% Primary fire rate, -10% turn rate.',
     ['wasp'],
     26,
     6,
-    { fireRateMul: 1.55, turnRateMul: 0.9 },
+    { fireRateMul: 1.4, turnRateMul: 0.9 },
   ),
   'snare-tag': d(
     'snare-tag',
