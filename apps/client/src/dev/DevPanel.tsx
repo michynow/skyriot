@@ -190,6 +190,13 @@ function Console() {
   const lines = useHud((h) => h.consoleLines);
   const [text, setText] = useState('');
   const [rec, setRec] = useState('');
+  // Hidden by default so it doesn't sit over the crosshair; ` toggles it.
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.code === 'Backquote' && setOpen((o) => !o);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   useEffect(() => {
     let n = 0;
     const t = setInterval(() => {
@@ -204,6 +211,7 @@ function Console() {
     }, 500);
     return () => clearInterval(t);
   }, []);
+  if (!open) return null;
   return (
     <div
       data-ui

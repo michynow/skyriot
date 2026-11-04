@@ -111,6 +111,7 @@ export function BattleEnd() {
 }
 
 const MARKERS = 5;
+const CENTRE_CLEAR_PX = 240;
 const p = { x: 0, y: 0 };
 
 /**
@@ -183,6 +184,9 @@ export function StructureMarkers() {
           el.dataset.off = offscreen ? '1' : '0';
           el.dataset.gate = t.hp < 0 ? '1' : '0';
           el.style.transform = `translate(${x}px,${y}px)`;
+          // Markers drifting through the middle of the screen fade so they don't bury the crosshair and Ships.
+          el.style.opacity =
+            !offscreen && Math.hypot(x - W / 2, y - H / 2) < CENTRE_CLEAR_PX ? '0.25' : '1';
           const chev = el.firstElementChild as HTMLElement;
           chev.style.transform = offscreen
             ? `rotate(${(Math.atan2(dy, dx) * 180) / Math.PI + 90}deg)`

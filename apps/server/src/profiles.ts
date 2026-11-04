@@ -39,7 +39,10 @@ export async function loadProfile(
 ): Promise<PilotProfile> {
   const accountId = accountFromToken(token);
   if (!db || !accountId) return guest(name, nation);
-  await db.insert(pilot).values({ accountId, name, nation, ...STARTING_WALLET }).onConflictDoNothing();
+  await db
+    .insert(pilot)
+    .values({ accountId, name, nation, ...STARTING_WALLET })
+    .onConflictDoNothing();
   const [p] = await db.select().from(pilot).where(eq(pilot.accountId, accountId));
   const items = await db.select().from(item).where(eq(item.pilotId, p!.id));
   const loadouts = await db.select().from(loadout).where(eq(loadout.pilotId, p!.id));
