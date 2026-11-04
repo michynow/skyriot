@@ -125,8 +125,8 @@ export interface HudState {
   halted: boolean;
   /** First B pressed: waiting for B / Y to confirm the halt. */
   haltPrompt: boolean;
-  /** Seconds left on the Barrel Roll recharge, shown briefly after a double-tap that came too early; 0 = hide. */
-  rollDeniedSec: number;
+  /** Why a Barrel Roll double-tap was just denied (boosting / recharge countdown); '' = hide. */
+  rollDenied: string;
   /** Over our own Launch Deck's approach (S lands). */
   overDeck: boolean;
   /** Distance (m) of the nearest guided missile homing on us; -1 = none. */
@@ -212,7 +212,7 @@ export const useHud = create<HudState>(() => ({
   consoleLines: [],
   halted: false,
   haltPrompt: false,
-  rollDeniedSec: 0,
+  rollDenied: '',
   overDeck: false,
   incomingDist: -1,
   launchPhase: 'none',
@@ -580,7 +580,14 @@ export function startHudFeed(): () => void {
         cooldownSec: cd.map((c) => c / TICK_HZ),
         halted: own.halted === true,
         haltPrompt: now < inputState.haltPromptUntil,
-        rollDeniedSec: now - inputState.rollDeniedAt < 900 ? own.rollCooldownTicks / TICK_HZ : 0,
+        rollDenied:
+          now - inputState.rollDeniedAt >= 900
+            ? ''
+            : inputState.rollDeniedBoost
+              ? 'NO ROLL WHILE BOOSTING'
+              : own.rollCooldownTicks > 0
+                ? `ROLL RECHARGING ${(own.rollCooldownTicks / TICK_HZ).toFixed(1)}s`
+                : '',
         overDeck:
           !own.docked &&
           !!world.map?.launchDecks[own.nation].some(

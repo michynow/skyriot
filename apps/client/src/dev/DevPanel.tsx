@@ -122,7 +122,7 @@ function Controls() {
     timescale: { value: 1, min: 0.1, max: 3, step: 0.1 },
     'send /timescale': button((get) => send(`/timescale ${get('Server commands.timescale')}`)),
   });
-  // Fakes Bases / Battle / Launch Queue / stall until the server sends them; see dev/hudMock.ts.
+  // Fakes Bases / Battle / Launch Queue until the server sends them; see dev/hudMock.ts.
   useControls('HUD mock', {
     scenario: {
       value: hudMock.scenario,

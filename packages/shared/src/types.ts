@@ -362,6 +362,8 @@ export interface EngineDef {
   accel: number; // m/s² toward throttle target
   /** Max angular rate toward aim (rad/s). */
   turnRate: number;
+  /** Turn-rate multiplier while boosting (<1: wider turn). */
+  boostTurnMul: number;
 }
 
 /** Engine stats are resolved onto the Frame (from its equipped `engine`) so the sim reads one record. */

@@ -47,7 +47,7 @@ export interface ShipRec {
   gear: ResolvedGear | null;
   body: RigidBody;
   collider: Collider;
-  /** World-space velocity not along the nose (strafe, vertical, roll, stall fall). Derivable from state. */
+  /** World-space velocity not along the nose (strafe, vertical, roll, momentum slip). Derivable from state. */
   lat: [number, number, number];
   fireCd: [number, number];
   shieldDelay: number;

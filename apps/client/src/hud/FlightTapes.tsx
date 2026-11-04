@@ -91,7 +91,7 @@ function readout(
 
 /**
  * Vertical tape: `value` sits at the centre line, `perUnit` px per unit, ticks every `minor` with a label every
- * `major`. `zoneBelow` hatches everything under that value (stall speed / the ground).
+ * `major`. `zoneBelow` hatches everything under that value (the ground).
  */
 function tape(
   g: CanvasRenderingContext2D,

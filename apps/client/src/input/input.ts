@@ -23,8 +23,10 @@ export const inputState = {
   onOpenChat: null as (() => void) | null,
   /** performance.now() until which a first B press waits for confirmation (B again or Y) to halt. */
   haltPromptUntil: 0,
-  /** performance.now() of the last double-tap made while the Barrel Roll was still recharging. */
+  /** performance.now() of the last double-tap made while the Barrel Roll was recharging or boosting. */
   rollDeniedAt: 0,
+  /** That denied double-tap came while boosting (no roll during boost). */
+  rollDeniedBoost: false,
   /** Hotbar bar the number keys fire (0-based); C cycles, F1-F3 pick. */
   hotbarBar: 0,
   /** Last aim direction sent (unit, world space); HUD range feedback raycasts along it from the Ship. */
@@ -213,9 +215,12 @@ export function attachInput(canvas: HTMLElement): () => void {
         rollArmUntil = performance.now() + ROLL_ARM_MS;
         lastUp[e.code] = -1e9;
         const own = world.ownId ? world.ships.get(world.ownId) : undefined;
-        // Still recharging past the arm window: the roll won't happen, say so instead of failing silently.
-        if (own && own.rollCooldownTicks / TICK_HZ > ROLL_ARM_MS / 1000)
+        // Boosting, or still recharging past the arm window: the roll won't happen, say so.
+        const boosting = !!own && keys.has('Space') && own.fuel > 0;
+        if (own && (boosting || own.rollCooldownTicks / TICK_HZ > ROLL_ARM_MS / 1000)) {
           inputState.rollDeniedAt = performance.now();
+          inputState.rollDeniedBoost = boosting;
+        }
       }
     } else if (e.code === 'Tab') cycleTarget();
     else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') lockNearestToCrosshair();
@@ -415,7 +420,7 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
     strafe: k('KeyD') - k('KeyA'),
     vertical: k('KeyE') - k('KeyQ'),
     boost: !!k('Space'),
-    // S is the brake: down to the engine's min speed, or onto the Launch Deck when over it.
+    // S is the brake: down to a stop (hover in place), or onto the Launch Deck when over it.
     brake: !!k('KeyS'),
     fire1: !typing && fire1,
     fire2: !typing && fire2,

@@ -4,7 +4,7 @@ import './controls.css';
 const BINDINGS: [key: string, action: string][] = [
   ['MOUSE', 'steer / aim'],
   ['LMB · RMB', 'fire Primary / Secondary'],
-  ['W · S', 'throttle: max / min speed (S over Launch Deck lands)'],
+  ['W · S', 'throttle up / down to a stop (hover; S over Launch Deck lands)'],
   ['A · D', 'strafe — double-tap to Barrel Roll'],
   ['Q · E', 'descend / climb'],
   ['SPACE', 'boost'],
