@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { ENGINES, FRAMES, HOTBAR_BAR_SLOTS, MAPS, SKILLS, WEAPONS } from '@skyriot/shared';
 import { useShallow } from 'zustand/react/shallow';
 import { session } from '../net/session';
@@ -333,7 +333,7 @@ function Killfeed() {
   return (
     <div className="killfeed">
       {feed.map((k) => (
-        <div key={k.id}>
+        <div key={k.id} className={k.mine ? 'mine' : undefined}>
           <b style={{ color: k.killerNation ? NATION_COLOR[k.killerNation] : '#ccc' }}>
             {k.killer}
           </b>
@@ -344,6 +344,28 @@ function Killfeed() {
         </div>
       ))}
     </div>
+  );
+}
+
+const STREAK_WORD = ['', '', 'DOUBLE', 'TRIPLE', 'QUAD'];
+
+/** Kill confirmation under the crosshair, plus the kill hit marker; remounts (restarts its fade) per kill. */
+function KillConfirm() {
+  const k = useHud((h) => h.killConfirm);
+  if (!k) return null;
+  const word = k.streak > 1 ? (STREAK_WORD[k.streak] ?? `${k.streak}× CHAIN`) : '';
+  return (
+    <Fragment key={k.nonce}>
+      <div className="hitmark kill" />
+      <div className="kill-confirm">
+        {word && <i>{word}</i>}
+        <b>DESTROYED</b>
+        <span>
+          {k.victim}
+          {k.reward && <em> {k.reward}</em>}
+        </span>
+      </div>
+    </Fragment>
   );
 }
 
@@ -668,6 +690,7 @@ export function Hud({ onLeave }: { onLeave(): void }) {
       <Incoming />
       <Hotbar />
       <Killfeed />
+      <KillConfirm />
       <Chat />
       <Radar />
       <EscMenu onLeave={onLeave} />

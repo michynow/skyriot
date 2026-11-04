@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Vector3 } from 'three';
 import {
   FRAMES,
+  KILL_REWARD,
   RESPAWN_SEC,
   SKILLS,
   STRUCTURES,
@@ -31,6 +32,16 @@ export interface KillEntry {
   victim: string;
   victimNation: NationId | null;
   at: number;
+  /** Scored by the own Ship. */
+  mine: boolean;
+}
+/** Centre-screen confirmation of a kill the own Ship scored. */
+export interface KillConfirm {
+  nonce: number;
+  victim: string;
+  reward: string;
+  /** Kills inside the streak window, 1 = single. */
+  streak: number;
 }
 export interface DamageFlash {
   id: number;
@@ -148,6 +159,7 @@ export interface HudState {
   /** Transient defensive warning (our structure under fire) shown in place of the objective. */
   defenseWarn: string;
   banner: Banner | null;
+  killConfirm: KillConfirm | null;
 }
 
 const EMPTY_BASE: BaseView = {
@@ -229,6 +241,7 @@ export const useHud = create<HudState>(() => ({
   objective: '',
   defenseWarn: '',
   banner: null,
+  killConfirm: null,
 }));
 
 export const isGrounded = (s: ShipState): boolean => s.grounded === true;
@@ -265,6 +278,10 @@ export const incoming = new Map<number, IncomingMissile>();
 
 let nextId = 1;
 const KILLFEED_MS = 6000;
+/** Kills closer together than this chain into a streak. */
+const STREAK_MS = 5000;
+let lastKillAt = -Infinity;
+let streak = 0;
 /** Airborne Siege hint threshold (m/s): "slow/hovering". */
 // Must match HOVER_MAX_SPEED in packages/shared/src/sim/constants.ts (airborne siege threshold).
 const HOVER_SPEED = 15;
@@ -442,8 +459,23 @@ export function handleHudEvent(ev: SimEvent): void {
       victim: v?.name ?? 'Unknown',
       victimNation: v?.nation ?? null,
       at: performance.now(),
+      mine: !!ownId && ev.killer === ownId && ev.victim !== ownId,
     };
     useHud.setState((s) => ({ killfeed: [...s.killfeed.slice(-4), entry] }));
+    if (entry.mine) {
+      streak = entry.at - lastKillAt < STREAK_MS ? streak + 1 : 1;
+      lastKillAt = entry.at;
+      // The server pays only for enemy kills (MapRoom awardKill).
+      const reward = v && v.nation !== k?.nation ? `+${KILL_REWARD.credits} cr` : '';
+      useHud.setState((s) => ({
+        killConfirm: {
+          nonce: (s.killConfirm?.nonce ?? 0) + 1,
+          victim: entry.victim,
+          reward,
+          streak,
+        },
+      }));
+    }
     if (ev.victim === ownId) useHud.setState({ diedAtMs: performance.now() });
   } else if (ev.type === 'structureDestroyed') {
     const st = world.structures.get(ev.structure);
@@ -457,6 +489,7 @@ export function handleHudEvent(ev: SimEvent): void {
         victim: STRUCTURE_NAME[st.kind],
         victimNation: st.nation,
         at: performance.now(),
+        mine: k.id === ownId,
       };
       useHud.setState((s) => ({ killfeed: [...s.killfeed.slice(-4), entry] }));
     }

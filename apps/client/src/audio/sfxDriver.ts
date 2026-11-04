@@ -125,6 +125,7 @@ export function handleAudioEvent(ev: SimEvent): void {
     }
     case 'shipDestroyed':
       playSfx('destroyed', ev.victim === own ? { volume: 0.9 } : { pos: ev.pos });
+      if (own && ev.killer === own && ev.victim !== own) playSfx('kill-confirm');
       break;
     case 'skillUsed':
       if (ev.id === own) playSfx(skillSfx(ev.skill), { pitch: 0.85 + (hash(ev.skill) % 7) / 20 });

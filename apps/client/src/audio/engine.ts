@@ -35,6 +35,7 @@ export type SfxName =
   | 'launch'
   | 'impact-bounce'
   | 'destroyed'
+  | 'kill-confirm'
   | 'evaded'
   | 'ui-click'
   | 'ui-hover';
@@ -276,6 +277,13 @@ const RECIPES: Record<SfxName, (r: R) => number> = {
       );
     return 2.2;
   },
+  // Two rising chimes over a short thump: the "you got them" sting.
+  'kill-confirm': (r) => (
+    tone(r, 'sine', 120, 50, 0.25, 0.6),
+    tone(r, 'triangle', 880, 880, 0.12, 0.35, 0.02),
+    tone(r, 'triangle', 1320, 1320, 0.25, 0.35, 0.11),
+    0.45
+  ),
   evaded: (r) => (
     burst(r, 'bandpass', 3000, 800, 1.2, 0.28, 0.4),
     tone(r, 'sine', 1760, 1760, 0.5, 0.25, 0.12, 0.01),
