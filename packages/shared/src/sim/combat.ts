@@ -19,6 +19,8 @@ import {
   AIR_BARRAGE_SPREAD_RAD,
   BOMB_DROP_SPEED,
   BOMB_GRAVITY,
+  MISSILE_SALVO,
+  MISSILE_SALVO_SPREAD_RAD,
   GROUND_STRIKE_GROUND_MUL,
   GROUND_STRIKE_SPLASH_MUL,
   NAV_MAX_LEAD_SEC,
@@ -499,59 +501,68 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
         }
       }
     }
-    const ang = ctx.rng() * Math.PI * 2;
-    const rad = w.spread * spreadScale * Math.sqrt(ctx.rng());
-    const sx = Math.cos(ang) * rad,
-      sy = Math.sin(ang) * rad;
-    let dx = bx + _r[0]! * sx + _u[0]! * sy;
-    let dy = by + _r[1]! * sx + _u[1]! * sy;
-    let dz = bz + _r[2]! * sx + _u[2]! * sy;
-    const dl = Math.hypot(dx, dy, dz);
-    dx /= dl;
-    dy /= dl;
-    dz /= dl;
-    let homing = w.homingTurnRate;
-    let target = homing > 0 ? s.lockTarget : null;
-    if (i === 1 && w.kind === 'shell' && s.sieged && s.lockTarget) {
-      // Siege mortar: loft toward the locked target, mild guidance pulls the shell down onto it.
-      const t = ctx.ships.get(s.lockTarget);
-      if (t) {
-        const tx = t.state.pos[0] - s.pos[0],
-          ty = t.state.pos[1] - s.pos[1],
-          tz = t.state.pos[2] - s.pos[2];
-        const tl = Math.hypot(tx, ty, tz) || 1;
-        dx = tx / tl;
-        dy = ty / tl + Math.tan(MORTAR_LOFT_RAD);
-        dz = tz / tl;
-        const ll = Math.hypot(dx, dy, dz);
-        dx /= ll;
-        dy /= ll;
-        dz /= ll;
-        homing = MORTAR_GUIDE_TURN;
-        target = s.lockTarget;
+    // Missile salvo: the first missile's ammo is already paid; each extra one costs 1, fanned sideways.
+    const extra =
+      w.kind === 'missile' ? Math.min(MISSILE_SALVO - 1 + rec.mods.salvoAdd, s.ammo2) : 0;
+    if (extra > 0) s.ammo2 -= extra;
+    let usedLock = false;
+    for (let k = 0; k <= extra; k++) {
+      const fan = (k - extra / 2) * MISSILE_SALVO_SPREAD_RAD;
+      const ang = ctx.rng() * Math.PI * 2;
+      const rad = w.spread * spreadScale * Math.sqrt(ctx.rng());
+      const sx = Math.cos(ang) * rad,
+        sy = Math.sin(ang) * rad;
+      let dx = bx + _r[0]! * (sx + fan) + _u[0]! * sy;
+      let dy = by + _r[1]! * (sx + fan) + _u[1]! * sy;
+      let dz = bz + _r[2]! * (sx + fan) + _u[2]! * sy;
+      const dl = Math.hypot(dx, dy, dz);
+      dx /= dl;
+      dy /= dl;
+      dz /= dl;
+      let homing = w.homingTurnRate;
+      let target = homing > 0 ? s.lockTarget : null;
+      if (i === 1 && w.kind === 'shell' && s.sieged && s.lockTarget) {
+        // Siege mortar: loft toward the locked target, mild guidance pulls the shell down onto it.
+        const t = ctx.ships.get(s.lockTarget);
+        if (t) {
+          const tx = t.state.pos[0] - s.pos[0],
+            ty = t.state.pos[1] - s.pos[1],
+            tz = t.state.pos[2] - s.pos[2];
+          const tl = Math.hypot(tx, ty, tz) || 1;
+          dx = tx / tl;
+          dy = ty / tl + Math.tan(MORTAR_LOFT_RAD);
+          dz = tz / tl;
+          const ll = Math.hypot(dx, dy, dz);
+          dx /= ll;
+          dy /= ll;
+          dz /= ll;
+          homing = MORTAR_GUIDE_TURN;
+          target = s.lockTarget;
+        }
       }
+      spawnProjectile(
+        ctx,
+        rec,
+        w.kind,
+        w.id,
+        w.damage * rec.mods.damageMul * (mods ? mods.damageMul : 1),
+        w.splashRadius * rec.mods.splashMul,
+        w.speed,
+        w.rangeM * (mods ? mods.rangeMul : 1),
+        homing,
+        target,
+        s.pos[0] + _f[0]! * nose,
+        s.pos[1] + _f[1]! * nose,
+        s.pos[2] + _f[2]! * nose,
+        dx,
+        dy,
+        dz,
+        // Gun-locked rounds lead the Target's current state, so they hit-test now, not in the rewound past.
+        gunLock ? 0 : rewind,
+      );
+      if (target) usedLock = true;
     }
-    spawnProjectile(
-      ctx,
-      rec,
-      w.kind,
-      w.id,
-      w.damage * rec.mods.damageMul * (mods ? mods.damageMul : 1),
-      w.splashRadius * rec.mods.splashMul,
-      w.speed,
-      w.rangeM * (mods ? mods.rangeMul : 1),
-      homing,
-      target,
-      s.pos[0] + _f[0]! * nose,
-      s.pos[1] + _f[1]! * nose,
-      s.pos[2] + _f[2]! * nose,
-      dx,
-      dy,
-      dz,
-      // Gun-locked rounds lead the Target's current state, so they hit-test now, not in the rewound past.
-      gunLock ? 0 : rewind,
-    );
-    if (target) {
+    if (usedLock) {
       s.lockTarget = null;
       rec.lockCand = null;
       rec.lockTime = 0;

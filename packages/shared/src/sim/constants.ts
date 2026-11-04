@@ -118,6 +118,9 @@ export const GROUND_STRIKE_GROUND_MUL = 1.4;
 export const GROUND_STRIKE_SPLASH_MUL = 1.3;
 export const BOMB_DROP_SPEED = 20;
 export const BOMB_GRAVITY = 30;
+/** Missile Secondaries fire this many per trigger pull (each costs 1 ammo), fanned this far apart. */
+export const MISSILE_SALVO = 2;
+export const MISSILE_SALVO_SPREAD_RAD = 0.05;
 export const PURGE_RADIUS = 120;
 
 // Guided missile manoeuvring: lead pursuit plus a deterministic corkscrew weave (seeded by projectile id).
