@@ -183,23 +183,34 @@ function bulwark() {
   );
   // airborne and fast: the skill auto-brakes, then sieges once slow
   run(60, { throttle: 1 });
-  run(1, { hotbar: 0 });
+  run(1, { hotbar: 0 }); // Ground Siege is refused while airborne
+  const refused = !b.sieged && !b.siegePending;
+  run(1, { hotbar: 1 }); // Air Siege
   const pending = b.siegePending && !b.sieged;
   run(90, {});
   log.push(`airSiegePending=${pending} airSiege=${b.sieged && !b.grounded}`);
   sim2.dispose();
-  return { log, ok: sieged && unsieged && !b.grounded && pending && b.sieged && moved > 20 };
+  return {
+    log,
+    ok: sieged && unsieged && refused && !b.grounded && pending && b.sieged && moved > 20,
+  };
 }
 const bw = bulwark();
 console.log('bulwark', bw.log.join(' | '));
 
-// 2a. Siege gun lock: a sieged Bulwark locks a crossing Wasp, its Primary leads it and lands most rounds;
+// 2a. Siege gun lock: a sieged Bulwark locks a jinking Wasp and every Primary round hits it;
 // swinging the nose away drops the lock.
 function siegeLockTest() {
   const sim2 = fresh(true);
-  const g = sampleHeight(hf, 0, 0);
-  sim2.addShip('b', spawn('bulwark'), [0, g + 3, 0]);
-  sim2.addShip('t', spawn('wasp', 'concord'), [-150, g + 120, -350]);
+  // A flat spot so the grounded hull sits level.
+  let ox = 0;
+  const slope = (x: number) =>
+    Math.abs(sampleHeight(hf, x + 10, 0) - sampleHeight(hf, x - 10, 0)) +
+    Math.abs(sampleHeight(hf, x, 10) - sampleHeight(hf, x, -10));
+  for (let x = -1500; x <= 1500; x += 50) if (slope(x) < slope(ox)) ox = x;
+  const g = sampleHeight(hf, ox, 0);
+  sim2.addShip('b', spawn('bulwark'), [ox, g + 3, 0]);
+  sim2.addShip('t', spawn('wasp', 'concord'), [ox - 150, g + 150, -650]);
   const b = sim2.getShip('b')!;
   const t = sim2.getShip('t')!;
   let seq = 0;
@@ -213,7 +224,13 @@ function siegeLockTest() {
     const ev = sim2.step(
       new Map([
         ['b', mk(++seq, { aim, target: 't', ...patch })],
-        ['t', mk(seq, { aim: [1, 0, 0] })],
+        [
+          't',
+          mk(seq, {
+            aim: [1, Math.sin(seq / 6) * 0.6, Math.cos(seq / 9) * 0.5],
+            boost: seq % 40 < 15,
+          }),
+        ],
       ]),
     );
     for (const e of ev) {
@@ -223,14 +240,15 @@ function siegeLockTest() {
     t.hp = t.maxHp; // keep the target alive
     t.shield = t.maxShield;
   };
-  for (let i = 0; i < 200 && !b.grounded; i++) step({ vertical: -1 }, true);
+  for (let i = 0; i < 200 && !b.grounded; i++) step({ vertical: -1, throttle: -1 }, true);
   step({ hotbar: 0 }, true);
-  for (let i = 0; i < 40; i++) step({}, true);
+  for (let i = 0; i < 150 && b.siegeLock !== 't'; i++) step({}, true);
   const acquired = b.sieged && b.siegeLock === 't';
   for (let i = 0; i < 90; i++) {
     step({ fire1: true }, true);
     if (b.siegeLock === 't') lockedTicks++;
   }
+  for (let i = 0; i < 30; i++) step({}, true); // rounds in flight land
   // Swing away: the lock must drop once the Target is outside the break cone.
   let dropped = false;
   for (let i = 0; i < 240 && !dropped; i++) {
@@ -238,7 +256,7 @@ function siegeLockTest() {
     dropped = b.siegeLock === null;
   }
   sim2.dispose();
-  return { sieged: b.sieged, acquired, lockedTicks, shots, hits, dropped };
+  return { grounded: b.grounded, sieged: b.sieged, acquired, lockedTicks, shots, hits, dropped };
 }
 const siegeLock = siegeLockTest();
 console.log('siege gun lock:', siegeLock);
@@ -728,7 +746,8 @@ check(bw.ok, 'bulwark ground mode');
 check(
   siegeLock.acquired &&
     siegeLock.lockedTicks > 80 &&
-    siegeLock.hits >= siegeLock.shots * 0.6 &&
+    siegeLock.shots > 0 &&
+    siegeLock.hits === siegeLock.shots &&
     siegeLock.dropped,
   'siege gun lock: ' + JSON.stringify(siegeLock),
 );

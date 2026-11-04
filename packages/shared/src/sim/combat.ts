@@ -39,6 +39,8 @@ import {
   MORTAR_LOCK_CONE_RAD,
   MORTAR_LOCK_SEC,
   SIEGE_GUN_BREAK_CONE_RAD,
+  SIEGE_GUN_HOMING_TURN,
+  SIEGE_GUN_RANGE_SLACK,
   SIEGE_GUN_SPREAD_MUL,
   MORTAR_LOFT_RAD,
   NOSE_OFFSET,
@@ -321,11 +323,11 @@ function updateSiegeLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, w: Weapon
       dz = _tp[2]! - s.pos[2];
     const d = Math.hypot(dx, dy, dz);
     const cone = s.siegeLock === id ? SIEGE_GUN_BREAK_CONE_RAD : AIM_ASSIST.coneRad;
-    if (
-      d >= 1 &&
-      d <= w.rangeM * siegeMods(s).rangeMul &&
-      (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d >= Math.cos(cone)
-    ) {
+    // Ground Siege: the hull stays level and the gun elevates, so only the heading counts.
+    const cos = s.grounded
+      ? (dx * _f[0]! + dz * _f[2]!) / (Math.hypot(dx, dz) * Math.hypot(_f[0]!, _f[2]!) || 1)
+      : (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d;
+    if (d >= 1 && d <= w.rangeM * siegeMods(s).rangeMul && cos >= Math.cos(cone)) {
       const ray = ctx.ray;
       ray.origin.x = s.pos[0];
       ray.origin.y = s.pos[1];
@@ -540,6 +542,11 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
           target = s.lockTarget;
         }
       }
+      if (gunLock) {
+        // Gun-locked rounds home hard on the Target so every one lands (see stepProjectiles).
+        homing = SIEGE_GUN_HOMING_TURN;
+        target = s.siegeLock;
+      }
       spawnProjectile(
         ctx,
         rec,
@@ -548,7 +555,7 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
         w.damage * rec.mods.damageMul * (mods ? mods.damageMul : 1),
         w.splashRadius * rec.mods.splashMul,
         w.speed,
-        w.rangeM * (mods ? mods.rangeMul : 1),
+        w.rangeM * (mods ? mods.rangeMul : 1) * (gunLock ? SIEGE_GUN_RANGE_SLACK : 1),
         homing,
         target,
         s.pos[0] + _f[0]! * nose,
@@ -560,7 +567,7 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
         // Gun-locked rounds lead the Target's current state, so they hit-test now, not in the rewound past.
         gunLock ? 0 : rewind,
       );
-      if (target) usedLock = true;
+      if (target && !gunLock) usedLock = true;
     }
     if (usedLock) {
       s.lockTarget = null;
@@ -728,6 +735,9 @@ export function stepProjectiles(ctx: SimCtx): void {
         let broke: 'roll' | 'terrain' | 'flare' | 'lost' | null = null;
         if (ts.flareTicks > 0) {
           broke = 'flare';
+        } else if (p.kind === 'tracer' && ctx.ships.get(p.owner)?.state.siegeLock !== ts.id) {
+          // Siege gun lock broke mid-flight: the round flies on unguided.
+          broke = 'lost';
         } else if (missile) {
           if (ts.rollTicks > 0 && tl < MISSILE_EVADE.rollBreakDistM) {
             broke = 'roll';

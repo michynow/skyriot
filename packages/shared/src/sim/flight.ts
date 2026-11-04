@@ -74,16 +74,19 @@ export function siegeLockConeMul(s: ShipState): number {
 }
 
 /**
- * The siege-anchor Skill: leave Siege, enter it when grounded or slow, or (airborne and fast)
- * auto-brake until slow enough (`siegePending`). Using it again cancels a pending request.
+ * The two Siege Skills. Either one leaves Siege (or cancels a pending Air Siege). Ground Siege (`siege-anchor`)
+ * only enters while grounded; Air Siege (`air-siege`) only while airborne, auto-braking first if too fast
+ * (`siegePending`). Returns false when refused (wrong mode), so no cooldown is paid.
  */
-export function toggleSiege(rec: ShipRec): void {
+export function toggleSiege(rec: ShipRec, ground: boolean): boolean {
   const s = rec.state;
-  if (s.frame !== 'bulwark' || s.docked) return;
+  if (s.frame !== 'bulwark' || s.docked) return false;
   if (s.sieged) s.sieged = false;
   else if (s.siegePending) s.siegePending = false;
-  else if (s.grounded || s.speed < HOVER_MAX_SPEED) s.sieged = true;
+  else if (ground !== s.grounded) return false;
+  else if (ground || s.speed < HOVER_MAX_SPEED) s.sieged = true;
   else s.siegePending = true;
+  return true;
 }
 
 /** Push body/collider to the ShipState transform. */

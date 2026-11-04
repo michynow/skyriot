@@ -282,6 +282,7 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
       burst(fx, P, C.yellow, 16, 30, 0.5, 1.2);
       break;
     case 'siege-anchor':
+    case 'air-siege':
       flatRing(fx, P, C.ground, R * 8, 0.8);
       for (let i = 0; i < 18; i++) {
         const a = rnd() * 6.28,

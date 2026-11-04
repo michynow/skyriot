@@ -227,6 +227,17 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
       </>
     ),
   },
+  'air-siege': {
+    cat: 'red',
+    art: (
+      <>
+        <path d="M8 30h32M12 36h24" stroke={G.red} strokeWidth="3" strokeLinecap="round" />
+        <path d="M24 26L15 12h18z" fill={G.red} />
+        <path d="M20 12V6h8v6z" fill={WHITE} opacity=".9" />
+        <circle cx="24" cy="17" r="2.5" fill={INK} />
+      </>
+    ),
+  },
   'repair-kit': {
     cat: 'green',
     art: (

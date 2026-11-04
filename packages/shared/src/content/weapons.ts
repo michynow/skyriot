@@ -144,8 +144,16 @@ export const SKILLS: Record<string, SkillDef> = {
   ),
   'siege-anchor': s(
     'siege-anchor',
-    'Siege Anchor',
-    'Toggle Siege Mode: root in place, first-person gunner view, Target lock. Stronger when grounded.',
+    'Ground Siege',
+    'Landed only: anchor to the ground, first-person gunner view, Target lock. x1.5 damage, x1.4 range.',
+    ['bulwark'],
+    1,
+    0,
+  ),
+  'air-siege': s(
+    'air-siege',
+    'Air Siege',
+    'Airborne only: brake and hover-lock in place, gunner view, Target lock. x1.15 damage and range, wider lock cone.',
     ['bulwark'],
     1,
     0,

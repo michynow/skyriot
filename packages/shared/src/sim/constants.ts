@@ -97,6 +97,9 @@ export const MORTAR_LOCK_SEC = 1.2;
 // Siege gun lock: acquired inside AIM_ASSIST.coneRad of the nose, held until the Target leaves this cone.
 export const SIEGE_GUN_BREAK_CONE_RAD = 0.5;
 export const SIEGE_GUN_SPREAD_MUL = 0.35;
+/** Gun-locked rounds home this hard (rad/s, effectively a direct track) and may fly this much past range. */
+export const SIEGE_GUN_HOMING_TURN = 60;
+export const SIEGE_GUN_RANGE_SLACK = 1.5;
 export const MORTAR_LOFT_RAD = 0.6;
 export const MORTAR_GUIDE_TURN = 0.9;
 
