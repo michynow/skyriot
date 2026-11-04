@@ -120,7 +120,6 @@ function Gauge() {
           cls={boosting ? 'spd boost' : reverse ? 'spd rev' : 'spd'}
           width={7}
         />
-        {fd && <Tick f={fd.minSpeed / top} r={64} />}
         {fd && <Tick f={fd.maxSpeed / top} r={64} />}
         <Arc r={52} pct={g.fuel} cls={g.fuel < 0.2 ? 'fu low' : 'fu'} width={4} />
       </svg>
@@ -444,7 +443,7 @@ function Warnings() {
       incomingDist: x.incomingDist,
       halted: x.halted,
       haltPrompt: x.haltPrompt,
-      rollDeniedSec: x.rollDeniedSec,
+      rollDenied: x.rollDenied,
       overDeck: x.overDeck,
     })),
   );
@@ -464,9 +463,7 @@ function Warnings() {
         </div>
       )}
       {h.halted && flying && <Loadout />}
-      {h.rollDeniedSec > 0 && flying && (
-        <div className="roll-denied">ROLL RECHARGING {h.rollDeniedSec.toFixed(1)}s</div>
-      )}
+      {h.rollDenied && flying && <div className="roll-denied">{h.rollDenied}</div>}
       {h.overDeck && flying && !h.docked && (
         <div className="deck-hint">
           HOLD <kbd>S</kbd> TO LAND

@@ -69,11 +69,11 @@ Skill kits are our own designs covering these roles (no 1:1 renames of any exist
 | Input                | Action                                                                                                                                                                                                      |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Mouse                | Steers: ship turns toward the cursor at Frame turn rate. The **crosshair is fixed at screen centre (= Ship nose, where guns fire and missiles lock)**; a small arrow from centre shows the cursor direction |
-| W / S                | Throttle up / down (stall floor on atmospheric maps)                                                                                                                                                        |
+| W / S                | Throttle up / down (down to 0: hover in place; no stall)                                                                                                                                                    |
 | A / D                | Strafe (visual bank)                                                                                                                                                                                        |
-| **Double-tap A / D** | **Barrel roll** — full 360° spin with a 25–35 m lateral displacement, 0.25 s invulnerability, costs fuel, 3 s cooldown. Not available while Grounded/Docked                                                 |
+| **Double-tap A / D** | **Barrel roll** — full 360° spin with a 25–35 m lateral displacement, 0.25 s invulnerability, costs fuel, 3 s cooldown. Not available while Grounded/Docked or boosting                                     |
 | Q / E                | Vertical strafe down / up                                                                                                                                                                                   |
-| Space                | Booster (fuel, regenerates)                                                                                                                                                                                 |
+| Space                | Booster (fuel, regenerates); wider turn while boosting, no Barrel Roll                                                                                                                                      |
 | Shift                | Hover/brake (Bulwark: land when near ground)                                                                                                                                                                |
 | R                    | Launch from a Launch Deck                                                                                                                                                                                   |
 | LMB / RMB            | Primary / secondary weapon                                                                                                                                                                                  |
@@ -126,14 +126,14 @@ Close third-person chase camera with slight lag. Mouse steering is deliberately 
 
 ## 7. Maps
 
-Each map has an **environment profile** (gravity, stall speed, ground behaviour) read by the flight model — new map types are mostly data.
+Each map has an **environment profile** (gravity, ground behaviour) read by the flight model — new map types are mostly data.
 
-| Map                              | Profile                                                                           | Content                                               | Story    |
-| -------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------- | -------- |
-| **Gildspire** / **Rivet Harbor** | City (safe zone)                                                                  | Shop, hangar, mission board, enemy-proof              | —        |
-| **Rustwater Canyons**            | Atmospheric, desert canyons                                                       | Low-altitude gorge dogfights; **Strategic Point war** | Ch. 1–3  |
-| **Shatterwave Archipelago**      | Atmospheric, stormy ocean, floating islands, lightning hazards                    | **Base war**, **Capture the Flag**                    | Ch. 4–6  |
-| **The Graveyard Belt**           | Space: zero-G, no stall, asteroids & capital wrecks; Bulwark siege-locks to hulls | **Mothership raid**                                   | Ch. 7–10 |
+| Map                              | Profile                                                                 | Content                                               | Story    |
+| -------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------- | -------- |
+| **Gildspire** / **Rivet Harbor** | City (safe zone)                                                        | Shop, hangar, mission board, enemy-proof              | —        |
+| **Rustwater Canyons**            | Atmospheric, desert canyons                                             | Low-altitude gorge dogfights; **Strategic Point war** | Ch. 1–3  |
+| **Shatterwave Archipelago**      | Atmospheric, stormy ocean, floating islands, lightning hazards          | **Base war**, **Capture the Flag**                    | Ch. 4–6  |
+| **The Graveyard Belt**           | Space: zero-G, asteroids & capital wrecks; Bulwark siege-locks to hulls | **Mothership raid**                                   | Ch. 7–10 |
 
 **Gate graph:** `Gildspire ↔ Canyons ↔ Archipelago ↔ Belt ↔ Rivet Harbor`, plus a shortcut gate from each city to its frontline. Each map has a home side per nation.
 

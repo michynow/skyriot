@@ -99,9 +99,6 @@ The order in which Ships waiting in a Base's hangar (after spawning or dying) ge
 One round on a Map Instance, from Bases intact until one Core falls; then the Bases rebuild and a new Battle starts.
 _Avoid_: match, round
 
-**Stall**:
-Flying slower than the Map's stall speed: the nose drops and steering is weak until speed recovers.
-
 **Docked**:
 A Ship resting on a Launch Deck, stationary and resupplying until it launches.
 
@@ -165,7 +162,7 @@ A warp link between two Maps.
 _Avoid_: portal, warp point
 
 **Environment Profile**:
-Map data that tunes physics: gravity, stall speed, what counts as ground.
+Map data that tunes physics: gravity (for falling objects like bombs), what counts as ground. Ships never stall: any Frame can throttle to 0 and hover in place.
 
 ## Story & events
 

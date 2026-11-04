@@ -15,7 +15,6 @@ import {
   CEILING_PUSH_SPEED,
   CEILING_SOFT_M,
   BRAKE_DECEL_MUL,
-  DECK_APPROACH_MUL,
   DOCK_CLEARANCE,
   DOCK_TOUCH_MARGIN,
   FLIP_TURN_RATE,
@@ -26,11 +25,8 @@ import {
   GROUND_NORMAL_TAU_SEC,
   GROUND_REVERSE_MUL,
   GROUND_SLIDE_SPEED,
-  HOVER_GAIN,
-  HOVER_CLEARANCE,
   HOVER_MAX_SPEED,
   LAND_HEIGHT,
-  LANDING_ASSIST_HEIGHT,
   LAUNCH_KICK,
   LIFTOFF_KICK,
   ROLL_DISPLACEMENT_PER_IMPULSE,
@@ -114,8 +110,8 @@ function resupply(ctx: SimCtx, s: ShipState): void {
   ctx.events.push({ type: 'resupplied', id: s.id });
 }
 
-/** Own-nation deck whose surface the Ship is touching (or approaching, when `approach`). */
-function ownDeck(ctx: SimCtx, s: ShipState, reach: number, radiusMul: number) {
+/** Own-nation deck whose surface the Ship is touching. */
+function ownDeck(ctx: SimCtx, s: ShipState, reach: number) {
   const decks = ctx.map.launchDecks[s.nation];
   for (let i = 0; i < decks.length; i++) {
     const d = decks[i]!;
@@ -123,8 +119,7 @@ function ownDeck(ctx: SimCtx, s: ShipState, reach: number, radiusMul: number) {
     if (dh < 0 || dh > reach) continue;
     const dx = s.pos[0] - d.pos[0],
       dz = s.pos[2] - d.pos[2];
-    const r = d.radius * radiusMul;
-    if (dx * dx + dz * dz <= r * r) return d;
+    if (dx * dx + dz * dz <= d.radius * d.radius) return d;
   }
   return null;
 }
@@ -183,8 +178,6 @@ export function stepFlight(
   if (!s.alive) return;
   const dt = ctx.dt;
   const fd = rec.fd;
-  const env = ctx.map.env;
-  const space = env.kind === 'space';
 
   if (s.rollTicks > 0) s.rollTicks--;
   if (s.rollCooldownTicks > 0) s.rollCooldownTicks--;
@@ -237,9 +230,17 @@ export function stepFlight(
   // Halt (B + confirm) toggles; any throttle or boost also releases it.
   if (input.halt && !s.docked && !s.grounded) s.halted = !s.halted;
   if (s.halted && (input.throttle > 0 || input.boost)) s.halted = false;
-  // Over the own Launch Deck the engine's min speed doesn't apply: easing off (S) lands.
-  const nearDeck =
-    !space && !fd.canHover && ownDeck(ctx, s, LANDING_ASSIST_HEIGHT, DECK_APPROACH_MUL) !== null;
+  // Boost: Space with fuel, in normal flight (not sieged, halted, braking, reversing or dashing).
+  const boosting =
+    input.boost &&
+    s.fuel > 0 &&
+    !sieged &&
+    !s.halted &&
+    !grounded &&
+    s.reverseTicks === 0 &&
+    s.dashTicks === 0 &&
+    !input.brake &&
+    !s.siegePending;
 
   // ---- orientation: ease the nose toward aim (angular velocity with time constant) ----
   forwardOf(s.rot, _f0);
@@ -290,7 +291,8 @@ export function stepFlight(
       : fd.turnRate *
         rec.mods.turnRateMul *
         (sieged ? siegeMods(s).turnRateMul : 1) *
-        (grounded ? 1 : speedTurnMul(fd, s.speed));
+        (grounded ? 1 : speedTurnMul(fd, s.speed)) *
+        (boosting ? fd.boostTurnMul : 1);
   const cosA = clamp(_f0[0]! * ax + _f0[1]! * ay + _f0[2]! * az, -1, 1);
   const angle = Math.acos(cosA);
   let cx = _f0[1]! * az - _f0[2]! * ay;
@@ -443,6 +445,7 @@ export function stepFlight(
     s.rollCooldownTicks === 0 &&
     s.fuel >= fd.rollFuelCost &&
     s.rollPhase < 0 &&
+    !boosting &&
     !sieged &&
     !grounded
   ) {
@@ -512,26 +515,19 @@ export function stepFlight(
 
   // ---- forward speed ----
   let target: number;
-  let boosting = false;
   if (sieged || s.halted) {
     target = 0;
   } else if (s.reverseTicks > 0) {
     target = -fd.boostSpeed * REVERSE_SPEED_MUL;
   } else if (input.brake || s.siegePending) {
-    target = nearDeck ? 0 : fd.minSpeed;
+    target = fd.minSpeed;
   } else {
-    // The engine's envelope: S = min, released = cruise, W = max, boost = boost speed.
+    // The engine's envelope: S = min (0: hover in place), released = cruise, W = max, boost = boost speed.
     target =
       input.throttle >= 0
         ? fd.cruiseSpeed + (fd.maxSpeed - fd.cruiseSpeed) * input.throttle
         : fd.cruiseSpeed + (fd.cruiseSpeed - fd.minSpeed) * input.throttle;
-    if (nearDeck && input.throttle < 0) target = 0;
-    if (s.dashTicks > 0) {
-      target = fd.boostSpeed;
-    } else if (input.boost && s.fuel > 0) {
-      target = fd.boostSpeed;
-      boosting = true;
-    }
+    if (s.dashTicks > 0 || boosting) target = fd.boostSpeed;
     target *= rec.mods.speedMul;
   }
   s.fuel = clamp(
@@ -556,22 +552,12 @@ export function stepFlight(
   let ty = input.vertical * fd.verticalSpeed;
   let tx = (hrx / hrl) * input.strafe * fd.strafeSpeed;
   let tz = (hrz / hrl) * input.strafe * fd.strafeSpeed;
+  // No stall or sink: at any speed a Ship holds its altitude unless Q/E moves it.
   if (sieged || s.halted) {
-    // Airborne siege / halt: hold position and altitude, no gravity.
+    // Airborne siege / halt: hold position and altitude.
     tx = 0;
     tz = 0;
     ty = 0;
-  } else if (!space) {
-    if (fd.canHover && s.speed < HOVER_MAX_SPEED) {
-      if (input.vertical === 0) {
-        const ground = sampleHeight(ctx.hf, s.pos[0], s.pos[2]);
-        ty = clamp(
-          (ground + fd.radius + HOVER_CLEARANCE - s.pos[1]) * HOVER_GAIN,
-          -fd.verticalSpeed,
-          fd.verticalSpeed,
-        );
-      }
-    }
   }
   const ceilPush = clamp((s.pos[1] - (ctx.map.ceiling - CEILING_SOFT_M)) / CEILING_SOFT_M, 0, 1);
   if (ceilPush > 0) ty = Math.min(ty, -ceilPush * CEILING_PUSH_SPEED);
@@ -613,7 +599,7 @@ export function stepFlight(
   // ---- Launch Deck docking (before impact so a slow landing is never an impact) ----
   const speedMag = Math.hypot(vx, vy, vz);
   if (speedMag < DECK.dockMaxSpeed) {
-    const deck = ownDeck(ctx, s, fd.radius + DOCK_TOUCH_MARGIN, 1);
+    const deck = ownDeck(ctx, s, fd.radius + DOCK_TOUCH_MARGIN);
     if (deck) {
       s.docked = true;
       s.dockTicks = 0;

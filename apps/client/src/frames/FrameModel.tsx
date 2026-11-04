@@ -112,14 +112,14 @@ export function FrameModel({
       const e = data.engines[i]!;
       const flick = 1 + 0.14 * Math.sin(s.t * 47 + i * 2.1) + 0.08 * Math.sin(s.t * 91 + i);
       const len =
-        (0.55 + s.boost * 3.4) * e.r * 4 * flick * (sg ? 0.35 : 1) * (1 + s.kick * 0.7) * s.idle;
+        (0.55 + s.boost * 1.6) * e.r * 4 * flick * (sg ? 0.35 : 1) * (1 + s.kick * 0.3) * s.idle;
       const dm = diamonds.current[i];
       if (dm) {
-        dm.visible = s.boost > 0.35;
+        dm.visible = s.boost > 0.6;
         dm.position.z = len * (0.38 + 0.04 * Math.sin(s.t * 60 + i));
         dm.scale.set(e.r * 0.55, e.r * 0.55, e.r * (0.9 + 0.3 * Math.sin(s.t * 80 + i * 3)));
       }
-      g.scale.set(e.r * (1 + s.boost * 0.3), e.r * (1 + s.boost * 0.3), len);
+      g.scale.set(e.r * (1 + s.boost * 0.12), e.r * (1 + s.boost * 0.12), len);
     }
     const me = shipId ? world.ships.get(shipId) : undefined;
     const docked = !!me?.docked;

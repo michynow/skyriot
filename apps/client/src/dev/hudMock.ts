@@ -20,8 +20,8 @@ export type MockScenario =
 export type MockBattle = 'battle' | 'victory' | 'defeat';
 
 /**
- * Fakes what the server does not send yet on this branch: Base structures, Battle state, Launch Queue phases and
- * stall. Applied on every HUD read of the own Ship (devHooks.ownShip), so it survives snapshot overwrites.
+ * Fakes what the server does not send yet on this branch: Base structures, Battle state, Launch Queue phases.
+ * Applied on every HUD read of the own Ship (devHooks.ownShip), so it survives snapshot overwrites.
  */
 export const hudMock = {
   scenario: 'off' as MockScenario,

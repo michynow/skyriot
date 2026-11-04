@@ -8,10 +8,8 @@ export const BANK_RATE_RAD = 9;
 /** Bank (rad) per rad/s of yaw rate. */
 export const BANK_PER_YAW_RATE = 0.5;
 export const BANK_PER_STRAFE = 0.35;
-/** Hover gap between the hull's lowest point and the ground. */
-export const HOVER_CLEARANCE = 2.6;
+/** Below this speed an airborne Bulwark can enter Siege at once (faster: it brakes first). */
 export const HOVER_MAX_SPEED = 15;
-export const HOVER_GAIN = 2;
 export const KCC_OFFSET = 0.15;
 /** Forward speed retained after a terrain impact. */
 export const IMPACT_SPEED_RETAIN = 0.55;
@@ -79,9 +77,6 @@ export const DECK_HALF_THICKNESS = 1;
 export const DOCK_TOUCH_MARGIN = 3;
 export const DOCK_CLEARANCE = 0.3;
 export const LAUNCH_KICK = 8;
-/** Landing assist: braking within this horizontal factor of own deck radius and below this height lands. */
-export const DECK_APPROACH_MUL = 4;
-export const LANDING_ASSIST_HEIGHT = 120;
 export const DECK_RESPAWN_SPREAD = 0.6;
 
 // Bulwark ground mode

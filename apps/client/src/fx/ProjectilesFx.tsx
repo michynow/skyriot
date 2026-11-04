@@ -1425,9 +1425,9 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
           const n = Math.min(24, Math.floor(d / sp));
           for (let k = 1; k <= n; k++) {
             const u = k / (n + 1);
-            const life = (boost ? 0.65 : 0.4) * (1 + look.upgrade * 0.03);
-            const sz = e.r * MODEL_SCALE * (boost ? 3.4 : 2.4) * ub;
-            if (boost && k % 3 === 0)
+            const life = (boost ? 0.5 : 0.4) * (1 + look.upgrade * 0.03);
+            const sz = e.r * MODEL_SCALE * (boost ? 2.8 : 2.4) * ub;
+            if (boost && k % 6 === 0)
               fx.puffs.emit(
                 t.x + mx * u,
                 t.y + my * u,
@@ -1435,9 +1435,9 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
                 rr(-1, 1),
                 rr(0.5, 2),
                 rr(-1, 1),
-                0.7,
-                sz * 1.5,
-                sz * 5,
+                0.5,
+                sz * 1.2,
+                sz * 3,
                 1.0,
                 0.85,
                 0.65,
@@ -1455,9 +1455,9 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
                 life,
                 sz,
                 sz * 0.25,
-                2.6,
-                1.7,
-                0.8,
+                1.8,
+                1.25,
+                0.65,
                 0.14,
               );
             else

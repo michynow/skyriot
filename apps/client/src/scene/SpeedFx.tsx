@@ -24,7 +24,7 @@ void main(){
   float cell = fract(a * N);
   float h = h11(id), h2 = h11(id + 17.0), h3 = h11(id + 53.0);
   // streak exists only if its hash is under the density
-  float on = step(h, uAmt * 0.9 + uKick * 0.2);
+  float on = step(h, uAmt * 0.45 + uKick * 0.15);
   // thin line across the sector
   float w = 0.1 + 0.12 * h2;
   float line = smoothstep(0.5 - w, 0.5, cell) * smoothstep(0.5 + w, 0.5, cell);
@@ -33,8 +33,8 @@ void main(){
   float s = fract(r * 0.9 - uTime * speed - h2 * 3.0);
   float seg = smoothstep(0.0, 0.05, s) * smoothstep(0.55 + 0.3 * h, 0.0, s);
   float radial = smoothstep(0.32, 0.95, r);
-  float alpha = line * seg * on * radial * (0.8 * uAmt + 0.5 * uKick);
-  gl_FragColor = vec4(uTint * (0.9 + 1.2 * uKick), alpha);
+  float alpha = line * seg * on * radial * (0.35 * uAmt + 0.25 * uKick);
+  gl_FragColor = vec4(uTint * (0.9 + 0.4 * uKick), alpha);
 }`;
 
 /** Anime-style radial speed lines (full-screen quad) + boost state tracking. Works at every quality level. */
@@ -58,7 +58,7 @@ export function SpeedLines() {
     if (on && !boostState.was) {
       boostState.kick = 1;
       const w = world as unknown as { shake?: number };
-      w.shake = Math.max(w.shake ?? 0, 0.45); // kick-in camera shake via the shared shake path
+      w.shake = Math.max(w.shake ?? 0, 0.15); // kick-in camera shake via the shared shake path
     }
     boostState.was = on;
     boostState.sustained += ((on ? 1 : 0) - boostState.sustained) * (1 - Math.exp(-6 * dt));
@@ -100,7 +100,7 @@ export class BoostEffect extends Effect {
       void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
         vec2 d = uv - 0.5;
         float r = length(d);
-        float k = uKick * 0.07 + uSus * 0.012;
+        float k = uKick * 0.03 + uSus * 0.005;
         if (k < 0.0005) { outputColor = inputColor; return; }
         vec3 c = vec3(0.0);
         for (int i = 0; i < 7; i++) {
@@ -108,7 +108,7 @@ export class BoostEffect extends Effect {
           c += texture2D(inputBuffer, 0.5 + d * (1.0 - k * t * (0.35 + r * 2.0))).rgb;
         }
         c /= 7.0;
-        float ca = uKick * 0.02 * r;
+        float ca = uKick * 0.008 * r;
         c.r = mix(c.r, texture2D(inputBuffer, uv - d * ca).r, min(1.0, uKick * 2.0));
         c.b = mix(c.b, texture2D(inputBuffer, uv + d * ca).b, min(1.0, uKick * 2.0));
         outputColor = vec4(c, inputColor.a);
