@@ -187,6 +187,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.rollCooldownTicks = 0;
     s.sieged = false;
     s.lockTarget = null;
+    s.siegeLock = null;
     s.cooldowns.fill(0);
     s.buffs.length = 0;
     initToggles(s, fd.hotbar);
@@ -277,6 +278,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       incomingTti: -1,
       canLock: false,
       lockProgress: 0,
+      siegeLock: null,
       launchPhase: 'none',
       queuePos: -1,
       tunnel: -1,

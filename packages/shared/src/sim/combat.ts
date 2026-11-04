@@ -36,6 +36,8 @@ import {
   MORTAR_GUIDE_TURN,
   MORTAR_LOCK_CONE_RAD,
   MORTAR_LOCK_SEC,
+  SIEGE_GUN_BREAK_CONE_RAD,
+  SIEGE_GUN_SPREAD_MUL,
   MORTAR_LOFT_RAD,
   NOSE_OFFSET,
   PROJECTILE_RADIUS,
@@ -301,6 +303,40 @@ function updateLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, sec: WeaponDef
   s.lockProgress = Math.min(rec.lockTime / lockSec, 1);
 }
 
+/**
+ * Siege gun lock: the selected enemy Ship is acquired inside the aim-assist cone of the nose and held while it stays
+ * inside the wider break cone, in Primary range and in terrain line of sight. Dropping out means re-aiming to re-lock.
+ */
+function updateSiegeLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, w: WeaponDef): void {
+  const s = rec.state;
+  const id = s.sieged && input.target && ctx.ships.has(input.target) ? input.target : null;
+  const t = id ? lockable(ctx, id) : null;
+  let keep = false;
+  if (t && t.nation !== s.nation) {
+    forwardOf(s.rot, _f);
+    const dx = _tp[0]! - s.pos[0],
+      dy = _tp[1]! - s.pos[1],
+      dz = _tp[2]! - s.pos[2];
+    const d = Math.hypot(dx, dy, dz);
+    const cone = s.siegeLock === id ? SIEGE_GUN_BREAK_CONE_RAD : AIM_ASSIST.coneRad;
+    if (
+      d >= 1 &&
+      d <= w.rangeM * siegeMods(s).rangeMul &&
+      (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d >= Math.cos(cone)
+    ) {
+      const ray = ctx.ray;
+      ray.origin.x = s.pos[0];
+      ray.origin.y = s.pos[1];
+      ray.origin.z = s.pos[2];
+      ray.dir.x = dx / d;
+      ray.dir.y = dy / d;
+      ray.dir.z = dz / d;
+      keep = ctx.world.castRay(ray, d, true, undefined, RAY_QUERY_GROUPS) === null;
+    }
+  }
+  s.siegeLock = keep ? id : null;
+}
+
 /** Time for a projectile of `speed` fired from the origin to meet a target moving at (vx,vy,vz). */
 export function interceptTime(
   rx: number,
@@ -339,6 +375,7 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
   const weapons = rec.gear ? rec.gear.weapons : [WEAPONS[fd.primary]!, WEAPONS[fd.secondary]!];
   const sec = weapons[1]!;
   updateLock(ctx, rec, input, sec);
+  updateSiegeLock(ctx, rec, input, weapons[0]!);
   const rewind = Math.min(Math.max(ctx.tick - input.viewTick, 0), MAX_REWIND_TICKS);
   const fire = s.halted ? [false, false] : [input.fire1, input.fire2];
   for (let i = 0; i < 2; i++) {
@@ -429,6 +466,7 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
       by = _f[1]!,
       bz = _f[2]!;
     let spreadScale = 1;
+    let gunLock = false;
     if (i === 0 && input.target) {
       const t = ctx.ships.get(input.target);
       if (t && t.state.alive && t.state.nation !== s.nation) {
@@ -438,7 +476,11 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
         const td = Math.hypot(tx, ty, tz) || 1;
         // The assist cone is measured from the nose (the centre crosshair), not the steering aim.
         const cosAim = (tx * _f[0]! + ty * _f[1]! + tz * _f[2]!) / td;
-        if (td <= w.rangeM * (mods ? mods.rangeMul : 1) && cosAim >= Math.cos(AIM_ASSIST.coneRad)) {
+        gunLock = s.siegeLock === t.state.id;
+        if (
+          gunLock ||
+          (td <= w.rangeM * (mods ? mods.rangeMul : 1) && cosAim >= Math.cos(AIM_ASSIST.coneRad))
+        ) {
           const rx = t.state.pos[0] - ox,
             ry = t.state.pos[1] - oy,
             rz = t.state.pos[2] - oz;
@@ -453,7 +495,7 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
           bx /= bl;
           by /= bl;
           bz /= bl;
-          spreadScale = AIM_ASSIST.spreadMul;
+          spreadScale = gunLock ? SIEGE_GUN_SPREAD_MUL : AIM_ASSIST.spreadMul;
         }
       }
     }
@@ -506,7 +548,8 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
       dx,
       dy,
       dz,
-      rewind,
+      // Gun-locked rounds lead the Target's current state, so they hit-test now, not in the rewound past.
+      gunLock ? 0 : rewind,
     );
     if (target) {
       s.lockTarget = null;

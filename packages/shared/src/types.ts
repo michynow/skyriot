@@ -139,6 +139,8 @@ export interface ShipState {
   canLock: boolean;
   /** Lock progress 0..1 toward `lockTarget`. */
   lockProgress: number;
+  /** Siege Mode gun lock: the Primary auto-tracks this Target until it leaves the break cone, range or sight. */
+  siegeLock: ShipId | null;
   // Launch Queue: after death a Ship waits in its Base's hangar, then is staged in a Launch Tunnel and catapulted.
   /** 'none' = flying (or dead, waiting for respawn); see LaunchPhase. */
   launchPhase: LaunchPhase;

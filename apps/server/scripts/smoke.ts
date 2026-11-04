@@ -193,6 +193,56 @@ function bulwark() {
 const bw = bulwark();
 console.log('bulwark', bw.log.join(' | '));
 
+// 2a. Siege gun lock: a sieged Bulwark locks a crossing Wasp, its Primary leads it and lands most rounds;
+// swinging the nose away drops the lock.
+function siegeLockTest() {
+  const sim2 = fresh(true);
+  const g = sampleHeight(hf, 0, 0);
+  sim2.addShip('b', spawn('bulwark'), [0, g + 3, 0]);
+  sim2.addShip('t', spawn('wasp', 'concord'), [-150, g + 120, -350]);
+  const b = sim2.getShip('b')!;
+  const t = sim2.getShip('t')!;
+  let seq = 0;
+  let shots = 0,
+    hits = 0,
+    lockedTicks = 0;
+  const step = (patch: Partial<PilotInput>, aimAtTarget: boolean) => {
+    const aim: [number, number, number] = aimAtTarget
+      ? [t.pos[0] - b.pos[0], t.pos[1] - b.pos[1], t.pos[2] - b.pos[2]]
+      : [b.pos[0] - t.pos[0], 0, b.pos[2] - t.pos[2]];
+    const ev = sim2.step(
+      new Map([
+        ['b', mk(++seq, { aim, target: 't', ...patch })],
+        ['t', mk(seq, { aim: [1, 0, 0] })],
+      ]),
+    );
+    for (const e of ev) {
+      if (e.type === 'projectileSpawned' && e.owner === 'b') shots++;
+      if (e.type === 'hit' && e.victim === 't') hits++;
+    }
+    t.hp = t.maxHp; // keep the target alive
+    t.shield = t.maxShield;
+  };
+  for (let i = 0; i < 200 && !b.grounded; i++) step({ vertical: -1 }, true);
+  step({ hotbar: 0 }, true);
+  for (let i = 0; i < 40; i++) step({}, true);
+  const acquired = b.sieged && b.siegeLock === 't';
+  for (let i = 0; i < 90; i++) {
+    step({ fire1: true }, true);
+    if (b.siegeLock === 't') lockedTicks++;
+  }
+  // Swing away: the lock must drop once the Target is outside the break cone.
+  let dropped = false;
+  for (let i = 0; i < 240 && !dropped; i++) {
+    step({}, false);
+    dropped = b.siegeLock === null;
+  }
+  sim2.dispose();
+  return { sieged: b.sieged, acquired, lockedTicks, shots, hits, dropped };
+}
+const siegeLock = siegeLockTest();
+console.log('siege gun lock:', siegeLock);
+
 // 2b. Missile evasion: a target that rolls at ~60 m vs one that flies straight.
 function missileTrial(roll: boolean, k: number): 'hit' | 'evaded' | 'miss' {
   const sim2 = fresh(true);
@@ -675,6 +725,13 @@ check(
   'no-shield crash rule',
 );
 check(bw.ok, 'bulwark ground mode');
+check(
+  siegeLock.acquired &&
+    siegeLock.lockedTicks > 80 &&
+    siegeLock.hits >= siegeLock.shots * 0.6 &&
+    siegeLock.dropped,
+  'siege gun lock: ' + JSON.stringify(siegeLock),
+);
 check(Object.values(buffRes).every(Boolean), 'buff/toggle/aura checks: ' + JSON.stringify(buffRes));
 check(purges >= 9, 'purge should break guidance');
 check(

@@ -93,6 +93,7 @@ export function Reticles() {
   const leadLink = useRef<HTMLDivElement>(null);
   const turnEl = useRef<HTMLDivElement>(null);
   const gunnerEl = useRef<HTMLDivElement>(null);
+  const gunTag = useRef<HTMLDivElement>(null);
   const ringEl = useRef<SVGCircleElement>(null);
   const ladderEls = useRef<(HTMLDivElement | null)[]>([]);
   const markerEls = useRef<(HTMLDivElement | null)[]>([]);
@@ -102,6 +103,8 @@ export function Reticles() {
     let last = performance.now();
     let lockProgress = 0;
     let lockFor: string | null = null;
+    let gunLockWas: string | null = null;
+    let gunLostUntil = 0;
     const labelCache: string[] = [];
     const labelX: number[] = [];
     const labelY: number[] = [];
@@ -283,6 +286,14 @@ export function Reticles() {
       // Range ladder + gunner info for first-person Siege.
       const gun = gunnerEl.current;
       place(gun, cx, cy, sieged);
+      // Siege gun lock (server-validated): GUN LOCK while held, LOCK LOST briefly when the sim drops it.
+      if (own.siegeLock) gunLockWas = own.siegeLock;
+      else if (gunLockWas) {
+        if (sieged && world.ships.get(gunLockWas)?.alive) gunLostUntil = now + 1500;
+        gunLockWas = null;
+      }
+      setText(gunTag.current, own.siegeLock ? 'GUN LOCK' : now < gunLostUntil ? 'LOCK LOST' : '');
+      gunTag.current?.classList.toggle('lost', !own.siegeLock);
       if (sieged) {
         const hl = Math.hypot(fx, fz) || 1;
         const hf = world.heightfield;
@@ -451,6 +462,7 @@ export function Reticles() {
           />
           <path d="M-44 0h24M20 0h24M0 -44v24M0 20v24" className="g-cross" />
         </svg>
+        <div className="g-tag" ref={gunTag} />
         <Ammo side={1} />
         <Ammo side={2} />
         <div className="ladder">

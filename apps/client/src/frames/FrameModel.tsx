@@ -31,6 +31,9 @@ const diamondMat = new THREE.MeshBasicMaterial({
   toneMapped: false,
   fog: false,
 });
+// Bulwark barrel root (model units): the gun swivels here toward its Siege gun lock.
+const GUN_PIVOT = new THREE.Vector3(0, 1.6, -1.0);
+const _gv = new THREE.Vector3();
 const flameGeo = new THREE.ConeGeometry(1, 1, 10, 1, true)
   .translate(0, 0.5, 0)
   .rotateX(Math.PI / 2);
@@ -57,6 +60,7 @@ export function FrameModel({
   const padFlames = useRef<(THREE.Group | null)[]>([]);
   const hull = useRef<THREE.Group>(null);
   const hover = useRef<THREE.Group>(null);
+  const gun = useRef<THREE.Group>(null);
   const st = useRef({
     boost: 0,
     siege: sieged ? 1 : 0,
@@ -135,6 +139,21 @@ export function FrameModel({
     for (const g of flames.current) if (g) g.visible = hv;
     for (const g of fins.current) if (g) g.visible = hv;
     for (const g of padFlames.current) if (g) g.visible = hv;
+    const gg = gun.current;
+    if (gg) {
+      const t = me?.siegeLock ? world.ships.get(me.siegeLock) : undefined;
+      let yaw = 0,
+        pitch = 0;
+      if (t && gg.parent) {
+        gg.parent.worldToLocal(_gv.set(t.pos[0], t.pos[1], t.pos[2])).sub(GUN_PIVOT);
+        yaw = Math.atan2(-_gv.x, -_gv.z);
+        pitch = Math.atan2(_gv.y, Math.hypot(_gv.x, _gv.z));
+      }
+      const k = 1 - Math.exp(-10 * dt);
+      gg.rotation.order = 'YXZ';
+      gg.rotation.y += (yaw - gg.rotation.y) * k;
+      gg.rotation.x += (pitch - gg.rotation.x) * k;
+    }
     if (spinner.current && data.spinner)
       spinner.current.rotation.z += dt * data.spinner.speed * (1 + s.boost);
     if (data.legs) {
@@ -172,11 +191,16 @@ export function FrameModel({
           </group>
         )}
       </group>
-      {data.gun &&
-        SLOTS.map((slot) => {
-          const g = data.gun![slot];
-          return g ? <mesh key={slot} geometry={g} material={mats[slot]} castShadow /> : null;
-        })}
+      {data.gun && (
+        <group ref={gun} position={GUN_PIVOT}>
+          <group position={GUN_PIVOT.clone().negate()}>
+            {SLOTS.map((slot) => {
+              const g = data.gun![slot];
+              return g ? <mesh key={slot} geometry={g} material={mats[slot]} castShadow /> : null;
+            })}
+          </group>
+        </group>
+      )}
       {data.spinner && (
         <group ref={spinner} position={data.spinner.pivot}>
           {SLOTS.map((slot) => {

@@ -75,6 +75,7 @@ function mk(
     incomingTti: -1,
     canLock: false,
     lockProgress: 0,
+    siegeLock: null,
     launchPhase: 'none',
     queuePos: -1,
     tunnel: -1,

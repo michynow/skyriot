@@ -449,6 +449,27 @@
   stroke-width: 2;
   fill: none;
 }
+.g-tag {
+  position: absolute;
+  left: -60px;
+  top: -72px;
+  width: 120px;
+  text-align: center;
+  font:
+    700 15px 'Rajdhani',
+    sans-serif;
+  letter-spacing: 0.12em;
+  color: #ff8a1f;
+}
+.g-tag.lost {
+  color: #ff4040;
+  animation: g-tag-blink 0.25s steps(2) infinite;
+}
+@keyframes g-tag-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
 .ladder {
   position: absolute;
   left: 0;
