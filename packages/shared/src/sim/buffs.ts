@@ -1,5 +1,5 @@
 import { SKILLS } from '../content/weapons';
-import type { ShipId, ShipState, SkillId } from '../types';
+import type { BuffEffect, ShipId, ShipState, SkillId } from '../types';
 import type { BuffMods, ShipRec, SimCtx } from './ctx';
 
 export function createMods(): BuffMods {
@@ -19,6 +19,21 @@ export function createMods(): BuffMods {
     cloak: false,
     damageAuraDps: 0,
     salvoAdd: 0,
+    primaryDamageMul: 1,
+    secondaryDamageMul: 1,
+    secondaryFireRateMul: 1,
+    spreadMul: 1,
+    lockConeMul: 1,
+    shieldDamageTakenMul: 1,
+    secondaryDamageTakenMul: 1,
+    collisionDamageMul: 1,
+    invulnerable: false,
+    noAttack: false,
+    rollCooldownMul: 1,
+    groundSpeedMul: 1,
+    shieldRestorePerSec: 0,
+    missileBlind: false,
+    primaryShotMul: 1,
   };
 }
 
@@ -31,8 +46,11 @@ export function resolveMods(ctx: SimCtx, rec: ShipRec): void {
   const s = rec.state;
   m.fireRateMul = m.speedMul = m.turnRateMul = m.damageMul = m.damageTakenMul = 1;
   m.maxHpMul = m.shieldRegenMul = m.fuelRegenMul = m.lockTimeMul = m.splashMul = 1;
-  m.deflectAdd = m.hpRegenPerSec = m.damageAuraDps = m.salvoAdd = 0;
-  m.cloak = false;
+  m.primaryDamageMul = m.secondaryDamageMul = m.secondaryFireRateMul = m.spreadMul = 1;
+  m.lockConeMul = m.shieldDamageTakenMul = m.secondaryDamageTakenMul = m.collisionDamageMul = 1;
+  m.rollCooldownMul = m.groundSpeedMul = m.primaryShotMul = 1;
+  m.deflectAdd = m.hpRegenPerSec = m.damageAuraDps = m.salvoAdd = m.shieldRestorePerSec = 0;
+  m.cloak = m.invulnerable = m.noAttack = m.missileBlind = false;
   for (const b of s.buffs) {
     const e = SKILLS[b.skill]?.buff;
     if (!e) continue;
@@ -50,7 +68,22 @@ export function resolveMods(ctx: SimCtx, rec: ShipRec): void {
     m.hpRegenPerSec += e.hpRegenPerSec ?? 0;
     m.damageAuraDps += e.damageAuraDps ?? 0;
     m.salvoAdd += e.salvoAdd ?? 0;
+    m.primaryDamageMul *= e.primaryDamageMul ?? 1;
+    m.secondaryDamageMul *= e.secondaryDamageMul ?? 1;
+    m.secondaryFireRateMul *= e.secondaryFireRateMul ?? 1;
+    m.spreadMul *= e.spreadMul ?? 1;
+    m.lockConeMul *= e.lockConeMul ?? 1;
+    m.shieldDamageTakenMul *= e.shieldDamageTakenMul ?? 1;
+    m.secondaryDamageTakenMul *= e.secondaryDamageTakenMul ?? 1;
+    m.collisionDamageMul *= e.collisionDamageMul ?? 1;
+    m.rollCooldownMul *= e.rollCooldownMul ?? 1;
+    m.groundSpeedMul *= e.groundSpeedMul ?? 1;
+    m.primaryShotMul *= e.primaryShotMul ?? 1;
+    m.shieldRestorePerSec += e.shieldRestorePerSec ?? 0;
     m.cloak ||= e.cloak === true;
+    m.invulnerable ||= e.invulnerable === true;
+    m.noAttack ||= e.noAttack === true;
+    m.missileBlind ||= e.missileBlind === true;
   }
   if (!s.alive) return;
   const target = ctx.frames[s.frame].maxHp * m.maxHpMul;
@@ -79,10 +112,22 @@ export function isCloaked(s: ShipState): boolean {
   return false;
 }
 
-/** Drop every cloak buff (the Ship fired). */
+/** Drop every cloak buff (the Ship fired, or was scanned). */
 export function breakCloak(s: ShipState): void {
-  for (let i = s.buffs.length - 1; i >= 0; i--)
-    if (SKILLS[s.buffs[i]!.skill]?.buff?.cloak) s.buffs.splice(i, 1);
+  dropBuffs(s, (e) => e.cloak === true);
+}
+
+/** Remove the buffs whose effect matches. */
+export function dropBuffs(s: ShipState, match: (e: BuffEffect) => boolean): void {
+  for (let i = s.buffs.length - 1; i >= 0; i--) {
+    const e = SKILLS[s.buffs[i]!.skill]?.buff;
+    if (e && match(e)) s.buffs.splice(i, 1);
+  }
+}
+
+/** A buff a hostile Skill put on the Ship (enemy debuff), as opposed to an own or ally buff. */
+export function isDebuff(skill: SkillId): boolean {
+  return SKILLS[skill]?.kind === 'skill';
 }
 
 /** Count down buffs and drop expired ones. */

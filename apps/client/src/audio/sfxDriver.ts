@@ -76,8 +76,7 @@ export function handleAudioEvent(ev: SimEvent): void {
       if (ev.kind === 'missile') {
         playSfx('missile-launch', mine ? { volume: 0.8 } : { pos: ev.origin });
         t.loop = startLoop('missile-hiss', ev.origin);
-      } else if (ev.kind === 'flare') playSfx('flare-pop', mine ? {} : { pos: ev.origin });
-      else playSfx('bomb-whistle', mine ? { volume: 0.7 } : { pos: ev.origin, volume: 0.8 });
+      } else playSfx('bomb-whistle', mine ? { volume: 0.7 } : { pos: ev.origin, volume: 0.8 });
       tracked.set(ev.id, t);
       break;
     }
@@ -86,11 +85,10 @@ export function handleAudioEvent(ev: SimEvent): void {
       if (t) {
         t.loop?.stop();
         tracked.delete(ev.id);
-        if (t.kind !== 'flare')
-          playSfx(t.kind === 'missile' ? 'explosion' : 'boom', {
-            pos: ev.pos,
-            volume: t.kind === 'missile' ? 0.7 : 1,
-          });
+        playSfx(t.kind === 'missile' ? 'explosion' : 'boom', {
+          pos: ev.pos,
+          volume: t.kind === 'missile' ? 0.7 : 1,
+        });
       }
       break;
     }

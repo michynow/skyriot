@@ -3,6 +3,8 @@ import {
   FRAMES,
   GILDSPIRE,
   RUSTWATER_CANYONS,
+  SKILLS,
+  TICK_HZ,
   createSim,
   generateHeightfield,
   sampleHeight,
@@ -470,10 +472,11 @@ function buffTests() {
       );
     }
   };
-  const hotSlot = FRAMES.wasp.hotbar.indexOf('hot-barrels');
+  const hotSlot = FRAMES.wasp.hotbar.indexOf('trim-tabs');
+  const hotTicks = Math.ceil(SKILLS['trim-tabs']!.durationSec * TICK_HZ);
   idle(1, { w: { hotbar: hotSlot } });
-  const hotOn = w.buffs.some((b) => b.skill === 'hot-barrels');
-  idle(179, { w: {} });
+  const hotOn = w.buffs.some((b) => b.skill === 'trim-tabs');
+  idle(hotTicks - 1, { w: {} });
   const stillOn = w.buffs.length === 1;
   idle(3, { w: {} });
   const expired = w.buffs.length === 0;

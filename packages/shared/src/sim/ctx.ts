@@ -38,6 +38,21 @@ export interface BuffMods {
   cloak: boolean;
   damageAuraDps: number;
   salvoAdd: number;
+  primaryDamageMul: number;
+  secondaryDamageMul: number;
+  secondaryFireRateMul: number;
+  spreadMul: number;
+  lockConeMul: number;
+  shieldDamageTakenMul: number;
+  secondaryDamageTakenMul: number;
+  collisionDamageMul: number;
+  invulnerable: boolean;
+  noAttack: boolean;
+  rollCooldownMul: number;
+  groundSpeedMul: number;
+  shieldRestorePerSec: number;
+  missileBlind: boolean;
+  primaryShotMul: number;
 }
 
 export interface ShipRec {
@@ -55,6 +70,8 @@ export interface ShipRec {
   lockCand: ShipId | null;
   lockTime: number;
   spawnCounter: number;
+  /** Hits left on the absorbHits buff (Chaff Screen); set on cast, server-side. */
+  absorbLeft: number;
   /** Lag-comp ring: x,y,z,fx,fy,fz per slot, tagged by tick. */
   histPos: Float32Array;
   histTick: Int32Array;
@@ -91,18 +108,6 @@ export interface Projectile {
   weaveAmp: number;
 }
 
-/** Static damage area (Cinder Cloud): hurts enemies of `nation` inside `radius` until `expireTick`. */
-export interface Zone {
-  x: number;
-  y: number;
-  z: number;
-  radius: number;
-  dps: number;
-  nation: NationId;
-  owner: ShipId;
-  expireTick: number;
-}
-
 export interface StructureRec {
   state: StructureState;
   collider: Collider;
@@ -134,7 +139,6 @@ export interface SimCtx {
   recList: ShipRec[];
   projectiles: Projectile[];
   pool: Projectile[];
-  zones: Zone[];
   nextProjectileId: number;
   events: SimEvent[];
   structures: StructureRec[];

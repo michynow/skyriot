@@ -67,17 +67,21 @@ const BOT_EDGE_MARGIN = 600;
 const SIEGE_SLOT = 0; // siege-anchor is hotbar slot 0 on the Bulwark
 const ROLL_WINDOW_MIN_M = 30;
 const ROLL_WINDOW_MAX_M = 80;
-const FLARE_INCOMING_M = 700;
-const FLARE_CHANCE = 0.05;
 const BUFF_ENGAGE_DIST = 900;
 const BOMB_DROP_RADIUS = 60;
 /** Distance to the enemy under which a Bot fires each offensive Skill (roughly its effect reach). */
 const OFFENSIVE_REACH_M: Record<string, number> = {
   'snare-tag': 400,
-  'sapping-hex': 130,
-  'quake-round': 180,
-  'cinder-cloud': 60,
+  'blind-tag': 400,
+  'shield-breaker': 400,
+  'dispel-lance': 500,
+  'quake-round': 220,
 };
+/** Halo heal Skills a Bot casts when it (or its nearest ally) is hurt. */
+const HEAL_SKILLS = new Set(['renewal-pulse', 'recharge-pulse', 'mend-beam', 'lifeline']);
+/** Core Breach: only when about to die anyway, with an enemy inside the blast. */
+const BREACH_HP_FRACTION = 0.2;
+const BREACH_REACH_M = 120;
 const BOMB_RUN_ALTITUDE = 120;
 const SIEGE_BOT_CHANCE = 0.5;
 const SIEGE_BOT_ENGAGE_DISTANCE = 700;
@@ -418,8 +422,7 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     input.strafe = mem.dodgeDir;
   }
 
-  const flareSlot = fd.hotbar.indexOf('flares');
-  // Incoming guided missile: roll inside the break window, otherwise pop flares.
+  // Incoming guided missile: roll inside the break window.
   if (me.incomingDist > 0 && !me.sieged && !me.grounded) {
     if (
       me.incomingDist < ROLL_WINDOW_MAX_M &&
@@ -430,13 +433,6 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     ) {
       if (mem.rng() < 0.5) input.rollLeft = true;
       else input.rollRight = true;
-    } else if (
-      me.incomingDist < FLARE_INCOMING_M &&
-      flareSlot >= 0 &&
-      me.cooldowns[flareSlot] === 0 &&
-      mem.rng() < FLARE_CHANCE
-    ) {
-      input.hotbar = flareSlot;
     }
   } else if (me.hp < me.maxHp * HEAL_HP_FRACTION && mem.rng() < SKILL_USE_CHANCE * 5) {
     input.hotbar = fd.hotbar.indexOf(mem.rng() < 0.5 ? 'repair-kit' : 'shield-kit');
@@ -454,6 +450,21 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       const id = fd.hotbar[slot];
       const def = id ? SKILLS[id] : undefined;
       if (!id || !def || me.cooldowns[slot] !== 0) continue;
+      if (!botMayCast(id, me, dist)) continue;
+      if (HEAL_SKILLS.has(id)) {
+        if (me.hp < me.maxHp * HEAL_HP_FRACTION * 1.5 || me.shield < me.maxShield * 0.3) {
+          input.hotbar = slot;
+          break;
+        }
+        continue;
+      }
+      if (id === 'core-breach') {
+        if (me.hp < me.maxHp * BREACH_HP_FRACTION && dist < BREACH_REACH_M) {
+          input.hotbar = slot;
+          break;
+        }
+        continue;
+      }
       if (def.kind === 'buff' && !me.buffs.some((x) => x.skill === id)) {
         input.hotbar = slot;
         break;
@@ -543,4 +554,24 @@ function pickEnemy(
 function noseOf(s: ShipState): [number, number, number] {
   const [x, y, z, w] = s.rot;
   return [-2 * (x * z + w * y), -2 * (y * z - w * x), -(1 - 2 * (x * x + y * y))];
+}
+
+/**
+ * Skills whose cast would fail or hurt the Bot right now: kept off the "use anything ready" pick so a
+ * refused cast (no cooldown paid) can't block the rest of the hotbar.
+ */
+function botMayCast(id: string, me: ShipState, dist: number): boolean {
+  switch (id) {
+    case 'ground-shroud':
+    case 'track-drive':
+      return me.grounded;
+    case 'sanctum':
+      // Weapons go offline: only as a panic button.
+      return me.hp < me.maxHp * HEAL_HP_FRACTION;
+    case 'shroud-veil':
+      // Stealth is for closing in, not mid-dogfight (firing ends it).
+      return dist > 400;
+    default:
+      return true;
+  }
 }

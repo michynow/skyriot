@@ -62,7 +62,6 @@ function mk(
     angVel: [0, 0, 0],
     brakeHeld: false,
     dashTicks: 0,
-    flareTicks: 0,
     dockTicks: 0,
     grounded: false,
     buffs: [],
@@ -127,7 +126,7 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
       t: 0,
       nextId: 1,
       ev: 0,
-      timers: { fire: 0, missile: 2, hit: 1, kill: 6, roll: 3, impact: 4, flare: 5 },
+      timers: { fire: 0, missile: 2, hit: 1, kill: 6, roll: 3, impact: 4 },
       deadUntil: new Map<string, number>(),
     };
   }, [map, opts.showcase, opts.focus]);
@@ -375,23 +374,6 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
         });
         push({ type: 'launched', id: pick()!.id });
         push({ type: 'resupplied', id: pick()!.id });
-      }
-      T.flare -= dt;
-      if (T.flare < 0) {
-        T.flare = 5;
-        const s = pick()!;
-        push({
-          type: 'projectileSpawned',
-          id: demo.nextId++,
-          owner: s.id,
-          kind: 'flare',
-          weapon: 'flares',
-          origin: s.pos,
-          dir: [0.2, -0.3, 0.9],
-          speed: 40,
-          target: null,
-          tick: 0,
-        });
       }
     }
 

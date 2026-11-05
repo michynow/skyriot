@@ -39,27 +39,42 @@ function auraMat(col: [number, number, number], hex: boolean, strength: number) 
 }
 const AURA = {
   rally: auraMat([0.3, 2.2, 0.7], false, 0.35),
-  renewal: auraMat([0.4, 2.6, 0.9], false, 0.4),
   ward: auraMat([0.6, 1.6, 3.0], true, 0.3),
-  bastion: auraMat([0.5, 1.2, 2.8], true, 0.35),
-  sap: auraMat([1.4, 0.5, 2.2], false, 0.45),
+  veer: auraMat([0.4, 2.4, 2.8], false, 0.3),
+  hull: auraMat([1.6, 1.7, 2.0], true, 0.28),
+  damper: auraMat([0.4, 2.2, 2.8], true, 0.3),
+  blast: auraMat([0.5, 1.2, 3.2], true, 0.45),
+  weave: auraMat([0.5, 1.4, 3.4], false, 0.45),
+  sanctum: auraMat([3.0, 2.3, 0.6], true, 0.55),
   snare: auraMat([2.8, 2.2, 0.3], true, 0.35),
-  quake: auraMat([2.4, 1.2, 0.3], false, 0.4),
+  blind: auraMat([1.4, 0.5, 2.2], false, 0.45),
+  breaker: auraMat([2.8, 0.5, 0.3], true, 0.4),
   veil: auraMat([1.2, 0.8, 2.6], false, 0.25),
 };
 /** Buff Skill -> aura shell and its scale (x hull radius). Debuffs show on the victim. */
 const BUFF_AURA: Record<string, [keyof typeof AURA, number]> = {
   'rally-field': ['rally', 1.15],
-  'renewal-pulse': ['renewal', 1.3],
   'ward-lattice': ['ward', 1.36],
-  'bastion-field': ['bastion', 1.42],
-  'sapping-hex': ['sap', 1.12],
+  'veer-field': ['veer', 1.25],
+  'hardened-hull': ['hull', 1.08],
+  'shield-damper': ['damper', 1.2],
+  'blast-ward': ['blast', 1.45],
+  'shield-weave': ['weave', 1.3],
+  sanctum: ['sanctum', 1.5],
   'snare-tag': ['snare', 1.18],
-  'quake-round': ['quake', 1.25],
+  'blind-tag': ['blind', 1.12],
+  'shield-breaker': ['breaker', 1.22],
   'shroud-veil': ['veil', 1.05],
+  'ground-shroud': ['veil', 1.05],
 };
 /** Buffs that also light the extra engine flame sheath. */
-const FLAME_BUFFS = new Set(['overdrive', 'ram-surge', 'servo-overclock', 'hot-barrels']);
+const FLAME_BUFFS = new Set(['overdrive', 'quiver-surge', 'track-drive', 'warhead-tune']);
+/** Buffs that leave afterimages (agility). */
+const GHOST_BUFFS = new Set(['trim-tabs', 'roll-cascade', 'jink-jets']);
+/** Buffs that bolt armour plates onto the hull. */
+const PLATE_BUFFS = new Set(['hardened-hull', 'crash-frame']);
+/** Buffs that spin charge rings at the nose (gun buffs). */
+const NOSE_BUFFS = new Set(['gun-tune', 'steady-hands', 'overcharge-round']);
 const odMat = new THREE.MeshBasicMaterial({
   color: new THREE.Color(3.2, 0.7, 0.15),
   transparent: true,
@@ -166,17 +181,9 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       const a = BUFF_AURA[b.skill];
       if (a) on[a[0]] = true;
       if (FLAME_BUFFS.has(b.skill)) overdrive = true;
-      switch (b.skill) {
-        case 'servo-overclock':
-          phantom = true;
-          break;
-        case 'ram-surge':
-          bulk = true;
-          break;
-        case 'shrapnel-ring':
-          calibr = true;
-          break;
-      }
+      if (GHOST_BUFFS.has(b.skill)) phantom = true;
+      if (PLATE_BUFFS.has(b.skill)) bulk = true;
+      if (NOSE_BUFFS.has(b.skill)) calibr = true;
     }
     const set = (k: string, on: boolean, sc: number) => {
       const m = auras.current[k];
@@ -209,7 +216,7 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       m.scale.set(e.r * 1.5 * s.od, e.r * 1.5 * s.od, e.r * 9 * s.od * f);
     }
 
-    // Ram Surge: armour plating snaps on with overshoot, off by scaling away
+    // Hardened Hull / Crash Frame: armour plating snaps on with overshoot, off by scaling away
     s.plate +=
       ((bulk ? 1 : 0) - s.plate) * (1 - Math.exp(-12 * dt)) +
       (bulk ? Math.min(dt * 3, 1 - s.plate) * 0.6 : 0);
@@ -231,7 +238,7 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       g.rotation.z = side * 1.25 * s.bay;
     }
 
-    // Shrapnel Ring: orbiting rings around the muzzle
+    // Gun buffs: charge rings spinning at the nose
     if (calib.current) {
       calib.current.visible = calibr;
       if (calibr) {
@@ -246,7 +253,7 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       }
     }
 
-    // Servo Overclock afterimages: ghost copies at past transforms (relative to the live model root)
+    // Agility buffs: afterimages ghost copies at past transforms (relative to the live model root)
     const root = plate.current?.parent;
     s.ghost += ((phantom ? 1 : 0) - s.ghost) * (1 - Math.exp(-8 * dt));
     if (root) {
@@ -318,23 +325,25 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
           })}
         </group>
       ))}
-      {frame === 'bulwark' && (
-        <group ref={calib} position={[0, 1.6, -4.1]} visible={false}>
-          <mesh geometry={orbGeo} material={ringMat} scale={0.35} />
-          <mesh
-            ref={(el) => void (rings.current[0] = el)}
-            geometry={ringGeo}
-            material={ringMat}
-            scale={0.9}
-          />
-          <mesh
-            ref={(el) => void (rings.current[1] = el)}
-            geometry={ringGeo}
-            material={ringMat}
-            scale={1.3}
-          />
-        </group>
-      )}
+      <group
+        ref={calib}
+        position={frame === 'bulwark' ? [0, 1.6, -4.1] : [0, 0, -len * 1.05]}
+        visible={false}
+      >
+        <mesh geometry={orbGeo} material={ringMat} scale={0.35} />
+        <mesh
+          ref={(el) => void (rings.current[0] = el)}
+          geometry={ringGeo}
+          material={ringMat}
+          scale={0.9}
+        />
+        <mesh
+          ref={(el) => void (rings.current[1] = el)}
+          geometry={ringGeo}
+          material={ringMat}
+          scale={1.3}
+        />
+      </group>
       {frame === 'anvil' &&
         [1, -1].map((side, i) => (
           <group

@@ -42,7 +42,6 @@ const KIND_ID: Record<ProjectileKind, number> = {
   missile: 1,
   rocket: 2,
   shell: 3,
-  flare: 4,
 };
 const rnd = Math.random;
 const rr = (a: number, b: number) => a + (b - a) * rnd();
@@ -86,7 +85,7 @@ class Projectiles {
     f[o + 6] = col[0];
     f[o + 7] = col[1];
     f[o + 8] = col[2];
-    f[o + 9] = e.kind === 'flare' ? 4.5 : (w?.rangeM ?? 1000);
+    f[o + 9] = w?.rangeM ?? 1000;
     f[o + 10] = 0;
     f[o + 11] = w?.splashRadius ?? 0;
     f[o + 12] = w?.homingTurnRate ?? 0;
@@ -876,13 +875,7 @@ function updateProjectiles(fx: Fx, dt: number) {
         f[o + 5] = nz * sp;
       }
     }
-    if (k === 4) {
-      const d = Math.max(0, 1 - 1.6 * dt);
-      f[o + 3]! *= d;
-      f[o + 5]! *= d;
-      f[o + 4] = f[o + 4]! * d - 16 * dt;
-      f[o + 9]! -= dt;
-    } else if (k === 3) {
+    if (k === 3) {
       f[o + 4]! -= 9.8 * dt * 0.6;
       f[o + 9]! -= Math.hypot(f[o + 3]!, f[o + 4]!, f[o + 5]!) * dt;
     } else {
@@ -920,7 +913,7 @@ function updateProjectiles(fx: Fx, dt: number) {
       dead = true;
       const pos: [number, number, number] = [f[o]!, f[o + 1]!, f[o + 2]!];
       if (k === 0) sparks(fx, pos, 4, false);
-      else if (k !== 4) {
+      else {
         explosion(
           fx,
           pos,
@@ -958,63 +951,6 @@ function updateProjectiles(fx: Fx, dt: number) {
       i++;
       continue;
     }
-    if (k === 4) {
-      // flare: blazing core and an arcing hot trail
-      const fl = 0.8 + 0.4 * Math.sin(f[o + 9]! * 40 + i);
-      fx.additive.push(x, y, z, 2.8 * fl, 3.5, 2.6, 1.4, 1);
-      fx.additive.push(x, y, z, 9 * fl, 1.6, 1.0, 0.45, 0.55);
-      f[o + 10]! += dt;
-      while (f[o + 10]! > 0.012) {
-        f[o + 10]! -= 0.012;
-        fx.glow.emit(
-          x,
-          y,
-          z,
-          rr(-1, 1),
-          rr(0, 2),
-          rr(-1, 1),
-          0.55,
-          1.5,
-          0.2,
-          3,
-          2.4,
-          1.4,
-          0.9,
-          1,
-          4,
-          1.3,
-          0.3,
-          0.05,
-        );
-      }
-      f[o + 15]! += dt;
-      while (f[o + 15]! > 0.05) {
-        f[o + 15]! -= 0.05;
-        fx.puffs.emit(
-          x,
-          y,
-          z,
-          rr(-1, 1),
-          rr(-1, 1),
-          rr(-1, 1),
-          2.2,
-          1,
-          4,
-          0.95,
-          0.9,
-          0.85,
-          0.4,
-          0.8,
-          -0.4,
-          0.4,
-          0.38,
-          0.37,
-        );
-      }
-      i++;
-      continue;
-    }
-
     // missile / rocket / shell: perpendicular basis for spiral + wobble
     let ux = dz,
       uy = 0,
@@ -1547,7 +1483,8 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
             1,
             5,
           );
-      } else if (bf.skill === 'servo-overclock' && rnd() < dt * 25) {
+      } else if (bf.skill === 'shield-weave' && rnd() < dt * 30) {
+        // rising blue motes: the shield rebuilding
         v.set(
           (rnd() - 0.5) * FRAMES[s.frame].radius * 2,
           rnd() - 0.5,
@@ -1558,15 +1495,36 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
           s.pos[1] + v.y,
           s.pos[2] + v.z,
           0,
+          4,
           0,
-          0,
-          0.5,
+          0.6,
           0.8,
           0.1,
           0.4,
           2,
           3,
           0.8,
+        );
+      } else if (bf.skill === 'chaff-screen' && rnd() < dt * 20) {
+        // silver decoy glints shed off the tail
+        const hl = FRAMES[s.frame].halfLength;
+        v.set((rnd() - 0.5) * FRAMES[s.frame].radius, -0.5, hl * 1.2).applyQuaternion(q);
+        fx.glow.emit(
+          s.pos[0] + v.x,
+          s.pos[1] + v.y,
+          s.pos[2] + v.z,
+          rr(-4, 4),
+          rr(-4, 1),
+          rr(-4, 4),
+          1.2,
+          1.4,
+          0.3,
+          2.4,
+          2.5,
+          2.8,
+          1,
+          0.8,
+          3,
         );
       }
     }

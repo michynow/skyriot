@@ -15,7 +15,6 @@ export type SfxName =
   | 'bomb-whistle'
   | 'explosion'
   | 'boom'
-  | 'flare-pop'
   | 'hit-dealt'
   | 'hit-deflect'
   | 'hit-shield'
@@ -178,11 +177,6 @@ const RECIPES: Record<SfxName, (r: R) => number> = {
     burst(r, 'lowpass', 1800, 50, 0.8, 2, 1, 0, 0.7),
     tone(r, 'sine', 70, 22, 1.8, 1),
     2.1
-  ),
-  'flare-pop': (r) => (
-    burst(r, 'highpass', 6000, 2000, 0.8, 0.3, 0.4),
-    tone(r, 'triangle', 2000, 900, 0.2, 0.15),
-    0.35
   ),
   'hit-dealt': (r) => (tone(r, 'triangle', 1900, 1700, 0.05, 0.35), 0.08),
   'hit-deflect': (r) => (

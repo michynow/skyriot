@@ -38,11 +38,11 @@ _Avoid_: build (and "kit" for this; a kit is the Skill Kit)
 The two weapon slots fired by LMB / RMB.
 
 **Skill**:
-An active ability on the hotbar with a cooldown, specific to a Frame (Flares is a Skill).
+An active ability on the hotbar with a cooldown, specific to a Frame (Pivot Flip is a shared Skill).
 _Avoid_: ability, spell, power
 
 **Skill Kit**:
-Every Skill one Frame can use (Frame-specific plus shared ones like Flares). The Hotbar holds up to 10 of them.
+Every Skill one Frame can use (Frame-specific plus shared ones like Pivot Flip). The Hotbar holds 3 bars of 10.
 
 **Debuff**:
 A timed effect a Skill puts on enemy Ships (slow, weaken), shown and resolved like a buff on the victim.

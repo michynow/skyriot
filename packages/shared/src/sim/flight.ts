@@ -515,7 +515,7 @@ export function stepFlight(
     s.rollPhase = 0;
     s.rollDir = dir;
     s.rollTicks = Math.ceil(fd.rollInvulnSec * TICK_HZ);
-    s.rollCooldownTicks = Math.ceil(fd.rollCooldownSec * TICK_HZ);
+    s.rollCooldownTicks = Math.ceil(fd.rollCooldownSec * rec.mods.rollCooldownMul * TICK_HZ);
     s.fuel -= fd.rollFuelCost;
     ctx.events.push({ type: 'barrelRoll', id: s.id, dir });
   }
@@ -533,7 +533,7 @@ export function stepFlight(
         input.throttle >= 0
           ? input.throttle * fd.cruiseSpeed
           : input.throttle * fd.cruiseSpeed * GROUND_REVERSE_MUL;
-      target *= rec.mods.speedMul;
+      target *= rec.mods.speedMul * rec.mods.groundSpeedMul;
     }
     const delta = target - s.speed;
     const rate2 = (Math.abs(target) < Math.abs(s.speed) ? BRAKE_DECEL_MUL : 1) * accel;
@@ -729,7 +729,7 @@ export function stepFlight(
       let loss = 0;
       if (!god) {
         s.shield = 0;
-        loss = TERRAIN_IMPACT.bounceHpFrac * s.maxHp;
+        loss = TERRAIN_IMPACT.bounceHpFrac * s.maxHp * rec.mods.collisionDamageMul;
         if (allowDamage) loss = damageShip(ctx, rec, loss, null);
         else s.hp = Math.max(s.hp - loss, 1);
       }

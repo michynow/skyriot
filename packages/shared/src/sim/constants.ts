@@ -44,9 +44,6 @@ export const LAG_HISTORY_TICKS = 20; // > LAG_COMP_MAX_MS in ticks (18)
 
 // Skills
 export const REPAIR_KIT_FRACTION = 0.35;
-export const FLARE_COUNT = 2;
-export const FLARE_SPEED = 25;
-export const FLARE_RANGE = 120;
 /** Pivot Flip: the steering aim is turned 180 degrees and turn rate is raised to this for the duration. */
 export const FLIP_TURN_RATE = 6.5;
 /** Backdraft: fly backwards at this fraction of boost speed, then resume at min speed. */
@@ -55,13 +52,20 @@ export const REVERSE_SPEED_MUL = 0.7;
 export const CLOAK_REVEAL_M = 180;
 export const SNARE_RANGE = 450;
 export const SNARE_CONE_RAD = 0.35;
-export const CINDER_RADIUS = 45;
-export const CINDER_DPS = 80;
-export const CINDER_MAX = 8;
-export const SAP_RADIUS = 140;
-export const QUAKE_DISTANCE = 140;
-export const QUAKE_RADIUS = 60;
-export const QUAKE_DAMAGE = 150;
+export const QUAKE_DISTANCE = 180;
+export const QUAKE_RADIUS = 70;
+export const QUAKE_DAMAGE = 600;
+/** Core Breach blast radius (damage = the caster's HP). */
+export const BREACH_RADIUS = 150;
+/** Renewal / Recharge Pulse: radius, HP and shield restored (fractions of max). */
+export const HEAL_FIELD_RADIUS = 200;
+export const HEAL_FIELD_HP = 0.2;
+export const HEAL_FIELD_SHIELD = 0.3;
+/** Mend Beam / Lifeline reach, and Mend Beam heal (fraction of max HP). */
+export const HEAL_BEAM_RANGE = 400;
+export const HEAL_BEAM_HP = 0.3;
+export const DISPEL_RANGE = 600;
+export const SCAN_RADIUS = 600;
 export const DAMAGE_AURA_RADIUS = 55;
 
 // Steering smoothing
@@ -110,6 +114,8 @@ export const SIEGE_GUN_SPREAD_MUL = 0.35;
 /** Gun-locked rounds home this hard (rad/s, effectively a direct track) and may fly this much past range. */
 export const SIEGE_GUN_HOMING_TURN = 60;
 export const SIEGE_GUN_RANGE_SLACK = 1.5;
+/** Overcharge Round: the armed Primary shot flies this much farther. */
+export const CHARGED_SHOT_RANGE_MUL = 2;
 export const MORTAR_LOFT_RAD = 0.6;
 export const MORTAR_GUIDE_TURN = 0.9;
 

@@ -1,31 +1,30 @@
 import { SKILLS } from '../content/weapons';
-import { TICK_HZ, type NationId, type ShipId, type SkillId } from '../types';
+import { TICK_HZ, type NationId, type ShipId, type SkillDef, type SkillId } from '../types';
 import type { ShipRec, SimCtx } from './ctx';
 import {
   PURGE_RADIUS,
-  CINDER_DPS,
-  CINDER_MAX,
-  CINDER_RADIUS,
   DAMAGE_AURA_RADIUS,
-  FLARE_COUNT,
-  FLARE_RANGE,
-  FLARE_SPEED,
   QUAKE_DAMAGE,
   QUAKE_DISTANCE,
   QUAKE_RADIUS,
+  HEAL_FIELD_HP,
+  HEAL_FIELD_SHIELD,
+  HEAL_BEAM_HP,
   REPAIR_KIT_FRACTION,
-  SAP_RADIUS,
   SNARE_CONE_RAD,
   SNARE_RANGE,
+  BREACH_RADIUS,
+  HEAL_FIELD_RADIUS,
+  HEAL_BEAM_RANGE,
+  DISPEL_RANGE,
+  SCAN_RADIUS,
 } from './constants';
-import { applyBuff, tickBuffs } from './buffs';
+import { applyBuff, breakCloak, dropBuffs, isCloaked, isDebuff, tickBuffs } from './buffs';
 import { toggleSiege } from './flight';
-import { forwardOf, rightOf } from './math';
-import { spawnProjectile } from './combat';
+import { forwardOf } from './math';
 import { damageShip } from './damage';
 
 const _f = [0, 0, 0];
-const _r = [0, 0, 0];
 
 /** Skills that change movement and therefore must also run in client prediction. */
 const PREDICTED = new Set([
@@ -34,13 +33,27 @@ const PREDICTED = new Set([
   'air-siege',
   'pivot-flip',
   'backdraft',
+  'fuel-cell',
 ]);
+
+/** Buff effects that change flight (predicted like PREDICTED Skills). */
+function affectsFlight(e: SkillDef['buff']): boolean {
+  return (
+    !!e &&
+    (e.speedMul !== undefined ||
+      e.turnRateMul !== undefined ||
+      e.rollCooldownMul !== undefined ||
+      e.groundSpeedMul !== undefined)
+  );
+}
+
+/** Skills that only work while Grounded. */
+const GROUND_ONLY = new Set(['ground-shroud', 'track-drive']);
 
 export function tickTimers(rec: ShipRec): void {
   const s = rec.state;
   for (let i = 0; i < s.cooldowns.length; i++) if (s.cooldowns[i]! > 0) s.cooldowns[i]!--;
   tickBuffs(s);
-  if (rec.state.flareTicks > 0) rec.state.flareTicks--;
 }
 
 export function useHotbar(ctx: SimCtx, rec: ShipRec, slot: number, predictOnly: boolean): void {
@@ -66,14 +79,12 @@ export function castSkill(
   const def = SKILLS[id];
   if (!def || !s.alive) return false;
   if (def.frames !== 'all' && !def.frames.includes(s.frame)) return false;
-  const movesShip =
-    def.kind === 'buff' &&
-    (def.buff?.speedMul !== undefined || def.buff?.turnRateMul !== undefined);
+  const movesShip = def.kind === 'buff' && affectsFlight(def.buff);
   if (predictOnly && !PREDICTED.has(id) && !movesShip) return false;
+  if (GROUND_ONLY.has(id) && !s.grounded) return false;
   if (def.kind === 'toggle' && def.toggleGroup && s.toggles[def.toggleGroup] === id) return false;
   const ticks = Math.ceil(def.durationSec * TICK_HZ);
   forwardOf(s.rot, _f);
-  rightOf(s.rot, _r);
 
   let targets: ShipId[] | undefined;
   if (def.kind === 'buff' && def.buff) {
@@ -92,6 +103,7 @@ export function castSkill(
     } else {
       applyBuff(s, id, s.id, ticks);
     }
+    if (def.buff.absorbHits) rec.absorbLeft = def.buff.absorbHits;
   } else if (def.kind === 'toggle' && def.toggleGroup) {
     s.toggles[def.toggleGroup] = id;
     // Switching modes costs the cooldown on every slot of the group.
@@ -116,6 +128,8 @@ export function castSkill(
       targets = [];
       for (const a of allies) {
         if (a !== rec) targets.push(a.state.id);
+        for (let k = a.state.buffs.length - 1; k >= 0; k--)
+          if (isDebuff(a.state.buffs[k]!.skill)) a.state.buffs.splice(k, 1);
         for (const o of ctx.recList) {
           if (o.state.lockTarget === a.state.id) {
             o.state.lockTarget = null;
@@ -138,41 +152,6 @@ export function castSkill(
       }
       break;
     }
-    case 'flares':
-      rec.state.flareTicks = Math.max(ticks, 1);
-      s.lockTarget = null;
-      for (const o of ctx.recList) if (o.state.lockTarget === s.id) o.state.lockTarget = null;
-      // Guided missiles drop their target (reason 'flare') in stepProjectiles while flares are active.
-      for (let i = 0; i < FLARE_COUNT; i++) {
-        const side = i === 0 ? -1 : 1;
-        let dx = -_f[0]! + _r[0]! * side * 0.5,
-          dy = -_f[1]! - 0.2,
-          dz = -_f[2]! + _r[2]! * side * 0.5;
-        const dl = Math.hypot(dx, dy, dz);
-        dx /= dl;
-        dy /= dl;
-        dz /= dl;
-        spawnProjectile(
-          ctx,
-          rec,
-          'flare',
-          'flare',
-          0,
-          0,
-          FLARE_SPEED,
-          FLARE_RANGE,
-          0,
-          null,
-          s.pos[0],
-          s.pos[1],
-          s.pos[2],
-          dx,
-          dy,
-          dz,
-          0,
-        );
-      }
-      break;
     case 'afterburn-dash':
       rec.state.dashTicks = Math.max(ticks, 1);
       s.speed = Math.max(s.speed, fd.boostSpeed);
@@ -199,7 +178,9 @@ export function castSkill(
     case 'air-siege':
       if (!toggleSiege(rec, id === 'siege-anchor')) return false;
       break;
-    case 'snare-tag': {
+    case 'snare-tag':
+    case 'shield-breaker':
+    case 'blind-tag': {
       const foe = nearestEnemyInFront(ctx, rec, SNARE_RANGE, SNARE_CONE_RAD);
       if (foe) {
         applyBuff(foe.state, id, s.id, ticks);
@@ -207,43 +188,89 @@ export function castSkill(
       }
       break;
     }
-    case 'sapping-hex':
-      targets = debuffEnemiesNear(
-        ctx,
-        s.nation,
-        s.pos[0],
-        s.pos[1],
-        s.pos[2],
-        SAP_RADIUS,
-        id,
-        s.id,
-        ticks,
-      );
+    case 'dispel-lance': {
+      const foe = nearestEnemyInFront(ctx, rec, DISPEL_RANGE, SNARE_CONE_RAD);
+      if (foe) {
+        foe.state.buffs.length = 0;
+        targets = [foe.state.id];
+      }
       break;
+    }
+    case 'scan-pulse':
+      targets = [];
+      for (const o of ctx.recList) {
+        const os = o.state;
+        if (
+          !os.alive ||
+          os.nation === s.nation ||
+          !isCloaked(os) ||
+          dist(os.pos, s.pos) > SCAN_RADIUS
+        )
+          continue;
+        breakCloak(os);
+        targets.push(os.id);
+      }
+      break;
+    case 'renewal-pulse':
+    case 'recharge-pulse':
+      targets = [];
+      for (const o of ctx.recList) {
+        const os = o.state;
+        if (!os.alive || os.nation !== s.nation || dist(os.pos, s.pos) > HEAL_FIELD_RADIUS)
+          continue;
+        if (id === 'renewal-pulse') os.hp = Math.min(os.maxHp, os.hp + os.maxHp * HEAL_FIELD_HP);
+        else os.shield = Math.min(os.maxShield, os.shield + os.maxShield * HEAL_FIELD_SHIELD);
+        if (o !== rec) targets.push(os.id);
+      }
+      break;
+    case 'mend-beam':
+    case 'lifeline': {
+      const a = mostHurtAlly(ctx, rec, HEAL_BEAM_RANGE);
+      const as = a.state;
+      if (id === 'mend-beam') as.hp = Math.min(as.maxHp, as.hp + as.maxHp * HEAL_BEAM_HP);
+      else {
+        // HP and shield only: fuel moves the Ship, and this cast isn't predicted.
+        as.hp = as.maxHp;
+        as.shield = as.maxShield;
+      }
+      if (a !== rec) targets = [as.id];
+      break;
+    }
     case 'quake-round': {
       const x = s.pos[0] + _f[0]! * QUAKE_DISTANCE,
         y = s.pos[1] + _f[1]! * QUAKE_DISTANCE,
         z = s.pos[2] + _f[2]! * QUAKE_DISTANCE;
-      targets = debuffEnemiesNear(ctx, s.nation, x, y, z, QUAKE_RADIUS, id, s.id, ticks);
-      for (const t of targets) {
-        const o = ctx.ships.get(t)!;
-        damageShip(ctx, o, QUAKE_DAMAGE * rec.mods.damageMul * o.mods.damageTakenMul, s.id);
-      }
+      targets = hurtEnemiesNear(
+        ctx,
+        s.nation,
+        s.id,
+        x,
+        y,
+        z,
+        QUAKE_RADIUS,
+        QUAKE_DAMAGE * rec.mods.damageMul,
+      );
       break;
     }
-    case 'cinder-cloud':
-      if (ctx.zones.length >= CINDER_MAX) ctx.zones.shift();
-      ctx.zones.push({
-        x: s.pos[0],
-        y: s.pos[1],
-        z: s.pos[2],
-        radius: CINDER_RADIUS,
-        dps: CINDER_DPS * rec.mods.damageMul,
-        nation: s.nation,
-        owner: s.id,
-        expireTick: ctx.tick + ticks,
-      });
-      break;
+    case 'core-breach':
+      // Damage = current HP, then the Ship goes with it (no killer: a self-destruct).
+      targets = hurtEnemiesNear(
+        ctx,
+        s.nation,
+        s.id,
+        s.pos[0],
+        s.pos[1],
+        s.pos[2],
+        BREACH_RADIUS,
+        s.hp,
+      );
+      dropBuffs(s, (e) => e.invulnerable === true);
+      rec.mods.invulnerable = false;
+      if (slot >= 0) s.cooldowns[slot] = Math.ceil(def.cooldownSec * TICK_HZ);
+      ctx.events.push({ type: 'skillUsed', id: s.id as ShipId, skill: id, slot, targets });
+      // Big enough to get through any shield-damage buff.
+      damageShip(ctx, rec, s.maxHp + s.maxShield * 10, null);
+      return true;
   }
   if (slot >= 0) s.cooldowns[slot] = Math.ceil(def.cooldownSec * TICK_HZ);
   ctx.events.push(
@@ -255,7 +282,7 @@ export function castSkill(
 }
 
 /**
- * Server-only per-tick Skill effects: heal-over-time and damage-aura buffs, and Cinder Cloud zones.
+ * Server-only per-tick Skill effects: heal-over-time, shield rebuild and damage-aura buffs.
  * ponytail: O(ships^2) for damage auras; fine at 60 Ships, spatial grid if it shows in profiles.
  */
 export function stepSkillEffects(ctx: SimCtx): void {
@@ -265,6 +292,11 @@ export function stepSkillEffects(ctx: SimCtx): void {
     if (!s.alive || s.launchPhase !== 'none') continue;
     if (rec.mods.hpRegenPerSec > 0)
       s.hp = Math.min(s.maxHp, s.hp + s.maxHp * rec.mods.hpRegenPerSec * dt);
+    if (rec.mods.shieldRestorePerSec > 0)
+      s.shield = Math.min(
+        s.maxShield,
+        s.shield + s.maxShield * rec.mods.shieldRestorePerSec * rec.mods.shieldRegenMul * dt,
+      );
     if (rec.mods.damageAuraDps > 0)
       hurtEnemiesNear(
         ctx,
@@ -277,13 +309,11 @@ export function stepSkillEffects(ctx: SimCtx): void {
         rec.mods.damageAuraDps * rec.mods.damageMul * dt,
       );
   }
-  for (let i = ctx.zones.length - 1; i >= 0; i--) {
-    const z = ctx.zones[i]!;
-    if (z.expireTick <= ctx.tick) ctx.zones.splice(i, 1);
-    else hurtEnemiesNear(ctx, z.nation, z.owner, z.x, z.y, z.z, z.radius, z.dps * dt);
-  }
 }
 
+const dist = (a: number[], b: number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+
+/** Damage every live enemy of `nation` within `radius` of a point; returns their ids. */
 function hurtEnemiesNear(
   ctx: SimCtx,
   nation: NationId,
@@ -293,36 +323,39 @@ function hurtEnemiesNear(
   z: number,
   radius: number,
   amount: number,
-): void {
-  for (const o of ctx.recList) {
-    const os = o.state;
-    if (!os.alive || os.nation === nation || os.launchPhase !== 'none') continue;
-    if (Math.hypot(os.pos[0] - x, os.pos[1] - y, os.pos[2] - z) > radius) continue;
-    damageShip(ctx, o, amount * o.mods.damageTakenMul, owner);
-  }
-}
-
-/** Apply debuff `skill` to every live enemy of `nation` within `radius` of a point; returns their ids. */
-function debuffEnemiesNear(
-  ctx: SimCtx,
-  nation: NationId,
-  x: number,
-  y: number,
-  z: number,
-  radius: number,
-  skill: SkillId,
-  source: ShipId,
-  ticks: number,
 ): ShipId[] {
   const hit: ShipId[] = [];
   for (const o of ctx.recList) {
     const os = o.state;
     if (!os.alive || os.nation === nation || os.launchPhase !== 'none') continue;
     if (Math.hypot(os.pos[0] - x, os.pos[1] - y, os.pos[2] - z) > radius) continue;
-    applyBuff(os, skill, source, ticks);
+    damageShip(ctx, o, amount * o.mods.damageTakenMul, owner);
     hit.push(os.id);
   }
   return hit;
+}
+
+/** Ally (self included) within `range` with the lowest HP fraction; the caster if nobody is lower. */
+function mostHurtAlly(ctx: SimCtx, rec: ShipRec, range: number): ShipRec {
+  const s = rec.state;
+  let best = rec;
+  let bestF = s.hp / s.maxHp;
+  for (const o of ctx.recList) {
+    const os = o.state;
+    if (
+      !os.alive ||
+      os.nation !== s.nation ||
+      os.launchPhase !== 'none' ||
+      dist(os.pos, s.pos) > range
+    )
+      continue;
+    const f = os.hp / os.maxHp;
+    if (f < bestF) {
+      best = o;
+      bestF = f;
+    }
+  }
+  return best;
 }
 
 /** Nearest live enemy inside a cone off the nose. Needs `_f` = the caster's forward. */

@@ -131,7 +131,8 @@ export function IconDefs() {
   );
 }
 
-type Category = 'red' | 'blue' | 'green' | 'gold' | 'violet';
+/** red = attack, blue = defence, green = support, gold = movement. */
+type Category = 'red' | 'blue' | 'green' | 'gold';
 const star = (cx: number, cy: number, r1: number, r2: number, n: number) =>
   Array.from({ length: n * 2 }, (_, i) => {
     const a = (i * Math.PI) / n - Math.PI / 2;
@@ -150,9 +151,10 @@ const G: Record<Category, string> = {
   blue: 'url(#i-blue)',
   green: 'url(#i-green)',
   gold: 'url(#i-gold)',
-  violet: 'url(#i-violet)',
 };
 
+/** Heater shield outline, 48-unit tile. */
+const shieldPath = 'M24 4l16 6v12c0 11-7 18-16 22C15 40 8 33 8 22V10z';
 const shipPath = 'M0-13L4-3 14 5v4L4 6 3 13 0 11-3 13-4 6-14 9V5L-4-3z';
 const ship = (x: number, y: number, k: number, fill: string, o = 1): ReactElement => (
   <path
@@ -181,23 +183,6 @@ const rocket = (angle: number, fill: string): ReactElement => (
 );
 
 const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
-  flares: {
-    cat: 'gold',
-    art: (
-      <>
-        <path
-          d="M24 42L13 14M24 42L24 10M24 42L35 14"
-          stroke={G.gold}
-          strokeWidth="3"
-          strokeLinecap="round"
-        />
-        <polygon points={star(13, 12, 6, 2.5, 4)} fill={WHITE} />
-        <polygon points={star(24, 8, 7, 3, 4)} fill={WHITE} />
-        <polygon points={star(35, 12, 6, 2.5, 4)} fill={WHITE} />
-        <circle cx="24" cy="42" r="3" fill={WHITE} />
-      </>
-    ),
-  },
   'afterburn-dash': {
     cat: 'gold',
     art: (
@@ -268,14 +253,14 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
     ),
   },
   'pivot-flip': {
-    cat: 'blue',
+    cat: 'gold',
     art: (
       <>
         {/* U-turn arc with the arrowhead coming back the other way */}
         <path
           d="M14 40V20a10 10 0 0 1 20 0v10"
           fill="none"
-          stroke={G.blue}
+          stroke={G.gold}
           strokeWidth="6"
           strokeLinecap="round"
         />
@@ -285,7 +270,7 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
     ),
   },
   backdraft: {
-    cat: 'blue',
+    cat: 'gold',
     art: (
       <>
         {/* Ship pointing up, chevrons streaming backwards beneath it */}
@@ -293,7 +278,7 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
         <path
           d="M14 26l10 7 10-7M14 34l10 7 10-7"
           fill="none"
-          stroke={G.blue}
+          stroke={G.gold}
           strokeWidth="4"
           strokeLinejoin="round"
         />
@@ -311,30 +296,6 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
       </>
     ),
   },
-  overdrive: {
-    cat: 'violet',
-    art: (
-      <>
-        <path
-          d="M6 36A19 19 0 0 1 42 36"
-          fill="none"
-          stroke={G.violet}
-          strokeWidth="6"
-          strokeLinecap="round"
-        />
-        <path
-          d="M32 18A19 19 0 0 1 42 36"
-          fill="none"
-          stroke={WHITE}
-          strokeWidth="6"
-          strokeLinecap="round"
-        />
-        <path d="M24 38L36 16" stroke={WHITE} strokeWidth="3" strokeLinecap="round" />
-        <circle cx="24" cy="38" r="4" fill={WHITE} />
-        <circle cx="24" cy="38" r="1.6" fill={INK} />
-      </>
-    ),
-  },
   'air-barrage-mode': {
     cat: 'red',
     art: <>{[rocket(-28, G.red), rocket(0, G.red), rocket(28, G.red)]}</>,
@@ -349,12 +310,12 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
     ),
   },
   'rally-field': {
-    cat: 'violet',
+    cat: 'green',
     art: (
       <>
-        <ellipse cx="24" cy="40" rx="17" ry="4" fill="none" stroke={G.violet} strokeWidth="2.5" />
+        <ellipse cx="24" cy="40" rx="17" ry="4" fill="none" stroke={G.green} strokeWidth="2.5" />
         <path d="M14 42V6" stroke={WHITE} strokeWidth="3" strokeLinecap="round" />
-        <path d="M16 8h22l-6 8 6 8H16z" fill={G.violet} />
+        <path d="M16 8h22l-6 8 6 8H16z" fill={G.green} />
         <polygon points={star(26, 16, 4.5, 2, 5)} fill={WHITE} />
       </>
     ),
@@ -382,22 +343,21 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
       </>
     ),
   },
-  // ---- Frame kit additions ----
   'shroud-veil': {
-    cat: 'violet',
+    cat: 'blue',
     art: (
       <>
         <path
           transform="translate(24 25) scale(1.4)"
           d={shipPath}
           fill="none"
-          stroke={G.violet}
+          stroke={G.blue}
           strokeWidth="1.6"
           strokeDasharray="3 2.2"
           strokeLinejoin="round"
         />
-        <path d="M8 10c10 8 22 8 32 0v6c-10 8-22 8-32 0z" fill={G.violet} opacity=".8" />
-        <path d="M8 36c10-8 22-8 32 0v-5c-10-8-22-8-32 0z" fill={G.violet} opacity=".45" />
+        <path d="M8 10c10 8 22 8 32 0v6c-10 8-22 8-32 0z" fill={G.blue} opacity=".8" />
+        <path d="M8 36c10-8 22-8 32 0v-5c-10-8-22-8-32 0z" fill={G.blue} opacity=".45" />
         <path d="M6 42L42 6" stroke={WHITE} strokeWidth="3" strokeLinecap="round" />
       </>
     ),
@@ -410,25 +370,6 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
         <path d="M10 26l22 0 6 4-6 4-22 0z" fill={G.red} />
         <path d="M6 18h4M6 30h4" stroke={WHITE} strokeWidth="3" strokeLinecap="round" />
         <path d="M38 8l4 4m0-4l-4 4M38 36l4 4m0-4l-4 4" stroke={WHITE} strokeWidth="2" />
-      </>
-    ),
-  },
-  'hot-barrels': {
-    cat: 'red',
-    art: (
-      <>
-        <rect x="8" y="14" width="26" height="6" rx="2" fill={G.red} />
-        <rect x="8" y="28" width="26" height="6" rx="2" fill={G.red} />
-        <path d="M34 13h5v8h-5zM34 27h5v8h-5z" fill={WHITE} />
-        <path
-          d="M42 10q3 3 0 6t0 6M42 26q3 3 0 6t0 6"
-          fill="none"
-          stroke={WHITE}
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        <path d="M4 22h18v4H4z" fill={INK} />
-        <circle cx="14" cy="24" r="3" fill={WHITE} opacity=".8" />
       </>
     ),
   },
@@ -453,48 +394,6 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
       </>
     ),
   },
-  'cinder-cloud': {
-    cat: 'red',
-    art: (
-      <>
-        <path d="M8 34a7 7 0 0 1 3-13 9 9 0 0 1 16-5 8 8 0 0 1 12 6 6 6 0 0 1 1 12z" fill={G.red} />
-        <path d="M17 32c-3-5 2-7 1-12 5 3 7 7 5 12zM27 32c-2-4 2-6 2-9 3 3 4 6 2 9z" fill={WHITE} />
-        <path
-          d="M12 40l-2 4M20 40l-1 5M28 40l-1 5M36 40l-2 4"
-          stroke={G.gold}
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
-      </>
-    ),
-  },
-  'heavy-payload': {
-    cat: 'violet',
-    art: (
-      <>
-        {bomb(20, 22, 2, G.violet)}
-        <path
-          d="M38 40V14M32 20l6-7 6 7"
-          fill="none"
-          stroke={WHITE}
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </>
-    ),
-  },
-  'ram-surge': {
-    cat: 'gold',
-    art: (
-      <>
-        <path d="M4 12l10 12-10 12h6l10-12-10-12z" fill={G.gold} opacity=".55" />
-        <path d="M14 12l10 12-10 12h6l10-12-10-12z" fill={G.gold} opacity=".8" />
-        <path d="M26 8l18 16-18 16 4-16z" fill={G.gold} />
-        <path d="M26 8l18 16H30z" fill={WHITE} opacity=".6" />
-      </>
-    ),
-  },
   'renewal-pulse': {
     cat: 'green',
     art: (
@@ -514,7 +413,7 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
     ),
   },
   'ward-lattice': {
-    cat: 'blue',
+    cat: 'green',
     art: (
       <>
         {[
@@ -530,20 +429,10 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
             key={i}
             points={star(x!, y!, 7.5, 7.5, 3)}
             transform={`rotate(30 ${x} ${y})`}
-            fill={i === 3 ? WHITE : G.blue}
+            fill={i === 3 ? WHITE : G.green}
             opacity={i === 3 ? 0.95 : 0.75}
           />
         ))}
-      </>
-    ),
-  },
-  'sapping-hex': {
-    cat: 'green',
-    art: (
-      <>
-        <polygon points={star(24, 20, 15, 15, 3)} fill="none" stroke={G.green} strokeWidth="3" />
-        <path d="M24 10v16M17 20l7 7 7-7" fill="none" stroke={WHITE} strokeWidth="3" />
-        <path d="M14 36q2 5 0 8M24 37q2 4 0 7M34 36q2 5 0 8" stroke={G.green} strokeWidth="2.5" />
       </>
     ),
   },
@@ -561,49 +450,435 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
       </>
     ),
   },
-  'shrapnel-ring': {
+
+  // ---- Shared buffs ----
+  'gun-tune': {
     cat: 'red',
     art: (
       <>
-        {Array.from({ length: 8 }, (_, i) => (
-          <path
-            key={i}
-            transform={`rotate(${i * 45} 24 24)`}
-            d="M24 3l4 7-4 2-3-6z"
-            fill={i % 2 ? WHITE : G.red}
-          />
-        ))}
-        <circle cx="24" cy="24" r="12" fill="none" stroke={G.red} strokeWidth="2" opacity=".6" />
-        {ship(24, 25, 0.62, WHITE)}
+        <path d="M4 14h22l7 4-7 4H4z" fill={G.red} />
+        <path d="M4 28h22l7 4-7 4H4z" fill={G.red} />
+        <path d="M6 16h16M6 30h16" stroke={WHITE} strokeWidth="1.6" opacity=".7" />
+        <path
+          d="M40 42V10M33 17l7-8 7 8"
+          fill="none"
+          stroke={WHITE}
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </>
     ),
   },
-  'servo-overclock': {
-    cat: 'gold',
+  'warhead-tune': {
+    cat: 'red',
     art: (
       <>
-        <polygon points={star(22, 26, 17, 12, 8)} fill={G.gold} />
-        <circle cx="22" cy="26" r="7" fill={INK} />
-        <path d="M37 3l-8 12h5l-3 9 9-13h-5z" fill={WHITE} />
+        <g transform="rotate(-45 20 28)">
+          <path d="M8 24h18l8 4-8 4H8z" fill={G.red} />
+          <path d="M8 24l-4-5v18l4-5z" fill={G.red} opacity=".7" />
+          <path d="M26 24l8 4-8 4z" fill={WHITE} />
+        </g>
+        <polygon points={star(34, 14, 11, 4.5, 8)} fill={WHITE} />
+        <polygon points={star(34, 14, 6, 2.5, 8)} fill={G.red} />
       </>
     ),
   },
-  'bastion-field': {
+  'steady-hands': {
+    cat: 'red',
+    art: (
+      <>
+        <circle cx="24" cy="24" r="16" fill="none" stroke={G.red} strokeWidth="3" />
+        <path
+          d="M24 2v12M24 34v12M2 24h12M34 24h12"
+          stroke={G.red}
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        <circle cx="24" cy="24" r="6" fill="none" stroke={WHITE} strokeWidth="2" />
+        <circle cx="24" cy="24" r="2.4" fill={WHITE} />
+      </>
+    ),
+  },
+  'hardened-hull': {
     cat: 'blue',
     art: (
       <>
-        <path d="M4 40a20 20 0 0 1 40 0z" fill={G.blue} opacity=".35" />
-        <path d="M4 40a20 20 0 0 1 40 0" fill="none" stroke={G.blue} strokeWidth="3" />
-        <path d="M17 40V24h3v-4h3v4h2v-4h3v4h3v16z" fill={WHITE} />
-        <path d="M21 40v-6a3 3 0 0 1 6 0v6z" fill={INK} />
-        <path d="M2 42h44v3H2z" fill={G.blue} />
+        <path d={shieldPath} fill={G.blue} />
+        <path d="M11 17h26M10 25h28M12 33h24" stroke={INK} strokeWidth="2.5" />
+        {[
+          [16, 13],
+          [32, 13],
+          [16, 21],
+          [32, 21],
+          [16, 29],
+          [32, 29],
+        ].map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r="1.6" fill={WHITE} />
+        ))}
+        <path d="M24 5v38" stroke={WHITE} strokeWidth="1.5" opacity=".5" />
+      </>
+    ),
+  },
+  'jink-jets': {
+    cat: 'blue',
+    art: (
+      <>
+        {ship(14, 26, 0.8, G.blue, 0.45)}
+        {ship(34, 26, 0.8, G.blue, 0.45)}
+        {ship(24, 22, 1, WHITE)}
+        <path
+          d="M6 42q18-8 36 0"
+          fill="none"
+          stroke={G.blue}
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+      </>
+    ),
+  },
+  // ---- Wasp ----
+  overdrive: {
+    cat: 'red',
+    art: (
+      <>
+        <g transform="rotate(-90 24 24)">
+          <path d="M6 14h22l10 5-10 5H6z" fill={G.red} />
+          <path d="M6 26h22l10 5-10 5H6z" fill={G.red} />
+          <path d="M28 14l10 5-10 5zM28 26l10 5-10 5z" fill={WHITE} />
+        </g>
+        <path
+          d="M17 44c-3-5 0-6 2-10 2 4 4 6 1 10zM29 44c-3-5 0-6 2-10 2 4 4 6 1 10z"
+          fill={G.gold}
+        />
+        <path d="M36 8h8M40 4v8" stroke={WHITE} strokeWidth="3" strokeLinecap="round" />
+      </>
+    ),
+  },
+  'trim-tabs': {
+    cat: 'gold',
+    art: (
+      <>
+        <path
+          d="M8 36A18 18 0 0 1 36 12"
+          fill="none"
+          stroke={G.gold}
+          strokeWidth="6"
+          strokeLinecap="round"
+        />
+        <path d="M30 4l14 6-10 10z" fill={WHITE} />
+        {ship(30, 32, 0.7, WHITE)}
+      </>
+    ),
+  },
+  'roll-cascade': {
+    cat: 'gold',
+    art: (
+      <>
+        <path
+          d="M3 30c3-12 9-12 10 0s7 12 10 0 7-12 10 0"
+          fill="none"
+          stroke={G.gold}
+          strokeWidth="4"
+          strokeLinecap="round"
+        />
+        <path d="M33 30l4-4 2 6z" fill={G.gold} />
+        <g transform="translate(40 24) rotate(90)">{ship(0, 0, 0.55, WHITE)}</g>
+        <path
+          d="M8 12h8M20 8h8M32 12h8"
+          stroke={WHITE}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          opacity=".7"
+        />
+      </>
+    ),
+  },
+  'blind-tag': {
+    cat: 'red',
+    art: (
+      <>
+        <path d="M3 24c9-13 33-13 42 0-9 13-33 13-42 0z" fill={G.red} />
+        <circle cx="24" cy="24" r="7" fill={INK} />
+        <circle cx="26" cy="22" r="2.2" fill={WHITE} />
+        <path d="M8 40L40 8" stroke={WHITE} strokeWidth="3.5" strokeLinecap="round" />
+        <path d="M8 40L40 8" stroke={INK} strokeWidth="1.2" strokeLinecap="round" />
+      </>
+    ),
+  },
+  'shield-damper': {
+    cat: 'blue',
+    art: (
+      <>
+        <path d={shieldPath} fill={G.blue} />
+        <path
+          d="M14 18q5-5 10 0t10 0M14 26q5-5 10 0t10 0"
+          fill="none"
+          stroke={WHITE}
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        <path
+          d="M24 31v8M20 35l4 4 4-4"
+          fill="none"
+          stroke={INK}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      </>
+    ),
+  },
+  // ---- Anvil ----
+  'overcharge-round': {
+    cat: 'red',
+    art: (
+      <>
+        <path d="M16 44V18c0-8 4-13 8-15 4 2 8 7 8 15v26z" fill={G.red} />
+        <path d="M16 38h16v6H16z" fill={WHITE} opacity=".8" />
+        <path d="M27 9l-7 13h5l-4 12 9-15h-5l4-10z" fill={WHITE} />
+        <path
+          d="M6 14l4 3M42 14l-4 3M5 26h5M43 26h-5"
+          stroke={G.gold}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        />
+      </>
+    ),
+  },
+  'chaff-screen': {
+    cat: 'blue',
+    art: (
+      <>
+        {ship(32, 14, 0.75, WHITE)}
+        {[
+          [10, 38],
+          [20, 30],
+          [8, 26],
+          [22, 42],
+        ].map(([x, y], i) => (
+          <g key={i} transform={`translate(${x} ${y}) rotate(45)`}>
+            <rect x="-4" y="-4" width="8" height="8" fill={G.blue} />
+            <rect x="-1.5" y="-1.5" width="3" height="3" fill={WHITE} />
+          </g>
+        ))}
+        <path d="M28 22L14 34" stroke={G.blue} strokeWidth="1.6" strokeDasharray="2 2" />
+      </>
+    ),
+  },
+  'core-breach': {
+    cat: 'red',
+    art: (
+      <>
+        <polygon points={star(24, 24, 22, 9, 10)} fill={G.red} />
+        <circle cx="24" cy="24" r="10" fill={G.gold} />
+        <circle cx="24" cy="24" r="5" fill={WHITE} />
+        <circle
+          cx="24"
+          cy="24"
+          r="14"
+          fill="none"
+          stroke={WHITE}
+          strokeWidth="1.5"
+          strokeDasharray="3 3"
+        />
+      </>
+    ),
+  },
+  // ---- Halo ----
+  'veer-field': {
+    cat: 'green',
+    art: (
+      <>
+        <ellipse cx="24" cy="38" rx="18" ry="5" fill="none" stroke={G.green} strokeWidth="2.5" />
+        {ship(24, 22, 0.85, WHITE)}
+        <path
+          d="M4 8q10 2 12 10M44 8q-10 2-12 10"
+          fill="none"
+          stroke={G.green}
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+        <path d="M14 18l2 1 0-3zM34 18l-2 1 0-3z" fill={G.green} />
+        <path d="M2 18l8 2M46 18l-8 2" stroke={WHITE} strokeWidth="2" strokeLinecap="round" />
+      </>
+    ),
+  },
+  'recharge-pulse': {
+    cat: 'green',
+    art: (
+      <>
+        <circle cx="24" cy="24" r="20" fill="none" stroke={G.green} strokeWidth="2" opacity=".6" />
+        <path d={shieldPath} transform="translate(6 6) scale(.75)" fill={G.green} />
+        <path d="M27 11l-8 13h5l-3 11 9-14h-5l3-10z" fill={WHITE} />
+      </>
+    ),
+  },
+  'mend-beam': {
+    cat: 'green',
+    art: (
+      <>
+        <path d="M8 40L28 20" stroke={G.green} strokeWidth="5" strokeLinecap="round" />
+        <path d="M8 40L28 20" stroke={WHITE} strokeWidth="1.6" strokeLinecap="round" />
+        <circle cx="8" cy="40" r="4" fill={G.green} />
+        <path d="M30 6h8v8h8v8h-8v8h-8v-8h-8v-8h8z" fill={WHITE} />
+        <path d="M32 8h4v8h8v4h-8v8h-4v-8h-8v-4h8z" fill={G.green} />
+      </>
+    ),
+  },
+  lifeline: {
+    cat: 'green',
+    art: (
+      <>
+        <path
+          d="M24 43C8 31 4 23 4 15a10 10 0 0 1 20-3 10 10 0 0 1 20 3c0 8-4 16-20 28z"
+          fill={G.green}
+        />
+        <path
+          d="M6 24h9l3-7 5 14 4-9 3 2h12"
+          fill="none"
+          stroke={WHITE}
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </>
+    ),
+  },
+  sanctum: {
+    cat: 'blue',
+    art: (
+      <>
+        <circle cx="24" cy="26" r="18" fill={G.blue} opacity=".3" />
+        <circle cx="24" cy="26" r="18" fill="none" stroke={G.blue} strokeWidth="3" />
+        {ship(24, 28, 0.85, WHITE)}
+        <ellipse cx="24" cy="6" rx="9" ry="3" fill="none" stroke={WHITE} strokeWidth="2.5" />
+      </>
+    ),
+  },
+  'dispel-lance': {
+    cat: 'red',
+    art: (
+      <>
+        <path d="M14 6h7v8h8v7h-8" fill={G.red} />
+        <path d="M27 27h-8v-8M27 27v8h-7v8" fill="none" stroke={G.red} strokeWidth="3" />
+        <path d="M4 44L40 8" stroke={WHITE} strokeWidth="3.5" strokeLinecap="round" />
+        <path d="M44 4l-10 3 7 7z" fill={WHITE} />
+      </>
+    ),
+  },
+  'scan-pulse': {
+    cat: 'green',
+    art: (
+      <>
+        <circle cx="24" cy="24" r="19" fill="none" stroke={G.green} strokeWidth="2" opacity=".5" />
+        <circle cx="24" cy="24" r="12" fill="none" stroke={G.green} strokeWidth="2" opacity=".7" />
+        <path d="M24 24L24 5A19 19 0 0 1 41 16z" fill={G.green} opacity=".8" />
+        <circle cx="24" cy="24" r="2.5" fill={WHITE} />
+        <circle cx="33" cy="13" r="3" fill={WHITE} />
+        <path d="M33 13l-3 6" stroke={WHITE} strokeWidth="1.5" strokeDasharray="1.5 1.5" />
+      </>
+    ),
+  },
+  // ---- Bulwark ----
+  'blast-ward': {
+    cat: 'blue',
+    art: (
+      <>
+        <path d={shieldPath} fill={G.blue} />
+        <g transform="rotate(-40 24 24)">
+          <path d="M12 21h18l6 3-6 3H12z" fill={WHITE} />
+          <path d="M12 21l-3-3v12l3-3z" fill={WHITE} opacity=".7" />
+        </g>
+        <path d="M10 38L38 10" stroke={INK} strokeWidth="4" strokeLinecap="round" />
+      </>
+    ),
+  },
+  'shield-weave': {
+    cat: 'blue',
+    art: (
+      <>
+        <path d={shieldPath} fill="none" stroke={G.blue} strokeWidth="3" />
+        <path d="M9 24h30c-1 10-7 16-15 19C16 40 10 34 9 24z" fill={G.blue} />
+        <path
+          d="M17 22v-8M14 17l3-4 3 4M31 22v-8M28 17l3-4 3 4"
+          fill="none"
+          stroke={WHITE}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </>
+    ),
+  },
+  'crash-frame': {
+    cat: 'blue',
+    art: (
+      <>
+        <path d="M2 42h44v4H2z" fill={G.blue} />
+        <g transform="translate(26 22) rotate(150)">{ship(0, 0, 0.9, G.blue)}</g>
+        <polygon points={star(18, 40, 9, 3.5, 6)} fill={WHITE} />
+        <path
+          d="M6 32l-3-4M12 30l-1-5M30 32l3-4"
+          stroke={WHITE}
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </>
+    ),
+  },
+  'track-drive': {
+    cat: 'gold',
+    art: (
+      <>
+        <rect
+          x="12"
+          y="26"
+          width="32"
+          height="14"
+          rx="7"
+          fill="none"
+          stroke={G.gold}
+          strokeWidth="4"
+        />
+        {[19, 28, 37].map((x) => (
+          <circle key={x} cx={x} cy="33" r="3" fill={WHITE} />
+        ))}
+        <path d="M18 26l4-10h14l4 10z" fill={G.gold} />
+        <path d="M2 28h7M4 34h5M2 40h7" stroke={WHITE} strokeWidth="2.5" strokeLinecap="round" />
+      </>
+    ),
+  },
+  'shield-breaker': {
+    cat: 'red',
+    art: (
+      <>
+        <path d="M23 4L8 10v12c0 10 6 17 14 21l3-9-4-6 4-6-3-6z" fill={G.red} />
+        <path d="M27 4l13 6v12c0 10-6 17-14 21l3-9-4-6 4-6-3-6z" fill={G.red} opacity=".75" />
+        <path d="M24 3l3 6-4 6 4 6-4 6 4 6-3 9" fill="none" stroke={WHITE} strokeWidth="2" />
+      </>
+    ),
+  },
+  'ground-shroud': {
+    cat: 'blue',
+    art: (
+      <>
+        <path d="M2 44c8-14 14-18 22-18s14 4 22 18z" fill={G.blue} opacity=".7" />
+        <path
+          transform="translate(24 18) scale(1.1)"
+          d={shipPath}
+          fill="none"
+          stroke={WHITE}
+          strokeWidth="1.6"
+          strokeDasharray="3 2.2"
+          strokeLinejoin="round"
+        />
+        <path d="M8 6c8 6 24 6 32 0" fill="none" stroke={G.blue} strokeWidth="2.5" />
       </>
     ),
   },
 };
 
 const RIM: Record<Category, string> = {
-  violet: '#c28aff',
   red: '#ff6a3d',
   blue: '#5fe3ff',
   green: '#6fffa0',

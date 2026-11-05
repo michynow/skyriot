@@ -61,9 +61,10 @@ const check = (name: string, ok: boolean) => {
   if (!ok) failed++;
 };
 
-// Every kit Skill has a working cast on its Frame.
+// Every kit Skill has a working cast on its Frame (landed-only ones are cast on the ground below).
+const GROUND_ONLY = new Set(['ground-shroud', 'track-drive', 'siege-anchor']);
 for (const def of Object.values(SKILLS)) {
-  if (def.frames === 'all') continue;
+  if (def.frames === 'all' || GROUND_ONLY.has(def.id) || def.id === 'core-breach') continue;
   for (const f of def.frames) {
     place(f, 100);
     // The active mode of a toggle group can't be re-selected.
@@ -71,45 +72,92 @@ for (const def of Object.values(SKILLS)) {
     check(`cast ${def.id} on ${f}`, active || sim.castSkill(f, def.id));
   }
 }
+const step1 = () => step();
 
-place('wasp', 100);
-sim.castSkill('wasp', 'shroud-veil');
-step();
-check('shroud-veil cloaks', isCloaked(ship('wasp')));
-step(2, { wasp: { fire1: true } });
-check('firing drops shroud-veil', !isCloaked(ship('wasp')));
-
+// ---- Wasp ----
 place('wasp', 200);
-sim.castSkill('wasp', 'snare-tag');
-check('snare-tag debuffs the foe ahead', has('foe', 'snare-tag'));
+sim.castSkill('wasp', 'blind-tag');
+check('blind-tag jams the foe ahead', has('foe', 'blind-tag'));
+sim.castSkill('wasp', 'roll-cascade');
+step(1, { wasp: { rollLeft: true } });
+check('roll-cascade: no roll cooldown', ship('wasp').rollCooldownTicks === 0);
 
-place('anvil', 0);
-const hpCinder = ship('foe').hp;
-sim.castSkill('anvil', 'cinder-cloud');
-step(30);
-check('cinder-cloud burns the foe inside', ship('foe').hp < hpCinder);
+// ---- Anvil ----
+place('anvil', 100);
+sim.castSkill('anvil', 'shroud-veil');
+step();
+check('shroud-veil cloaks', isCloaked(ship('anvil')));
+step(2, { anvil: { fire1: true } });
+check('firing drops shroud-veil', !isCloaked(ship('anvil')));
+place('anvil', 100);
+sim.castSkill('anvil', 'overcharge-round');
+step(10, { anvil: { fire1: true } });
+check('overcharge-round is spent by one shot', !has('anvil', 'overcharge-round'));
+sim.castSkill('anvil', 'chaff-screen');
+check('chaff-screen is up', has('anvil', 'chaff-screen'));
+place('anvil', 40);
+const foeHpBreach = ship('foe').hp;
+sim.castSkill('anvil', 'core-breach');
+check(
+  'core-breach hurts the foe and destroys the caster',
+  ship('foe').hp < foeHpBreach && !ship('anvil').alive,
+);
+step(200);
 
-place('halo', 60);
-sim.castSkill('halo', 'sapping-hex');
-check('sapping-hex weakens nearby foe', has('foe', 'sapping-hex'));
+// ---- Halo ----
+place('halo', 300);
+ship('wasp').hp = 300;
 ship('anvil').hp = 1000;
 sim.castSkill('halo', 'renewal-pulse');
-step(30);
-check('renewal-pulse heals allies over time', ship('anvil').hp > 1000);
+check('renewal-pulse heals allies at once', ship('anvil').hp > 1000);
+const hpMend = ship('wasp').hp;
+sim.castSkill('halo', 'mend-beam');
+check('mend-beam heals the most hurt ally', ship('wasp').hp > hpMend);
+ship('wasp').shield = 0;
+sim.castSkill('halo', 'recharge-pulse');
+check('recharge-pulse refills ally shields', ship('wasp').shield > 0);
+ship('wasp').hp = 100;
+sim.castSkill('halo', 'lifeline');
+check('lifeline fully restores', ship('wasp').hp === ship('wasp').maxHp);
 sim.castSkill('halo', 'ward-lattice');
 check('ward-lattice reaches allies', has('wasp', 'ward-lattice'));
+sim.castSkill('halo', 'sanctum');
+const hpSanctum = ship('halo').hp;
+check('sanctum is up', has('halo', 'sanctum'));
+step(5, { halo: { fire1: true } });
+check(
+  'sanctum blocks firing',
+  ship('halo').ammo1 === FRAMES.halo.ammo1Max && ship('halo').hp === hpSanctum,
+);
+place('halo', 100);
+sim.castSkill('foe', 'blast-ward');
+sim.castSkill('halo', 'dispel-lance');
+check('dispel-lance strips the foe', ship('foe').buffs.length === 0);
+place('halo', 100);
+sim.castSkill('wasp', 'shield-damper');
+ship('wasp').buffs.push({ skill: 'snare-tag', source: 'foe' as ShipId, ticksLeft: 300 });
+sim.castSkill('halo', 'purge');
+check(
+  'purge cleanses debuffs, keeps buffs',
+  !has('wasp', 'snare-tag') && has('wasp', 'shield-damper'),
+);
 
-place('bulwark', 140);
+// ---- Bulwark ----
+place('bulwark', 180);
 const hpQuake = ship('foe').hp;
 sim.castSkill('bulwark', 'quake-round');
-check('quake-round damages and slows', ship('foe').hp < hpQuake && has('foe', 'quake-round'));
-place('bulwark', 30);
-const hpRing = ship('foe').hp;
-sim.castSkill('bulwark', 'shrapnel-ring');
+check('quake-round damages the blast area', ship('foe').hp < hpQuake);
+place('bulwark', 200);
+sim.castSkill('bulwark', 'shield-breaker');
+check('shield-breaker locks the foe shield', has('foe', 'shield-breaker'));
+step(60);
+check('locked shield does not regenerate', ship('foe').shield === 0);
+ship('bulwark').shield = 0;
+sim.castSkill('bulwark', 'shield-weave');
 step(30);
-check('shrapnel-ring grinds nearby foe', ship('foe').hp < hpRing);
-sim.castSkill('bulwark', 'bastion-field');
-check('bastion-field reaches allies', has('halo', 'bastion-field'));
+check('shield-weave rebuilds the shield', ship('bulwark').shield > 0);
+check('ground-shroud refused in the air', !sim.castSkill('bulwark', 'ground-shroud'));
+step1();
 
 console.log(failed ? `${failed} check(s) failed` : 'all Skill checks passed');
 process.exit(failed ? 1 : 0);

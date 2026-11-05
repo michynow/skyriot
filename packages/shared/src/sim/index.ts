@@ -87,12 +87,14 @@ export { createSim } from './createSim';
 export { isCloaked } from './buffs';
 // Skill area sizes the client draws.
 export {
-  CINDER_RADIUS,
+  BREACH_RADIUS,
   CLOAK_REVEAL_M,
   DAMAGE_AURA_RADIUS,
   QUAKE_DISTANCE,
   QUAKE_RADIUS,
-  SAP_RADIUS,
+  HEAL_FIELD_RADIUS,
+  SCAN_RADIUS,
+  SNARE_RANGE,
 } from './constants';
 // Projectile tuning the client needs to draw where Secondary / bombing Skills will land.
 export {

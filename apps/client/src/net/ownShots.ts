@@ -31,7 +31,11 @@ export function predictOwnShot(s: ShipState, input: PilotInput): Spawn | null {
   const w = WEAPONS[fd.primary];
   if (!w || w.kind !== 'tracer') return null;
   let rateMul = 1;
-  for (const b of s.buffs) rateMul *= SKILLS[b.skill]?.buff?.fireRateMul ?? 1;
+  for (const b of s.buffs) {
+    const e = SKILLS[b.skill]?.buff;
+    if (e?.noAttack) return null;
+    rateMul *= e?.fireRateMul ?? 1;
+  }
   fireCd += w.fireIntervalSec / rateMul;
   const [x, y, z, qw] = s.rot;
   const dir: [number, number, number] = [

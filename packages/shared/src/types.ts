@@ -123,7 +123,6 @@ export interface ShipState {
   /** Brake was held last tick (Siege Mode toggles on the rising edge). */
   brakeHeld: boolean;
   dashTicks: number;
-  flareTicks: number;
   /** Ticks spent docked (resupply fires at DECK.resupplySec). */
   dockTicks: number;
   /** Siege skill used while airborne and fast: auto-brake until slow, then enter airborne Siege. */
@@ -138,7 +137,7 @@ export interface ShipState {
   /** Distance (m) / time to impact (s) of the nearest guided missile homing on this Ship; -1 = none. */
   incomingDist: number;
   incomingTti: number;
-  /** Secondary can currently lock the selected Target (cone from the nose, range, no flares). */
+  /** Secondary can currently lock the selected Target (cone from the nose, range). */
   canLock: boolean;
   /** Lock progress 0..1 toward `lockTarget`. */
   lockProgress: number;
@@ -200,7 +199,7 @@ export interface MatchState {
   queues: Record<NationId, ShipId[]>;
 }
 
-export type ProjectileKind = 'tracer' | 'missile' | 'rocket' | 'shell' | 'flare';
+export type ProjectileKind = 'tracer' | 'missile' | 'rocket' | 'shell';
 
 export type SimEvent =
   | {
@@ -241,7 +240,7 @@ export type SimEvent =
       type: 'missileEvaded';
       id: number;
       victim: ShipId;
-      reason: 'roll' | 'terrain' | 'flare' | 'purge' | 'lost';
+      reason: 'roll' | 'terrain' | 'purge' | 'lost';
     }
   | { type: 'teleport'; id: ShipId; pos: Vec3 }
   | { type: 'docked'; id: ShipId }
@@ -282,7 +281,7 @@ export interface MissileSnapshot {
   id: number;
   pos: Vec3;
   vel: Vec3;
-  /** Still homing on a target (false after roll/terrain/flare/purge broke guidance). */
+  /** Still homing on a target (false after roll/terrain/purge broke guidance). */
   guided: boolean;
 }
 
@@ -471,6 +470,37 @@ export interface BuffEffect {
   damageAuraDps?: number;
   /** Extra missiles per Secondary salvo. */
   salvoAdd?: number;
+  /** Primary / Secondary damage only (on top of damageMul). */
+  primaryDamageMul?: number;
+  secondaryDamageMul?: number;
+  /** Secondary refire rate (fireRateMul is Primary only). */
+  secondaryFireRateMul?: number;
+  /** Primary spread (accuracy). */
+  spreadMul?: number;
+  /** Secondary lock cone. */
+  lockConeMul?: number;
+  /** Damage that lands on the shield (the part the shield absorbs). */
+  shieldDamageTakenMul?: number;
+  /** Damage from Secondary weapons (missiles, rockets, bombs, shells); 0 = immune. */
+  secondaryDamageTakenMul?: number;
+  /** Terrain impact HP loss. */
+  collisionDamageMul?: number;
+  /** Takes no damage at all. */
+  invulnerable?: boolean;
+  /** Can't fire either weapon. */
+  noAttack?: boolean;
+  /** Barrel Roll cooldown; 0 = rolls back to back. */
+  rollCooldownMul?: number;
+  /** Speed while Grounded (driving on terrain). */
+  groundSpeedMul?: number;
+  /** Shield restored per second, as a fraction of max shield. */
+  shieldRestorePerSec?: number;
+  /** Debuff: no incoming-missile warning, and Barrel Rolls don't break missile guidance. */
+  missileBlind?: boolean;
+  /** Armed shot: the next Primary round deals this many times damage, flies twice as far, no spread; then the buff ends. */
+  primaryShotMul?: number;
+  /** Decoys: the next N projectile hits are absorbed whole; the buff ends when they're used up. */
+  absorbHits?: number;
 }
 
 export interface ActiveBuff {
