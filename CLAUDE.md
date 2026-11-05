@@ -14,5 +14,4 @@ Hard rules:
 
 - `packages/shared/src/types.ts` and `content/**` are shared contracts — don't change shape without the orchestrator.
 - No unit/integration tests. Verify by running the game.
-- Original IP only (ADR 0005). Never copy names/assets/text from existing games.
 - Agents testing the game must be silent: run the client with `VITE_MUTE=1` (the `client` entry in `.claude/launch.json` does) or open it with `?mute` in the URL. Never let an agent's game tab play sound.
