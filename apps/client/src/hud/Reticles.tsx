@@ -16,6 +16,7 @@ import { inputState } from '../input/input';
 import { isFlying, isGrounded, ownShip, targetView } from './hudStore';
 import { project } from './view';
 import { Ammo } from './Ammo';
+import { TargetWindow } from './TargetWindow';
 
 const MARKERS = 40;
 /** Text labels (name + distance) at once; everything else is a bare marker. */
@@ -90,7 +91,10 @@ export function Reticles() {
   const targetEl = useRef<HTMLDivElement>(null);
   const targetLabel = useRef<HTMLSpanElement>(null);
   const targetState = useRef<HTMLSpanElement>(null);
-  const tbRing = useRef<SVGCircleElement>(null);
+  const candEl = useRef<HTMLDivElement>(null);
+  const edgeEl = useRef<HTMLDivElement>(null);
+  const edgeArrow = useRef<HTMLElement>(null);
+  const edgeText = useRef<HTMLSpanElement>(null);
   const leadLink = useRef<HTMLDivElement>(null);
   const turnEl = useRef<HTMLDivElement>(null);
   const gunnerEl = useRef<HTMLDivElement>(null);
@@ -101,9 +105,6 @@ export function Reticles() {
 
   useEffect(() => {
     let raf = 0;
-    let last = performance.now();
-    let lockProgress = 0;
-    let lockFor: string | null = null;
     let gunLockWas: string | null = null;
     let gunLostUntil = 0;
     const labelCache: string[] = [];
@@ -112,8 +113,6 @@ export function Reticles() {
 
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
-      const dt = Math.min(0.1, (now - last) / 1000);
-      last = now;
       const W = window.innerWidth;
       const H = window.innerHeight;
       const own = ownShip();
@@ -131,6 +130,8 @@ export function Reticles() {
         place(leadEl.current, 0, 0, false);
         place(leadLink.current, 0, 0, false);
         place(targetEl.current, 0, 0, false);
+        place(candEl.current, 0, 0, false);
+        place(edgeEl.current, 0, 0, false);
         place(gunnerEl.current, 0, 0, false);
         markerEls.current.forEach((m) => place(m, 0, 0, false));
         return;
@@ -161,12 +162,8 @@ export function Reticles() {
       }
       others.sort((a, b) => a.d - b.d);
 
-      // Target (single, Tab-selected).
-      let target = targetView(inputState.targetId);
-      if (target && (!target.alive || target.nation === own.nation)) {
-        inputState.targetId = null;
-        target = undefined;
-      }
+      // Target (single; picked by hover/Shift in input.ts).
+      const target = targetView(inputState.targetId);
       const rel = target
         ? [target.pos[0] - own.pos[0], target.pos[1] - own.pos[1], target.pos[2] - own.pos[2]]
         : null;
@@ -212,7 +209,8 @@ export function Reticles() {
         const cos = (rel[0]! * aim[0] + rel[1]! * aim[1] + rel[2]! * aim[2]) / (targetD || 1);
         assist = Math.acos(Math.min(1, Math.max(-1, cos))) < AIM_ASSIST.coneRad;
       }
-      const locked = lockProgress >= 1 || (!!target && own.lockTarget === target.id);
+      // ADV lock is server-validated: instant, no acquire time.
+      const locked = !!target && own.lockTarget === target.id;
 
       const cur = cursorEl.current;
       place(cur, cx, cy, !sieged);
@@ -285,6 +283,12 @@ export function Reticles() {
         }
       }
 
+      // Candidate bracket: a valid enemy under the crosshair/cursor that is not the Target.
+      const cand = targetView(inputState.candidateId);
+      place(candEl.current, 0, 0, false);
+      if (cand && project(cand.pos[0], cand.pos[1], cand.pos[2], p))
+        place(candEl.current, p.x, p.y, true);
+
       // Range ladder + gunner info for first-person Siege.
       const gun = gunnerEl.current;
       place(gun, cx, cy, sieged);
@@ -294,6 +298,8 @@ export function Reticles() {
         if (sieged && world.ships.get(gunLockWas)?.alive) gunLostUntil = now + 1500;
         gunLockWas = null;
       }
+      if (ringEl.current)
+        ringEl.current.style.strokeDashoffset = own.siegeLock ? '0' : String(RING_LEN);
       setText(gunTag.current, own.siegeLock ? 'GUN LOCK' : now < gunLostUntil ? 'LOCK LOST' : '');
       gunTag.current?.classList.toggle('lost', !own.siegeLock);
       if (sieged) {
@@ -320,8 +326,7 @@ export function Reticles() {
         place(leadEl.current, 0, 0, false);
         place(leadLink.current, 0, 0, false);
         place(targetEl.current, 0, 0, false);
-        lockProgress = 0;
-        if (ringEl.current) ringEl.current.style.strokeDashoffset = String(RING_LEN);
+        place(edgeEl.current, 0, 0, false);
         return;
       }
       const t = primary ? leadTime(rel, target.vel, primary.speed) : 0;
@@ -337,61 +342,66 @@ export function Reticles() {
       place(leadEl.current, leadX, leadY, showLead);
       leadEl.current?.classList.toggle('assist', assist);
       const onTarget = project(target.pos[0], target.pos[1], target.pos[2], p);
-      place(targetEl.current, p.x, p.y, onTarget);
+      const onScreen = onTarget && p.x > 0 && p.x < W && p.y > 0 && p.y < H;
+      place(targetEl.current, p.x, p.y, onScreen);
       // Dashed tether from the Target to its lead pip so the two read as one.
       const link = leadLink.current;
       if (link) {
         const len = Math.hypot(leadX - p.x, leadY - p.y);
-        link.style.display = showLead && onTarget && len > 24 ? 'block' : 'none';
+        link.style.display = showLead && onScreen && len > 24 ? 'block' : 'none';
         link.style.width = `${len}px`;
         link.style.transform = `translate(${p.x}px,${p.y}px) rotate(${(Math.atan2(leadY - p.y, leadX - p.x) * 180) / Math.PI}deg)`;
       }
-      setText(targetLabel.current, `${target.name} · ${Math.round(targetD)}m`);
-
-      // Lock progress is a client estimate: time with the Target inside the secondary's range and cone.
-      if (lockFor !== target.id) {
-        lockFor = target.id;
-        lockProgress = 0;
-      }
-      if (secondary && secondary.lockTimeSec > 0) {
-        lockProgress = Math.min(
-          1,
-          Math.max(0, lockProgress + (lockRange ? dt : -dt * 2) / secondary.lockTimeSec),
-        );
-        if (own.lockTarget === target.id) lockProgress = Math.max(lockProgress, own.lockProgress);
-        if (own.lockTarget === target.id && own.lockProgress >= 1) lockProgress = 1;
-      } else lockProgress = 0;
-      if (ringEl.current)
-        ringEl.current.style.strokeDashoffset = String(RING_LEN * (1 - lockProgress));
-      const isLocked = lockProgress >= 1;
+      const far = targetD > Math.max(primRange, secRange);
+      const label = `${target.name} · ${Math.round(targetD)}m`;
+      setText(targetLabel.current, label);
       const tgt = targetEl.current;
       if (tgt) {
-        tgt.dataset.locked = isLocked ? '1' : '0';
+        tgt.dataset.locked = locked ? '1' : '0';
         tgt.dataset.assist = assist ? '1' : '0';
-        // Side pips slide in while the lock builds: the homing-missile "you can fire" cue.
-        tgt.dataset.canlock = lockRange || isLocked ? '1' : '0';
-        tgt.style.setProperty('--tri', `${(1 - lockProgress) * 18}px`);
-        // Brackets close in on the Target as the lock builds.
-        tgt.style.setProperty('--k', String(1.5 - 0.5 * lockProgress));
+        tgt.dataset.far = far ? '1' : '0';
+        tgt.dataset.canlock = lockRange || locked ? '1' : '0';
+        // Brackets snap tight round the Target when the ADV lock holds.
+        tgt.style.setProperty('--k', locked ? '1' : '1.5');
       }
-      if (tbRing.current)
-        tbRing.current.style.strokeDashoffset = String(RING_LEN * (1 - lockProgress));
       setText(
         targetState.current,
-        isLocked
+        locked
           ? 'LOCKED · FIRE RMB'
-          : lockRange
-            ? `LOCKING ${Math.round(lockProgress * 100)}%`
+          : far
+            ? `${Math.round(targetD)} m`
             : secInRange
               ? 'TURN TO LOCK'
-              : secondary && secondary.lockTimeSec > 0
-                ? 'OUT OF RANGE'
-                : '',
+              : '',
       );
+      // Off screen: arrow on the screen edge toward the Target, with name and distance.
+      const edge = edgeEl.current;
+      if (edge) {
+        edge.style.display = onScreen ? 'none' : 'block';
+        if (!onScreen) {
+          // Behind the camera the projection mirrors; flip it so the arrow points the way to turn.
+          let dx = p.x - cx;
+          let dy = p.y - cy;
+          if (!onTarget) {
+            dx = -dx;
+            dy = -dy;
+          }
+          const k = Math.min(
+            (cx - 60) / (Math.abs(dx) || 1e-6),
+            (cy - 60) / (Math.abs(dy) || 1e-6),
+          );
+          edge.style.transform = `translate(${cx + dx * k}px,${cy + dy * k}px)`;
+          edge.dataset.far = far ? '1' : '0';
+          edge.dataset.locked = locked ? '1' : '0';
+          if (edgeArrow.current)
+            edgeArrow.current.style.transform = `rotate(${(Math.atan2(dy, dx) * 180) / Math.PI + 90}deg)`;
+          setText(edgeText.current, label);
+        }
+      }
       // "turn to lock": in range but outside the nose cone -> chevron pointing from the nose toward the Target.
       const tl = turnEl.current;
       if (tl) {
-        const show = secInRange && !lockRange && onTarget;
+        const show = secInRange && !lockRange && onScreen;
         tl.style.display = show ? 'block' : 'none';
         if (show)
           tl.style.transform = `translate(${cx}px,${cy}px) rotate(${(Math.atan2(p.y - cy, p.x - cx) * 180) / Math.PI + 90}deg)`;
@@ -421,20 +431,22 @@ export function Reticles() {
             className="tgt-br"
             d="M-7 -23L0 -30 7 -23M23 -7L30 0 23 7M7 23L0 30 -7 23M-23 7L-30 0 -23 -7"
           />
-          <circle
-            className="tgt-ring"
-            ref={tbRing}
-            r="34"
-            strokeDasharray={RING_LEN}
-            strokeDashoffset={RING_LEN}
-            transform="rotate(-90)"
-          />
           <path className="tgt-diamond" d="M0 -9L9 0 0 9 -9 0z" />
           <path className="tgt-tri l" d="M-58 -9L-42 0 -58 9z" />
           <path className="tgt-tri r" d="M58 -9L42 0 58 9z" />
         </svg>
         <span className="tgt-name" ref={targetLabel} />
         <span className="tgt-state" ref={targetState} />
+      </div>
+      <TargetWindow />
+      <div className="cand" ref={candEl} style={{ display: 'none' }}>
+        <svg viewBox="-30 -30 60 60">
+          <path d="M-18 -10V-18H-10M10 -18H18V-10M18 10V18H10M-10 18H-18V10" />
+        </svg>
+      </div>
+      <div className="tgt-edge" ref={edgeEl} style={{ display: 'none' }}>
+        <i ref={edgeArrow} />
+        <span ref={edgeText} />
       </div>
       <div className="lead-link" ref={leadLink} style={{ display: 'none' }} />
       <div className="lead" ref={leadEl} style={{ display: 'none' }} />

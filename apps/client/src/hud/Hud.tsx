@@ -601,10 +601,10 @@ function FlightTips() {
         <kbd>W</kbd> hold for speed · <kbd>SPACE</kbd> boost · <kbd>S</kbd> slow to a hover
       </p>
       <p>
-        <kbd>SHIFT</kbd> lock Target · <kbd>TAB</kbd> next hotbar set · <kbd>C</kbd> land
+        <kbd>SHIFT</kbd> switch Target · <kbd>TAB</kbd> next hotbar set · <kbd>C</kbd> land
       </p>
       <p>
-        <kbd>LMB</kbd> guns · <kbd>RMB</kbd> missile (locks the enemy in the crosshair)
+        <kbd>LMB</kbd> guns · <kbd>RMB</kbd> missile (needs a lock on the Target)
       </p>
       <p>
         <kbd>A</kbd>

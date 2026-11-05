@@ -97,6 +97,10 @@ export interface HudState {
   grounded: boolean;
   outOfBounds: boolean;
   locked: boolean;
+  /** Primary heat 0..1, overheated, seconds until the Secondary can fire again. */
+  heat: number;
+  overheated: boolean;
+  advReadyIn: number;
   respawnIn: number;
   rollCd: number;
   ammo1: number;
@@ -189,6 +193,9 @@ export const useHud = create<HudState>(() => ({
   grounded: false,
   outOfBounds: false,
   locked: false,
+  heat: 0,
+  overheated: false,
+  advReadyIn: 0,
   respawnIn: 0,
   rollCd: 0,
   ammo1: 0,
@@ -586,6 +593,9 @@ export function startHudFeed(): () => void {
         grounded,
         outOfBounds: own.outOfBounds,
         locked,
+        heat: Math.round(own.heat * 50) / 50,
+        overheated: own.overheated,
+        advReadyIn: Math.ceil(own.advReadyIn * 10) / 10,
         respawnIn: own.alive
           ? 0
           : Math.min(RESPAWN_SEC, Math.max(0, (own.respawnAtTick - tick) / TICK_HZ)),

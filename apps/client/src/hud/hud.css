@@ -2398,3 +2398,141 @@
   letter-spacing: 0.2em;
   color: #9ff0da;
 }
+
+/* Targeting: candidate bracket, off-screen Target arrow, far (greyed) state, Target window, weapon panel. */
+.cand {
+  width: 0;
+  height: 0;
+}
+.cand svg {
+  position: absolute;
+  left: -30px;
+  top: -30px;
+  width: 60px;
+  height: 60px;
+  fill: none;
+  stroke: #ff4d4d;
+  stroke-width: 1;
+  opacity: 0.8;
+  filter: drop-shadow(0 0 2px #000);
+}
+.tgt[data-far='1'] {
+  --tc: #8b98a4;
+}
+.tgt[data-far='1'] .tgt-dm,
+.tgt[data-far='1'] .tgt-br {
+  stroke: #8b98a4;
+}
+.tgt-edge {
+  width: 0;
+  height: 0;
+  --tc: #ffd24a;
+}
+.tgt-edge[data-far='1'] {
+  --tc: #8b98a4;
+}
+.tgt-edge[data-locked='1'] {
+  --tc: #ffe14a;
+}
+.tgt-edge i {
+  position: absolute;
+  left: -9px;
+  top: -9px;
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 16px solid var(--tc);
+  filter: drop-shadow(0 0 3px #000);
+}
+.tgt-edge span {
+  position: absolute;
+  top: 14px;
+  left: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font:
+    700 12px 'Rajdhani',
+    sans-serif;
+  color: var(--tc);
+  text-shadow: 0 0 4px #000;
+}
+.twin {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+  padding: 6px 10px 8px;
+  background: #0a141cb0;
+  border: 1px solid #ffd24a66;
+  font-family: 'Rajdhani', sans-serif;
+  color: #e8f4ff;
+  text-shadow: 0 1px 2px #000;
+}
+.twin-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.twin-top b {
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.twin-top small {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  opacity: 0.7;
+}
+.twin-top span {
+  font:
+    700 12px 'Orbitron',
+    sans-serif;
+  color: #ffd24a;
+}
+.twin-bar {
+  height: 5px;
+  margin-top: 4px;
+  background: #ffffff22;
+}
+.twin-bar i {
+  display: block;
+  height: 100%;
+}
+.twin-bar.hp i {
+  background: #ff5a4a;
+}
+.twin-bar.sh i {
+  background: #5ac8ff;
+}
+.heat {
+  display: block;
+  width: 64px;
+  height: 4px;
+  margin-top: 3px;
+  background: #ffffff22;
+}
+.heat i {
+  display: block;
+  height: 100%;
+  background: #ffb02e;
+}
+.heat.hot i {
+  background: #ff3b30;
+  animation: blink 0.3s infinite alternate;
+}
+.adv {
+  margin-top: 2px;
+  font:
+    800 10px 'Orbitron',
+    sans-serif;
+  letter-spacing: 0.1em;
+  color: #9fb4c8;
+}
+.adv.ready {
+  color: #7dffa0;
+}

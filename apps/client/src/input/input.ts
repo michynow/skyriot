@@ -12,13 +12,16 @@ import {
   type ShipState,
 } from '@skyriot/shared';
 import { showBanner } from '../hud/hudStore';
+import { project } from '../hud/view';
 import { world } from '../state/world';
 import { useSettings } from '../ui/settings';
 
 /** Mutable input-side state shared with the HUD (read per frame, never React state). */
 export const inputState = {
   targetId: null as ShipId | null,
-  /** Target picked by hand (Shift): auto-lock leaves it alone until the next Shift. */
+  /** Enemy under the crosshair or cursor that is not the Target (Shift would switch to it). */
+  candidateId: null as ShipId | null,
+  /** Siege gun lock was just released by Shift: no hover pick until Siege ends or Shift is pressed again. */
   manualTarget: false,
   typing: false,
   /** Called when Enter requests the chat line. Set by the HUD. */
@@ -92,10 +95,8 @@ let holdYaw: number | null = null;
 let holdPitch = 0;
 let flipUntil = 0;
 const AIM_PITCH_MAX = 1.45;
-/** Shift picks enemies within ~55 degrees of the nose. */
-const LOCK_PICK_COS = Math.cos((55 * Math.PI) / 180);
-/** Auto-lock takes an enemy within ~15 degrees of the nose (in the crosshair) when nothing is picked by hand. */
-const AUTO_LOCK_COS = Math.cos((15 * Math.PI) / 180);
+/** An enemy counts as hovered when it is this close (px) to the crosshair or the cursor. */
+const HOVER_PX = 44;
 /** Cursor is kept inside this NDC box so the aim point never leaves the screen. */
 const CURSOR_EDGE = 0.92;
 /** Full stick asks for this fraction of the Frame's turn rate (the sim turns at angle-to-aim * TURN_GAIN). */
@@ -128,55 +129,64 @@ function reset() {
   world.lookBack = false;
 }
 
-/** Enemy (Ship or Base structure) nearest the centre crosshair within `minCos` of the nose and radar range. */
-function nearestToCrosshair(own: ShipState, minCos: number): ShipId | null {
-  const range = FRAMES[own.frame].radarRangeM;
-  const [x, y, z, w] = own.rot;
-  const fx = -2 * (x * z + w * y),
-    fy = -2 * (y * z - w * x),
-    fz = -(1 - 2 * (x * x + y * y));
+const _p = { x: 0, y: 0 };
+
+/** Can `id` be the Target: an enemy Ship or Base structure, alive and inside radar range. */
+function validTarget(own: ShipState, id: ShipId): boolean {
+  const s = world.ships.get(id);
+  const st = s ? undefined : world.structures.get(id);
+  const t = s ?? st;
+  if (!t || !t.alive || t.nation === own.nation) return false;
+  const y = st ? st.pos[1] + STRUCTURES[st.kind].height / 2 : t.pos[1];
+  return (
+    Math.hypot(t.pos[0] - own.pos[0], y - own.pos[1], t.pos[2] - own.pos[2]) <=
+    FRAMES[own.frame].radarRangeM
+  );
+}
+
+/** Valid enemy (Ship or Base structure) nearest on screen to the crosshair or the cursor, within HOVER_PX. */
+function hovered(own: ShipState): ShipId | null {
+  const W = window.innerWidth,
+    H = window.innerHeight;
+  const pts = [
+    [W / 2, H / 2],
+    [W / 2 + (world.cursor.x * W) / 2, H / 2 - (world.cursor.y * H) / 2],
+  ];
   let best: ShipId | null = null;
-  let bestCos = minCos;
-  const consider = (id: string, dx: number, dy: number, dz: number) => {
-    const d = Math.hypot(dx, dy, dz);
-    if (d > range || d < 1) return;
-    const cos = (dx * fx + dy * fy + dz * fz) / d;
-    if (cos > bestCos) {
-      bestCos = cos;
-      best = id;
+  let bestD = HOVER_PX;
+  const consider = (id: string, x: number, y: number, z: number) => {
+    if (!project(x, y, z, _p) || !validTarget(own, id)) return;
+    for (const [px, py] of pts) {
+      const d = Math.hypot(_p.x - px!, _p.y - py!);
+      if (d < bestD) {
+        bestD = d;
+        best = id;
+      }
     }
   };
-  for (const s of world.ships.values())
-    if (s.alive && s.nation !== own.nation)
-      consider(s.id, s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]);
-  // Enemy Base structures (Shield Stations, Turrets, Core) can be locked too.
+  for (const s of world.ships.values()) if (s.alive) consider(s.id, s.pos[0], s.pos[1], s.pos[2]);
   for (const st of world.structures.values())
-    if (st.alive && st.nation !== own.nation)
-      consider(
-        st.id,
-        st.pos[0] - own.pos[0],
-        st.pos[1] + STRUCTURES[st.kind].height / 2 - own.pos[1],
-        st.pos[2] - own.pos[2],
-      );
+    if (st.alive) consider(st.id, st.pos[0], st.pos[1] + STRUCTURES[st.kind].height / 2, st.pos[2]);
   return best;
 }
 
-/** Shift: lock onto the enemy nearest the centre crosshair and hold it; Shift on it again (or on nothing) releases to auto-lock. */
-export function lockNearestToCrosshair(): void {
+/** Shift: switch the Target to the enemy under the crosshair or cursor; in a Siege gun lock it drops the lock cleanly. */
+export function switchTarget(): void {
   const own = world.ownId ? world.ships.get(world.ownId) : undefined;
   if (!own) return;
   if (own.sieged && own.siegeLock) {
-    // Siege: Shift drops the gun lock cleanly. No auto-lock until the next Shift; the view keeps its aim.
+    // The view keeps its aim; no hover pick until the next Shift.
     inputState.targetId = null;
     inputState.manualTarget = true;
     holdYaw = baseYaw;
     holdPitch = basePitch;
     return;
   }
-  const best = nearestToCrosshair(own, LOCK_PICK_COS);
-  const release = best === null || (inputState.manualTarget && best === inputState.targetId);
-  inputState.targetId = release ? null : best;
-  inputState.manualTarget = !release;
+  const h = hovered(own);
+  if (h) {
+    inputState.targetId = h;
+    inputState.manualTarget = false;
+  }
 }
 
 export function setTyping(on: boolean): void {
@@ -221,7 +231,7 @@ export function attachInput(canvas: HTMLElement): () => void {
         }
       }
     } else if (e.code === 'Tab') inputState.hotbarBar = (inputState.hotbarBar + 1) % HOTBAR_BARS;
-    else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') lockNearestToCrosshair();
+    else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') switchTarget();
     else if (e.code === 'KeyX') world.lookBack = true;
     else if (e.code === 'KeyB' || (e.code === 'KeyY' && inputState.haltPromptUntil > 0)) {
       const own = world.ownId ? world.ships.get(world.ownId) : undefined;
@@ -436,17 +446,13 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
   }
   if (!aim.every(Number.isFinite)) aim = [0, 0, -1];
   inputState.aim = aim;
-  // A hand-picked Target (Shift/Tab) is held until the next Shift/Tab; otherwise auto-lock takes whoever is in
-  // the crosshair and keeps them until someone else is. Either drops when it dies.
-  const id = inputState.targetId;
-  const alive = id ? (world.ships.get(id) ?? world.structures.get(id))?.alive : false;
-  // A Siege lock release (manual, no Target) only suppresses auto-lock while sieged.
-  if (!own || (id ? !alive : !own.sieged)) {
+  // Target sticks until it is lost; with none, hovering an enemy picks it. Shift switches (switchTarget).
+  if (!own?.sieged) inputState.manualTarget = false;
+  if (!own || (inputState.targetId && !validTarget(own, inputState.targetId)))
     inputState.targetId = null;
-    inputState.manualTarget = false;
-  }
-  if (own && !inputState.manualTarget)
-    inputState.targetId = nearestToCrosshair(own, AUTO_LOCK_COS) ?? inputState.targetId;
+  const hov = own ? hovered(own) : null;
+  if (hov && !inputState.targetId && !inputState.manualTarget) inputState.targetId = hov;
+  inputState.candidateId = hov !== inputState.targetId ? hov : null;
 
   // Armed roll: resent every tick of the window; the sim ignores it once the roll has started.
   const rollArm = performance.now() < rollArmUntil ? rollArmDir : 0;
