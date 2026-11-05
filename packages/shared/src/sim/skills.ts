@@ -133,11 +133,7 @@ export function castSkill(
         for (let k = a.state.buffs.length - 1; k >= 0; k--)
           if (isDebuff(a.state.buffs[k]!.skill)) a.state.buffs.splice(k, 1);
         for (const o of ctx.recList) {
-          if (o.state.lockTarget === a.state.id) {
-            o.state.lockTarget = null;
-            o.lockCand = null;
-            o.lockTime = 0;
-          }
+          if (o.state.lockTarget === a.state.id) o.state.lockTarget = null;
         }
         for (const p of ctx.projectiles) {
           if (p.kind === 'missile' && p.target === a.state.id) {

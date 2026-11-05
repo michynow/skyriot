@@ -214,8 +214,9 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.halted = false;
     s.landing = false;
     s.liftTicks = 0;
-    rec.lockCand = null;
-    rec.lockTime = 0;
+    rec.salvoLeft = rec.salvoCd = rec.siegeArm = 0;
+    rec.salvoTarget = null;
+    rec.wasSieged = false;
     rec.shieldDelay = 0;
     rec.fireCd[0] = rec.fireCd[1] = 0;
   }
@@ -318,8 +319,11 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       lat: [0, 0, 0],
       fireCd: [0, 0],
       shieldDelay: 0,
-      lockCand: null,
-      lockTime: 0,
+      salvoLeft: 0,
+      salvoCd: 0,
+      salvoTarget: null,
+      siegeArm: 0,
+      wasSieged: false,
       spawnCounter: 0,
       absorbLeft: 0,
       histPos: new Float32Array(LAG_HISTORY_TICKS * 6),

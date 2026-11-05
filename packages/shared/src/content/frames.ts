@@ -30,6 +30,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     ammo1Max: 3600,
     ammo2Max: 320,
     radarRangeM: 1600,
+    radarStdM: 1200,
+    radarAdvM: 1300,
     radius: 4.4,
     halfLength: 6.0,
     canHover: false,
@@ -92,8 +94,10 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     rollFuelCost: 0.14,
     deflectChance: 0.1,
     ammo1Max: 1500,
-    ammo2Max: 36,
+    ammo2Max: 100,
     radarRangeM: 1300,
+    radarStdM: 950,
+    radarAdvM: 850,
     radius: 7.2,
     halfLength: 10.0,
     canHover: false,
@@ -158,6 +162,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     ammo1Max: 2400,
     ammo2Max: 320,
     radarRangeM: 1800,
+    radarStdM: 1050,
+    radarAdvM: 1150,
     radius: 5.6,
     halfLength: 7.0,
     canHover: false,
@@ -220,8 +226,10 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     rollFuelCost: 0.2,
     deflectChance: 0.03,
     ammo1Max: 1800,
-    ammo2Max: 48,
+    ammo2Max: 192,
     radarRangeM: 1400,
+    radarStdM: 1150,
+    radarAdvM: 1350,
     radius: 6.8,
     halfLength: 8.0,
     canHover: true,
@@ -266,7 +274,16 @@ export const FRAMES: Record<FrameId, FrameDef> = {
 };
 
 /** Bulwark Siege Mode multipliers. damageTakenMul = the built-in siege armour (takes 25% less damage). */
-export const SIEGE = { damageMul: 1.5, rangeMul: 1.4, turnRateMul: 0.6, damageTakenMul: 0.75 };
+export const SIEGE = {
+  damageMul: 1.5,
+  rangeMul: 1.4,
+  turnRateMul: 0.6,
+  damageTakenMul: 0.75,
+  /** Primary rounds can't hit a Target closer than this (m). */
+  minRangeM: 70,
+  /** After entering either Siege the Primary holds fire this long (s). */
+  armSec: 0.5,
+};
 
 /** Airborne Siege Mode (hover-locked in place): weaker than grounded. */
 export const SIEGE_AIR = {
@@ -275,6 +292,8 @@ export const SIEGE_AIR = {
   turnRateMul: 0.7,
   lockConeMul: 1.4,
   damageTakenMul: 0.85,
+  /** The hovering gun can't depress: a Target more than this far (rad) below the horizon can't be hit. */
+  maxDepressionRad: 0.6,
 };
 
 /**
@@ -293,6 +312,25 @@ export const RESPAWN_SEC = 5;
  * Primary rounds are fired at the Target's lead point instead of straight down the aim line.
  */
 export const AIM_ASSIST = { coneRad: 0.2, spreadMul: 0.5 };
+
+/**
+ * Targeting rules (server-side): the Primary resolves each round as an accuracy roll against the selected Target
+ * if it is inside STD radar and within `stdConeRad` of the nose; beyond the weapon's range the hit chance falls
+ * by `falloffBase` per percent of range (capped at 1). Damage varies by +-`damageSpread`. Continuous fire overheats
+ * after the weapon's overheatSec; heat bleeds off in `coolMul` x overheatSec (the forced cool-down when overheated).
+ * Locks get the lag tolerance: +`lockToleranceDeg` Valid Angle, +`rangeTolerance` range. Series volleys are
+ * `seriesSec` apart; a missed round flies at least `missSpreadRad` off the Target.
+ */
+export const TARGETING = {
+  stdConeRad: 0.35,
+  falloffBase: 0.983,
+  damageSpread: 0.125,
+  coolMul: 0.5,
+  lockToleranceDeg: 1,
+  rangeTolerance: 0.02,
+  seriesSec: 0.2,
+  missSpreadRad: 0.025,
+};
 
 /**
  * Missile evasion (the skill curve):

@@ -45,7 +45,10 @@ export interface PilotInput {
   halt: boolean;
   /** Rising edge of C: land (Bulwark: onto the terrain below, or lift off when grounded; others: nearest own Launch Deck). */
   land: boolean;
-  /** Currently selected target (Shift). Missiles only lock onto this Ship. */
+  /**
+   * Selected Target (hover when none, Shift switches): a Ship or structure id. The server accepts it only if it
+   * exists, is hostile, visible and inside the Frame's STD or ADV radar range; otherwise it counts as none.
+   */
   target: ShipId | null;
   /** Client's estimate of server tick it is viewing remotes at (for lag compensation). */
   viewTick: number;
@@ -247,6 +250,16 @@ export type SimEvent =
       victim: ShipId;
       reason: 'roll' | 'terrain' | 'purge' | 'lost';
     }
+  /** A Secondary volley was fired at this Ship (start the missile siren). One per volley. */
+  | {
+      type: 'missileIncoming';
+      attacker: ShipId;
+      target: ShipId;
+      weapon: WeaponId;
+      missiles: number[];
+    }
+  /** A projectile announced by missileIncoming is gone: hit = burst on/near a Ship, impact = terrain/structure. */
+  | { type: 'missileEnded'; id: number; reason: 'hit' | 'impact' | 'expired' }
   | { type: 'teleport'; id: ShipId; pos: Vec3 }
   | { type: 'docked'; id: ShipId }
   | { type: 'resupplied'; id: ShipId }
@@ -403,6 +416,9 @@ export interface FrameDef extends Omit<EngineDef, 'id' | 'name'> {
   ammo1Max: number;
   /** Radar and visibility range (m): enemies beyond it aren't shown or sent to this Pilot. */
   radarRangeM: number;
+  /** STD radar (m): the Primary damages the Target only inside it. ADV radar (m): Secondary lock range. */
+  radarStdM: number;
+  radarAdvM: number;
   ammo2Max: number;
   /** Capsule radius & half-height for hit tests and terrain collision. */
   radius: number;
@@ -427,12 +443,22 @@ export interface WeaponDef {
   rangeM: number;
   /** Cone half-angle (rad) of random spread. */
   spread: number;
-  /** Homing turn rate rad/s; 0 = dumb. */
+  /** Homing turn rate rad/s; 0 = dumb. Derived from inductionDegPerSec. */
   homingTurnRate: number;
-  /** Lock-on cone half-angle (rad) and time to lock; missiles only. */
+  /** Legacy lock cone (rad) = validAngleDeg in radians; lockTimeSec is always 0 (locks are instant). */
   lockConeRad: number;
   lockTimeSec: number;
   splashRadius: number;
+  /** Primary: per-round hit chance (0..1) against the selected Target inside STD radar range. */
+  accuracy: number;
+  /** Rounds per trigger: `count` at once, `series` volleys in a row (Secondary only; Primary fires count x 1). */
+  pattern: { count: number; series: number };
+  /** Primary: seconds of continuous fire until overheated; 0 = never overheats. */
+  overheatSec: number;
+  /** Secondary: half-angle (deg) from the nose inside which the Target is LOCKED; 0 = lockless (bombs). */
+  validAngleDeg: number;
+  /** Secondary: guided turn rate (deg/s); 0 = flies straight. */
+  inductionDegPerSec: number;
 }
 
 export interface SkillDef {
@@ -465,7 +491,10 @@ export interface BuffEffect {
   maxHpMul?: number;
   shieldRegenMul?: number;
   fuelRegenMul?: number;
+  /** Legacy, unused: locks are instant. */
   lockTimeMul?: number;
+  /** Primary accuracy (hit chance) added, e.g. 0.1 = +10 points. */
+  accuracyAdd?: number;
   splashMul?: number;
   /** Heal-over-time: fraction of max HP restored per second. */
   hpRegenPerSec?: number;
