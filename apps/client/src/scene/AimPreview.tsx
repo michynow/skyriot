@@ -195,7 +195,7 @@ export function AimPreview() {
       opacity = Math.min(Math.max((d - FADE_NEAR_M) / (FADE_FAR_M - FADE_NEAR_M), 0), 1);
       radius = w.splashRadius * GROUND_STRIKE_SPLASH_MUL;
       flat = true;
-    } else if (mode === 'air-barrage-mode' || w.homingTurnRate === 0) {
+    } else if (mode === 'air-barrage-mode') {
       const [qx, qy, qz, qw] = own.rot;
       const fx = -2 * (qx * qz + qw * qy),
         fy = -2 * (qy * qz - qw * qx),
