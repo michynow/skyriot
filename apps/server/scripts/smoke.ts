@@ -483,8 +483,12 @@ function buffTests() {
   const cooldownRunning = w.cooldowns[hotSlot]! > 0;
   sim2.addShip('a', spawn('anvil'), [300, 600, 0]);
   const a = sim2.getShip('a')!;
-  // Toggles + Air Barrage ammo.
-  const defaultMode = a.toggles.bombing === 'air-barrage-mode';
+  // Toggles: bombing starts off, a press turns Air Barrage on (then its ammo use).
+  const abSlot = FRAMES.anvil.hotbar.indexOf('air-barrage-mode');
+  const startsOff = a.toggles.bombing === undefined;
+  idle(1, { a: { hotbar: abSlot } });
+  const defaultMode = startsOff && a.toggles.bombing === 'air-barrage-mode';
+  idle(70, { a: {} });
   const before = a.ammo2;
   let spawnedRockets = 0;
   const ev = sim2.step(new Map([['a', mk(1, { aim: [0, 0, -1], fire2: true })]]));
@@ -499,6 +503,10 @@ function buffTests() {
   for (const e of sim2.step(new Map([['a', mk(2, { aim: [0, 0, -1], fire2: true })]]))) {
     if (e.type === 'projectileSpawned' && e.owner === 'a' && e.dir[1] < -0.1) bombDown = true;
   }
+  // Pressing the active mode turns bombing off again.
+  idle(70, { a: {} });
+  idle(1, { a: { hotbar: gsSlot } });
+  const toggledOff = a.toggles.bombing === undefined;
   sim2.dispose();
   // Halo aura (Rally Field) reaches a nearby ally with the caster as source.
   const sim3 = fresh(true);
@@ -522,6 +530,7 @@ function buffTests() {
     defaultMode,
     barrage,
     switched,
+    toggledOff,
     bombDown,
     aura,
   };

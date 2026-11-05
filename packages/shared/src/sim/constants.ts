@@ -116,6 +116,8 @@ export const SIEGE_GUN_HOMING_TURN = 60;
 export const SIEGE_GUN_RANGE_SLACK = 1.5;
 /** Overcharge Round: the armed Primary shot flies this much farther. */
 export const CHARGED_SHOT_RANGE_MUL = 2;
+/** Rocket / bomb proximity fuse: bursts when a hull is within this fraction of the blast radius. */
+export const ROCKET_FUSE_FRAC = 0.6;
 export const MORTAR_LOFT_RAD = 0.6;
 export const MORTAR_GUIDE_TURN = 0.9;
 

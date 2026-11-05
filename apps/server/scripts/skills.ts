@@ -67,9 +67,7 @@ for (const def of Object.values(SKILLS)) {
   if (def.frames === 'all' || GROUND_ONLY.has(def.id) || def.id === 'core-breach') continue;
   for (const f of def.frames) {
     place(f, 100);
-    // The active mode of a toggle group can't be re-selected.
-    const active = def.toggleGroup && ship(f).toggles[def.toggleGroup] === def.id;
-    check(`cast ${def.id} on ${f}`, active || sim.castSkill(f, def.id));
+    check(`cast ${def.id} on ${f}`, sim.castSkill(f, def.id));
   }
 }
 const step1 = () => step();
@@ -103,6 +101,24 @@ check(
   ship('foe').hp < foeHpBreach && !ship('anvil').alive,
 );
 step(200);
+
+// Bombing toggles off on a second press; rockets burst near (not only on) a hull.
+place('anvil', 100);
+ship('anvil').toggles.bombing = 'air-barrage-mode';
+sim.castSkill('anvil', 'air-barrage-mode');
+check('bombing mode toggles off', ship('anvil').toggles.bombing === undefined);
+sim.castSkill('anvil', 'air-barrage-mode');
+step(80);
+place('anvil', 120);
+{
+  const f = ship('foe');
+  sim.teleport('foe', [f.pos[0], f.pos[1] + 16, f.pos[2]]);
+  step();
+  const hpProx = ship('foe').hp;
+  step(1, { anvil: { fire2: true } });
+  step(90);
+  check('rocket proximity burst hits a near-miss', ship('foe').hp < hpProx);
+}
 
 // ---- Halo ----
 place('halo', 300);

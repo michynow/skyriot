@@ -13,7 +13,14 @@ import {
   sampleHeight,
   type ShipState,
 } from '@skyriot/shared';
-import { BufferAttribute, BufferGeometry, Group, Mesh, MeshBasicMaterial } from 'three';
+import {
+  BufferAttribute,
+  BufferGeometry,
+  CircleGeometry,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+} from 'three';
 import { world } from '../state/world';
 import { isFlying } from '../hud/hudStore';
 
@@ -23,7 +30,7 @@ const AIR_MARK_MAX_M = 650;
 const FADE_NEAR_M = 25;
 const FADE_FAR_M = 60;
 /** Minimum angular size (radius / camera distance) so the sight stays readable far away. */
-const MIN_ANGULAR = 0.022;
+const MIN_ANGULAR = 0.045;
 const MAX_STEPS = 900;
 const TEETH = 12;
 
@@ -103,15 +110,17 @@ function trace(
 }
 
 /**
- * Where the Secondary will land: a white toothed gun-sight ring (dark outline for contrast), drawn on top
+ * Where the Secondary will land: a bright gold toothed gun-sight ring (dark outline for contrast) over a
+ * faint blast-area fill, sized to the real blast radius and drawn on top
  * of everything. Ground-strike bombs: flat on the terrain at the ballistic impact. Air mode and other dumb
  * ordnance: facing the camera where the shot meets terrain or AIR_MARK_MAX_M down the aim, whichever is
  * nearer. Homing missiles get the lock reticle instead.
  */
 export function AimPreview() {
   const { group, sight } = useMemo(() => {
+    // Warm, bright sight so it reads against sky and terrain; a faint fill shows the blast area.
     const white = new MeshBasicMaterial({
-      color: '#ffffff',
+      color: '#ffd23a',
       transparent: true,
       depthTest: false,
       depthWrite: false,
@@ -125,13 +134,23 @@ export function AimPreview() {
       depthWrite: false,
       toneMapped: false,
     });
-    const fg = new Mesh(sightGeometry(0.9, 1, 0.74, 0.07), white);
-    const bg = new Mesh(sightGeometry(0.86, 1.045, 0.68, 0.1), dark);
+    const fillMat = new MeshBasicMaterial({
+      color: '#ff8a1f',
+      transparent: true,
+      opacity: 0.18,
+      depthTest: false,
+      depthWrite: false,
+      toneMapped: false,
+    });
+    const fg = new Mesh(sightGeometry(0.84, 1, 0.66, 0.08), white);
+    const bg = new Mesh(sightGeometry(0.8, 1.06, 0.6, 0.11), dark);
+    const fill = new Mesh(new CircleGeometry(0.84, 48), fillMat);
+    fill.renderOrder = 999;
     fg.renderOrder = 1001;
     bg.renderOrder = 1000;
-    fg.frustumCulled = bg.frustumCulled = false;
+    fg.frustumCulled = bg.frustumCulled = fill.frustumCulled = false;
     const sight = new Group();
-    sight.add(bg, fg);
+    sight.add(fill, bg, fg);
     sight.visible = false;
     const group = new Group();
     group.add(sight);
@@ -148,7 +167,7 @@ export function AimPreview() {
     [sight],
   );
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera, clock }) => {
     sight.visible = false;
     const own: ShipState | undefined = world.ownId ? world.ships.get(world.ownId) : undefined;
     if (!own || !isFlying(own) || own.docked || own.halted) return;
@@ -208,10 +227,11 @@ export function AimPreview() {
       sight.position.y += 0.6;
       sight.rotation.set(-Math.PI / 2, 0, 0);
     } else sight.quaternion.copy(camera.quaternion);
-    for (const m of sight.children as Mesh[]) {
-      const mat = m.material as MeshBasicMaterial;
-      mat.opacity = (mat.color.r > 0.5 ? 1 : 0.55) * opacity;
-    }
+    const [fill, bg, fg] = sight.children as Mesh[];
+    const pulse = 0.85 + 0.15 * Math.sin(clock.elapsedTime * 6);
+    (fg!.material as MeshBasicMaterial).opacity = pulse * opacity;
+    (bg!.material as MeshBasicMaterial).opacity = 0.6 * opacity;
+    (fill!.material as MeshBasicMaterial).opacity = 0.18 * pulse * opacity;
     sight.visible = opacity > 0.01;
   });
 

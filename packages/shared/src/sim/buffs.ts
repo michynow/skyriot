@@ -138,13 +138,7 @@ export function tickBuffs(s: ShipState): void {
   }
 }
 
-/** Default mode of each toggle group = the first toggle Skill of that group on the hotbar. */
-export function initToggles(s: ShipState, hotbar: (SkillId | null)[]): void {
+/** Every toggle group starts off (e.g. no bombing mode: the Secondary fires normally). */
+export function initToggles(s: ShipState): void {
   for (const key of Object.keys(s.toggles)) delete s.toggles[key];
-  for (const id of hotbar) {
-    const def = id ? SKILLS[id] : undefined;
-    if (def?.kind === 'toggle' && def.toggleGroup && !(def.toggleGroup in s.toggles)) {
-      s.toggles[def.toggleGroup] = def.id;
-    }
-  }
 }

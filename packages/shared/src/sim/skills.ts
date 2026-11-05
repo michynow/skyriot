@@ -82,7 +82,6 @@ export function castSkill(
   const movesShip = def.kind === 'buff' && affectsFlight(def.buff);
   if (predictOnly && !PREDICTED.has(id) && !movesShip) return false;
   if (GROUND_ONLY.has(id) && !s.grounded) return false;
-  if (def.kind === 'toggle' && def.toggleGroup && s.toggles[def.toggleGroup] === id) return false;
   const ticks = Math.ceil(def.durationSec * TICK_HZ);
   forwardOf(s.rot, _f);
 
@@ -105,7 +104,9 @@ export function castSkill(
     }
     if (def.buff.absorbHits) rec.absorbLeft = def.buff.absorbHits;
   } else if (def.kind === 'toggle' && def.toggleGroup) {
-    s.toggles[def.toggleGroup] = id;
+    // Pressing the active mode turns it off; another mode of the group switches to it.
+    if (s.toggles[def.toggleGroup] === id) delete s.toggles[def.toggleGroup];
+    else s.toggles[def.toggleGroup] = id;
     // Switching modes costs the cooldown on every slot of the group.
     const cd = Math.ceil(def.cooldownSec * TICK_HZ);
     for (let j = 0; j < fd.hotbar.length; j++) {

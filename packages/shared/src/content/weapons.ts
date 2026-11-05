@@ -20,7 +20,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     splashRadius: 5,
   }),
   'brick-bomb': w('brick-bomb', 'Brick Bomb', 'rocket', 520, 3.0, 140, 900, 0.01, {
-    splashRadius: 14,
+    splashRadius: 22,
   }),
   'mortar-battery': w('mortar-battery', 'Mortar Battery', 'shell', 380, 2.6, 220, 1600, 0.02, {
     splashRadius: 10,
@@ -63,10 +63,10 @@ export const WEAPONS: Record<string, WeaponDef> = {
     splashRadius: 5.5,
   }),
   'slab-bomb': w('slab-bomb', 'Slab Bomb', 'rocket', 590, 2.9, 145, 920, 0.01, {
-    splashRadius: 15,
+    splashRadius: 23,
   }),
   'monolith-bomb': w('monolith-bomb', 'Monolith Bomb', 'rocket', 660, 2.8, 150, 950, 0.01, {
-    splashRadius: 16,
+    splashRadius: 24,
   }),
   'howler-battery': w('howler-battery', 'Howler Battery', 'shell', 430, 2.5, 225, 1650, 0.02, {
     splashRadius: 11,
@@ -205,14 +205,14 @@ export const SKILLS: Record<string, SkillDef> = {
   'air-barrage-mode': t(
     'air-barrage-mode',
     'Air Barrage Mode',
-    'Bombing mode: Secondary fires a forward salvo of 3 rockets at air targets.',
+    'Bombing mode (press again for off): Secondary fires a forward salvo of 3 proximity-fused rockets at air targets.',
     ['anvil'],
     'bombing',
   ),
   'ground-strike-mode': t(
     'ground-strike-mode',
     'Ground Strike Mode',
-    'Bombing mode: Secondary drops heavy bombs straight down, +40% damage vs Grounded/Docked targets and splash.',
+    'Bombing mode (press again for off): Secondary drops heavy proximity-fused bombs straight down, +40% damage vs Grounded/Docked targets and splash.',
     ['anvil'],
     'bombing',
   ),

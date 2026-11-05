@@ -189,7 +189,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.siegeLock = null;
     s.cooldowns.fill(0);
     s.buffs.length = 0;
-    initToggles(s, fd.hotbar);
+    initToggles(s);
     rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;
     s.ammo1 = fd.ammo1Max;
     s.ammo2 = fd.ammo2Max;

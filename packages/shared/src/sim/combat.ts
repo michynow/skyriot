@@ -42,6 +42,7 @@ import {
   SIEGE_GUN_HOMING_TURN,
   SIEGE_GUN_RANGE_SLACK,
   CHARGED_SHOT_RANGE_MUL,
+  ROCKET_FUSE_FRAC,
   SIEGE_GUN_SPREAD_MUL,
   MORTAR_LOFT_RAD,
   NOSE_OFFSET,
@@ -846,6 +847,7 @@ export function stepProjectiles(ctx: SimCtx): void {
     let victim: ShipRec | null = null;
     let structure: StructureRec | null = null;
     let dome: StructureRec | null = null;
+    let fused = false;
 
     if (step > 0) {
       ray.origin.x = p.x;
@@ -869,14 +871,17 @@ export function stepProjectiles(ctx: SimCtx): void {
           continue;
         const fd = ctx.frames[os.frame];
         poseAt(ctx, o, testTick);
-        const reach = fd.halfLength + PROJECTILE_RADIUS + step;
+        const fuse = p.kind === 'rocket' ? p.splash * ROCKET_FUSE_FRAC : 0;
+        const reach = fd.halfLength + PROJECTILE_RADIUS + step + fuse;
         if (
           Math.abs(_cx - p.x) > reach ||
           Math.abs(_cy - p.y) > reach ||
           Math.abs(_cz - p.z) > reach
         )
           continue;
-        const r = fd.radius + PROJECTILE_RADIUS;
+        // Rockets and bombs carry a proximity fuse: they burst when a hull comes within part of their blast.
+        const contact = fd.radius + PROJECTILE_RADIUS;
+        const r = contact + fuse;
         const d2 = segmentCapsuleDist2(
           p.x,
           p.y,
@@ -888,10 +893,12 @@ export function stepProjectiles(ctx: SimCtx): void {
         );
         if (d2 <= r * r && _s * step < hitT) {
           hitT = _s * step;
-          victim = o;
+          // A proximity burst (no contact) deals splash damage with falloff, not a direct hit.
+          victim = d2 <= contact * contact ? o : null;
+          fused = true;
         }
       }
-      if (victim) structure = null;
+      if (fused) structure = null;
       const domeT = domeEntry(ctx, p.nation, p.x, p.y, p.z, p.dx, p.dy, p.dz, step);
       if (domeT < hitT) {
         hitT = domeT;
