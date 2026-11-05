@@ -203,13 +203,14 @@ const RECIPES: Record<SfxName, (r: R) => number> = {
   ),
   roll: (r) => (burst(r, 'bandpass', 500, 2400, 1, 0.45, 0.45), 0.5),
   'lock-beep': (r) => (tone(r, 'sine', 1200, 1200, 0.07, 0.28), 0.1),
-  'warn-beep': (r) => (tone(r, 'square', 1500, 1500, 0.07, 0.25), 0.1),
-  // Someone has a missile lock on us: low two-tone warble, distinct from the incoming-missile beeps.
-  'lock-alarm': (r) => (
-    tone(r, 'square', 880, 880, 0.12, 0.2),
-    tone(r, 'square', 620, 620, 0.12, 0.2, 0.15),
-    0.3
+  // Missile-lock siren: one rising wail per call; the driver repeats it faster as impact nears.
+  'warn-beep': (r) => (
+    tone(r, 'sawtooth', 700, 1250, 0.2, 0.22, 0, 0.01),
+    tone(r, 'square', 1400, 2500, 0.2, 0.06, 0, 0.01),
+    0.22
   ),
+  // Someone has us as their locked Target: one discreet tick, no siren.
+  'lock-alarm': (r) => (tone(r, 'sine', 1900, 1900, 0.03, 0.12), 0.05),
   'skill-buff': (r) => {
     [1, 1.25, 1.5, 2].forEach((m, i) =>
       tone(r, 'sine', 330 * m, 330 * m * 1.01, 0.8, 0.22, i * 0.07, 0.03),

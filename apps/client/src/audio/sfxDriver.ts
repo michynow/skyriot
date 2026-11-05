@@ -8,6 +8,7 @@ import {
   type Vec3,
 } from '@skyriot/shared';
 import { world } from '../state/world';
+import { incomingThreats } from '../hud/incomingMissiles';
 import { music, playSfx, startLoop, type LoopHandle, type SfxName } from './engine';
 
 const FIRE_SFX: Record<string, SfxName> = {
@@ -33,7 +34,8 @@ let wasBoosting = false;
 let engine: LoopHandle | null = null;
 let burner: LoopHandle | null = null;
 let lockTone: LoopHandle | null = null;
-let nextAlarm = 0;
+let wasLockedOn = false;
+let sirening = false;
 let nextBeep = 0;
 let nextWarn = 0;
 
@@ -200,20 +202,26 @@ export function updateAudio(): void {
     playSfx('lock-beep', { pitch: 0.8 + own!.lockProgress * 0.9, volume: 0.8 });
     nextBeep = t + 0.35 - own!.lockProgress * 0.25;
   }
-  // An enemy holding a lock on us (no missile yet): warble until it fires or loses the lock.
+  // An enemy has us as their locked Target: one discreet tick when it starts (no siren until it fires).
   let lockedOn = false;
   if (alive && own)
     for (const s of world.ships.values()) if (s.alive && s.lockTarget === own.id) lockedOn = true;
-  if (lockedOn && own!.incomingDist < 0 && t >= nextAlarm) {
-    playSfx('lock-alarm', { volume: 0.7 });
-    nextAlarm = t + 0.6;
-  }
-  if (alive && own && own.incomingDist >= 0) {
+  if (lockedOn && !wasLockedOn) playSfx('lock-alarm');
+  wasLockedOn = lockedOn;
+  // Missile siren: runs while any missile homes on us (none = silence); tempo rises as impact nears.
+  const threat = alive ? incomingThreats(performance.now())[0] : undefined;
+  if (threat) {
     lastCombat = t;
+    if (!sirening) console.debug('[audio] missile siren start');
+    sirening = true;
     if (t >= nextWarn) {
       playSfx('warn-beep');
-      nextWarn = t + Math.min(0.7, Math.max(0.09, own.incomingTti * 0.2));
+      nextWarn = t + Math.min(0.9, Math.max(0.2, Math.min(threat.t * 0.25, threat.d / 1500)));
     }
+  } else if (sirening) {
+    console.debug('[audio] missile siren stop');
+    sirening = false;
+    nextWarn = 0;
   }
 
   // Missiles in flight: follow the estimated position.

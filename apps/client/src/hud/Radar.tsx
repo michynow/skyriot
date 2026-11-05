@@ -4,6 +4,7 @@ import { world } from '../state/world';
 import { inputState } from '../input/input';
 import { NATION_COLOR } from './Reticles';
 import { ownShip } from './hudStore';
+import { incomingThreats } from './incomingMissiles';
 
 const SIZE = 220;
 const R = SIZE / 2 - 8;
@@ -174,6 +175,45 @@ export function Radar() {
           g.arc(x, y, 8, 0, Math.PI * 2);
           g.stroke();
         }
+      }
+      // Enemies holding us as their locked Target: small yellow marker on the rim (no alarm).
+      for (const s of world.ships.values()) {
+        if (!s.alive || s.lockTarget !== own.id) continue;
+        const r = toScreen(s.pos[0] - own.pos[0], s.pos[2] - own.pos[2]);
+        const a = Math.atan2(r.y, r.x);
+        g.save();
+        g.translate(c + Math.cos(a) * R, c + Math.sin(a) * R);
+        g.rotate(a);
+        g.fillStyle = '#ffd24a';
+        g.beginPath();
+        g.moveTo(4, 0);
+        g.lineTo(-6, 5);
+        g.lineTo(-6, -5);
+        g.closePath();
+        g.fill();
+        g.restore();
+      }
+      // Incoming missiles: red diamonds (rim arrows when out of range) and a red flash of the whole scope.
+      const threats = incomingThreats(performance.now());
+      if (threats.length) {
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 70);
+        g.fillStyle = `rgba(255,40,40,${0.1 + 0.25 * pulse})`;
+        g.beginPath();
+        g.arc(c, c, R, 0, Math.PI * 2);
+        g.fill();
+        g.strokeStyle = `rgba(255,60,60,${0.4 + 0.6 * pulse})`;
+        g.lineWidth = 4;
+        g.stroke();
+        for (const m of threats)
+          edgeIcon(m.x, m.z, '#ff3030', (x, y) => {
+            g.beginPath();
+            g.moveTo(x, y - 6);
+            g.lineTo(x + 5, y);
+            g.lineTo(x, y + 6);
+            g.lineTo(x - 5, y);
+            g.closePath();
+            g.fill();
+          });
       }
       // Own arrow (always up).
       g.fillStyle = '#7fe7ff';

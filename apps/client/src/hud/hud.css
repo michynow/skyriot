@@ -235,18 +235,6 @@
 }
 
 /* warnings */
-.warn-lock {
-  position: absolute;
-  top: 16%;
-  left: 50%;
-  transform: translateX(-50%);
-  font:
-    800 34px 'Orbitron',
-    sans-serif;
-  letter-spacing: 0.2em;
-  color: #ff3b3b;
-  animation: blink 0.35s infinite alternate;
-}
 .siege {
   position: absolute;
   bottom: 104px;
@@ -1018,7 +1006,6 @@
 .chat,
 .siege,
 .dock,
-.warn-lock,
 .incoming,
 .evaded,
 .oob {
@@ -2088,7 +2075,7 @@
   zoom: var(--hud-scale, 1);
 }
 
-/* Missile alarm: red screen-edge flash while a guided missile homes on us; amber pulse while merely locked. */
+/* Missile alarm: red screen-edge flash while a guided missile homes on us. */
 .alarm {
   position: absolute;
   inset: 0;
@@ -2098,10 +2085,6 @@
   box-shadow: inset 0 0 120px 30px #ff1e1ecc;
   border: 3px solid #ff2a2a;
   animation: alarm 0.22s infinite alternate;
-}
-.alarm.lock {
-  box-shadow: inset 0 0 90px 16px #ff7a1e88;
-  animation: alarm 0.6s infinite alternate;
 }
 @keyframes alarm {
   from {

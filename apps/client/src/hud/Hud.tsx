@@ -453,10 +453,6 @@ function Warnings() {
   return (
     <>
       {flying && h.incomingDist >= 0 && <div className="alarm missile" />}
-      {flying && h.locked && h.incomingDist < 0 && <div className="alarm lock" />}
-      {h.locked && flying && h.incomingDist < 0 && (
-        <div className="warn-lock">LOCKED ON — EVADE</div>
-      )}
       {h.haltPrompt && !h.halted && flying && (
         <div className="halt-ask">
           HALT IN PLACE? <kbd>B</kbd> / <kbd>Y</kbd> confirm
