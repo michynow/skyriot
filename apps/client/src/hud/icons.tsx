@@ -725,6 +725,18 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
       </>
     ),
   },
+  'charge-beam': {
+    cat: 'green',
+    art: (
+      <>
+        <path d="M8 40L24 24" stroke={G.green} strokeWidth="5" strokeLinecap="round" />
+        <path d="M8 40L24 24" stroke={WHITE} strokeWidth="1.6" strokeLinecap="round" />
+        <circle cx="8" cy="40" r="4" fill={G.green} />
+        <path d={shieldPath} transform="translate(20 2) scale(.55)" fill={G.green} />
+        <path d="M35 8l-5 9h4l-2 8 6-10h-4l2-7z" fill={WHITE} />
+      </>
+    ),
+  },
   lifeline: {
     cat: 'green',
     art: (

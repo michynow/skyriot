@@ -246,7 +246,7 @@ export const SKILLS: Record<string, SkillDef> = {
   'core-breach': s(
     'core-breach',
     'Core Breach',
-    'Once per life: overload the reactor and explode, dealing damage equal to your current HP to every enemy within 150 m.',
+    'Overload the reactor and explode, dealing damage equal to your current HP to every enemy within 150 m. The cooldown keeps running through death and respawn.',
     ['anvil'],
     240,
     0,
@@ -303,6 +303,14 @@ export const SKILLS: Record<string, SkillDef> = {
     'mend-beam',
     'Mend Beam',
     'Heal the most hurt ally within 400 m (or yourself) for 30% max HP.',
+    ['halo'],
+    6,
+    0,
+  ),
+  'charge-beam': s(
+    'charge-beam',
+    'Charge Beam',
+    'Recharge the ally within 400 m with the lowest shield (or yourself) for 40% max shield.',
     ['halo'],
     6,
     0,

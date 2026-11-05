@@ -100,6 +100,16 @@ check(
   'core-breach hurts the foe and destroys the caster',
   ship('foe').hp < foeHpBreach && !ship('anvil').alive,
 );
+// castSkill() is slotless: set the slot cooldowns by hand, then let the Ship respawn.
+ship('anvil').cooldowns[FRAMES.anvil.hotbar.indexOf('core-breach')] = 99999;
+ship('anvil').cooldowns[FRAMES.anvil.hotbar.indexOf('shroud-veil')] = 99999;
+for (let i = 0; i < 60 * 60 && !ship('anvil').alive; i++) step();
+check(
+  'core-breach cooldown survives respawn',
+  ship('anvil').alive &&
+    ship('anvil').cooldowns[FRAMES.anvil.hotbar.indexOf('core-breach')]! > 0 &&
+    ship('anvil').cooldowns[FRAMES.anvil.hotbar.indexOf('shroud-veil')] === 0,
+);
 step(200);
 
 // Bombing toggles off on a second press; rockets burst near (not only on) a hull.
@@ -129,6 +139,13 @@ check('renewal-pulse heals allies at once', ship('anvil').hp > 1000);
 const hpMend = ship('wasp').hp;
 sim.castSkill('halo', 'mend-beam');
 check('mend-beam heals the most hurt ally', ship('wasp').hp > hpMend);
+ship('wasp').shield = 10;
+ship('halo').shield = ship('halo').maxShield;
+sim.castSkill('halo', 'charge-beam');
+check(
+  'charge-beam recharges the lowest-shield ally',
+  ship('wasp').shield === Math.min(ship('wasp').maxShield, 10 + ship('wasp').maxShield * 0.4),
+);
 ship('wasp').shield = 0;
 sim.castSkill('halo', 'recharge-pulse');
 check('recharge-pulse refills ally shields', ship('wasp').shield > 0);

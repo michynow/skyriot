@@ -78,7 +78,13 @@ const OFFENSIVE_REACH_M: Record<string, number> = {
   'quake-round': 220,
 };
 /** Halo heal Skills a Bot casts when it (or its nearest ally) is hurt. */
-const HEAL_SKILLS = new Set(['renewal-pulse', 'recharge-pulse', 'mend-beam', 'lifeline']);
+const HEAL_SKILLS = new Set([
+  'renewal-pulse',
+  'recharge-pulse',
+  'mend-beam',
+  'charge-beam',
+  'lifeline',
+]);
 /** Core Breach: only when about to die anyway, with an enemy inside the blast. */
 const BREACH_HP_FRACTION = 0.2;
 const BREACH_REACH_M = 120;

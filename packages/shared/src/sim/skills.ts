@@ -10,6 +10,7 @@ import {
   HEAL_FIELD_HP,
   HEAL_FIELD_SHIELD,
   HEAL_BEAM_HP,
+  CHARGE_BEAM_SHIELD,
   REPAIR_KIT_FRACTION,
   SNARE_CONE_RAD,
   SNARE_RANGE,
@@ -237,6 +238,13 @@ export function castSkill(
       if (a !== rec) targets = [as.id];
       break;
     }
+    case 'charge-beam': {
+      const a = mostHurtAlly(ctx, rec, HEAL_BEAM_RANGE, true);
+      const as = a.state;
+      as.shield = Math.min(as.maxShield, as.shield + as.maxShield * CHARGE_BEAM_SHIELD);
+      if (a !== rec) targets = [as.id];
+      break;
+    }
     case 'quake-round': {
       const x = s.pos[0] + _f[0]! * QUAKE_DISTANCE,
         y = s.pos[1] + _f[1]! * QUAKE_DISTANCE,
@@ -336,11 +344,12 @@ function hurtEnemiesNear(
   return hit;
 }
 
-/** Ally (self included) within `range` with the lowest HP fraction; the caster if nobody is lower. */
-function mostHurtAlly(ctx: SimCtx, rec: ShipRec, range: number): ShipRec {
+/** Ally (self included) within `range` with the lowest HP (or shield) fraction; the caster if nobody is lower. */
+function mostHurtAlly(ctx: SimCtx, rec: ShipRec, range: number, shield = false): ShipRec {
   const s = rec.state;
+  const frac = (x: typeof s) => (shield ? x.shield / Math.max(1, x.maxShield) : x.hp / x.maxHp);
   let best = rec;
-  let bestF = s.hp / s.maxHp;
+  let bestF = frac(s);
   for (const o of ctx.recList) {
     const os = o.state;
     if (
@@ -350,7 +359,7 @@ function mostHurtAlly(ctx: SimCtx, rec: ShipRec, range: number): ShipRec {
       dist(os.pos, s.pos) > range
     )
       continue;
-    const f = os.hp / os.maxHp;
+    const f = frac(os);
     if (f < bestF) {
       best = o;
       bestF = f;

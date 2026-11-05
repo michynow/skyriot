@@ -187,7 +187,9 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.sieged = false;
     s.lockTarget = null;
     s.siegeLock = null;
-    s.cooldowns.fill(0);
+    // Core Breach's cooldown runs through death, or it would be free every life.
+    for (let i = 0; i < s.cooldowns.length; i++)
+      if (fd.hotbar[i] !== 'core-breach') s.cooldowns[i] = 0;
     s.buffs.length = 0;
     initToggles(s);
     rec.lat[0] = rec.lat[1] = rec.lat[2] = 0;

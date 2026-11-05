@@ -171,8 +171,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
       'renewal-pulse',
       'recharge-pulse',
       'mend-beam',
+      'charge-beam',
       'lifeline',
-      null,
       null,
       null,
       // Bar 2: Skill Kit

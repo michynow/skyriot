@@ -64,6 +64,7 @@ export const HEAL_FIELD_SHIELD = 0.3;
 /** Mend Beam / Lifeline reach, and Mend Beam heal (fraction of max HP). */
 export const HEAL_BEAM_RANGE = 400;
 export const HEAL_BEAM_HP = 0.3;
+export const CHARGE_BEAM_SHIELD = 0.4;
 export const DISPEL_RANGE = 600;
 export const SCAN_RADIUS = 600;
 export const DAMAGE_AURA_RADIUS = 55;

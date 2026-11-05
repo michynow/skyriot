@@ -284,8 +284,9 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
       break;
     }
     case 'mend-beam':
+    case 'charge-beam':
     case 'lifeline': {
-      const col = e.skill === 'mend-beam' ? C.green : C.gold;
+      const col = e.skill === 'mend-beam' ? C.green : e.skill === 'charge-beam' ? C.blue : C.gold;
       const t = targetsOf(e)[0];
       const ts = t ? world.ships.get(t) : s;
       if (t) beam(fx, e.id, t, col, e.skill === 'lifeline' ? 1.4 : 0.8);
