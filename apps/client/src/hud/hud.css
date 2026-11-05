@@ -235,23 +235,6 @@
 }
 
 /* warnings */
-.siege {
-  display: flex;
-  flex-direction: column;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #ffb02e66;
-  color: #ffb02e;
-}
-.siege b {
-  font:
-    800 13px 'Orbitron',
-    sans-serif;
-  letter-spacing: 0.15em;
-}
-.siege small {
-  font-size: 10px;
-  letter-spacing: 0.08em;
-}
 .dmg {
   position: absolute;
   left: 50%;
@@ -1221,42 +1204,6 @@
 .buff.expiring {
   animation: blink 0.5s infinite alternate;
 }
-.skill-banner {
-  position: absolute;
-  left: 50%;
-  top: 36%;
-  transform: translateX(-50%);
-  font:
-    800 52px 'Orbitron',
-    sans-serif;
-  letter-spacing: 0.3em;
-  color: #fff;
-  text-shadow:
-    0 0 20px #7fe7ff,
-    0 0 40px #7fe7ff,
-    0 3px 0 #0006;
-  animation: banner 1.1s ease-out forwards;
-  white-space: nowrap;
-}
-@keyframes banner {
-  0% {
-    opacity: 0;
-    transform: translateX(-50%) scale(1.6);
-    letter-spacing: 0.6em;
-  }
-  20% {
-    opacity: 1;
-    transform: translateX(-50%) scale(1);
-    letter-spacing: 0.3em;
-  }
-  75% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(-50%) scale(0.95);
-  }
-}
 .skill-fly {
   position: fixed;
   width: 54px;
@@ -1511,28 +1458,6 @@
   display: block;
   mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
 }
-.pitch {
-  position: absolute;
-  left: 50%;
-  top: 100%;
-  transform: translateX(-50%);
-  margin-top: 3px;
-  font:
-    700 10px 'Rajdhani',
-    sans-serif;
-  letter-spacing: 0.2em;
-  color: #7fe7ff;
-  opacity: 0.7;
-  white-space: nowrap;
-}
-.pitch b {
-  font:
-    700 12px 'Orbitron',
-    sans-serif;
-  color: #e8f4ff;
-  letter-spacing: 0;
-}
-
 /* Objectives: both Bases, top centre. */
 .objectives {
   position: absolute;

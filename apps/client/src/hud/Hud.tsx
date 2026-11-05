@@ -307,9 +307,6 @@ function SkillFx() {
   if (!fx) return null;
   return (
     <>
-      <div key={`b${fx.nonce}`} className="skill-banner">
-        {SKILLS[fx.skill]?.name.toUpperCase()}
-      </div>
       {fly && fly.nonce === fx.nonce && (
         <div
           key={`f${fly.nonce}`}

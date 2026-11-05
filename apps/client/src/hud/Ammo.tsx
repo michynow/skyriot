@@ -57,18 +57,8 @@ function Ammo({ side }: { side: 1 | 2 }) {
 
 /** Both weapons in one compact panel, left edge, vertically centred (keeps the crosshair area clear). */
 export function WeaponPanel() {
-  const siege = useHud((h) => (h.sieged ? (h.grounded ? 'GROUND SIEGE' : 'AIR SIEGE') : ''));
-  const detail = siege.startsWith('G')
-    ? '×1.5 DMG · RANGE ×1.4'
-    : '×1.15 DMG · RANGE ×1.15 · LOCK ×1.4';
   return (
     <div className="wpanel">
-      {siege && (
-        <div className="siege">
-          <b>{siege}</b>
-          <small>{detail}</small>
-        </div>
-      )}
       <Ammo side={1} />
       <Ammo side={2} />
     </div>
