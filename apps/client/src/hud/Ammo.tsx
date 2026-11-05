@@ -8,8 +8,8 @@ const MODE_LABEL: Record<string, string> = {
   'wide-lock-mode': 'WIDE LOCK',
 };
 
-/** Compact rounds counter beside the reticle: weapon icon, count, small name. */
-export function Ammo({ side }: { side: 1 | 2 }) {
+/** One weapon row: icon, name, rounds, then heat bar (Primary) or reattack countdown (Secondary). */
+function Ammo({ side }: { side: 1 | 2 }) {
   const a = useHud(
     useShallow((h) =>
       side === 1
@@ -51,6 +51,26 @@ export function Ammo({ side }: { side: 1 | 2 }) {
         </span>
       )}
       {a.n <= 0 && <span className="resup">RESUPPLY AT LAUNCH DECK</span>}
+    </div>
+  );
+}
+
+/** Both weapons in one compact panel, left edge, vertically centred (keeps the crosshair area clear). */
+export function WeaponPanel() {
+  const siege = useHud((h) => (h.sieged ? (h.grounded ? 'GROUND SIEGE' : 'AIR SIEGE') : ''));
+  const detail = siege.startsWith('G')
+    ? '×1.5 DMG · RANGE ×1.4'
+    : '×1.15 DMG · RANGE ×1.15 · LOCK ×1.4';
+  return (
+    <div className="wpanel">
+      {siege && (
+        <div className="siege">
+          <b>{siege}</b>
+          <small>{detail}</small>
+        </div>
+      )}
+      <Ammo side={1} />
+      <Ammo side={2} />
     </div>
   );
 }

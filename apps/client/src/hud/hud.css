@@ -236,24 +236,21 @@
 
 /* warnings */
 .siege {
-  position: absolute;
-  bottom: 104px;
-  left: 50%;
-  transform: translateX(-50%);
-  font:
-    800 20px 'Orbitron',
-    sans-serif;
-  letter-spacing: 0.25em;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #ffb02e66;
   color: #ffb02e;
-  border: 2px solid #ffb02e;
-  padding: 4px 18px;
-  background: #2a1a00aa;
 }
-.siege.off {
-  color: #9bb;
-  border-color: #9bb5;
-  background: none;
-  font-size: 13px;
+.siege b {
+  font:
+    800 13px 'Orbitron',
+    sans-serif;
+  letter-spacing: 0.15em;
+}
+.siege small {
+  font-size: 10px;
+  letter-spacing: 0.08em;
 }
 .dmg {
   position: absolute;
@@ -874,63 +871,66 @@
   transform: none;
   font-size: 15px;
 }
-.ammo {
+.wpanel {
   position: absolute;
-  top: -26px;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  zoom: var(--hud-scale, 1);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  width: 90px;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #0a141cb0;
+  border-left: 2px solid #7fe7ff88;
   font-family: 'Rajdhani', sans-serif;
   text-shadow: 0 1px 3px #000;
 }
-.ammo.a1 {
-  right: 52px;
+.ammo {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  grid-template-areas: 'i n b' 'i s s';
+  align-items: center;
+  column-gap: 8px;
+  width: 150px;
 }
-.ammo.a2 {
-  left: 52px;
-}
-.wpn-icon {
-  width: 30px;
-  height: 30px;
+.ammo .wpn-icon {
+  grid-area: i;
+  width: 26px;
+  height: 26px;
   color: #d8f4ff;
   filter: drop-shadow(0 0 2px #000);
 }
+.ammo small {
+  grid-area: n;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  opacity: 0.7;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
 .ammo b {
+  grid-area: b;
   font:
-    800 22px 'Orbitron',
+    800 18px 'Orbitron',
     sans-serif;
   line-height: 1;
 }
-.ammo small {
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  opacity: 0.6;
-  text-transform: uppercase;
-  white-space: nowrap;
+.ammo .heat,
+.ammo .adv {
+  grid-area: s;
 }
 .ammo.low b {
   color: #ff4d4d;
   animation: blink 0.35s infinite alternate;
 }
 .resup {
-  position: absolute;
-  top: 76px;
-  white-space: nowrap;
+  grid-column: 1 / -1;
   font-size: 11px;
   font-weight: 800;
   color: #ff4d4d;
   letter-spacing: 0.08em;
-}
-.gunner .ammo {
-  top: 50px;
-}
-.gunner .ammo.a1 {
-  right: auto;
-  left: -150px;
-}
-.gunner .ammo.a2 {
-  left: 60px;
 }
 .cursor.assist {
   border-color: #ffd24a;
@@ -1004,7 +1004,6 @@
 .radar,
 .killfeed,
 .chat,
-.siege,
 .dock,
 .incoming,
 .evaded,
@@ -1484,7 +1483,8 @@
   opacity: 0.7;
 }
 .tape-alt {
-  left: calc(50% + 244px);
+  right: 14px;
+  zoom: 0.7;
 }
 .tape-alt small {
   left: 2px;
@@ -2122,7 +2122,7 @@
 }
 .loadout {
   position: absolute;
-  right: 40px;
+  right: 130px;
   top: 50%;
   transform: translateY(-50%);
   width: 360px;
@@ -2310,7 +2310,7 @@
 /* First-flight key card (right side, clear of tapes and radar). */
 .tips {
   position: absolute;
-  right: 24px;
+  right: 130px;
   top: 42%;
   transform: translateY(-50%);
   zoom: var(--hud-scale, 1);
@@ -2442,7 +2442,8 @@
 }
 .twin {
   position: absolute;
-  top: 14px;
+  zoom: var(--hud-scale, 1);
+  top: 172px; /* under Objectives and the heading tape */
   left: 50%;
   transform: translateX(-50%);
   width: 240px;
@@ -2494,7 +2495,7 @@
 }
 .heat {
   display: block;
-  width: 64px;
+  width: 100%;
   height: 4px;
   margin-top: 3px;
   background: #ffffff22;
