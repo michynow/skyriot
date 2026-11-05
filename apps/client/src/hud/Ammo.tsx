@@ -13,13 +13,25 @@ export function Ammo({ side }: { side: 1 | 2 }) {
   const a = useHud(
     useShallow((h) =>
       side === 1
-        ? { n: h.ammo1, max: h.ammoMax1, name: h.weapon1, id: h.weaponId1, mode: '' }
+        ? {
+            n: h.ammo1,
+            max: h.ammoMax1,
+            name: h.weapon1,
+            id: h.weaponId1,
+            mode: '',
+            heat: h.heat,
+            hot: h.overheated,
+            wait: 0,
+          }
         : {
             n: h.ammo2,
             max: h.ammoMax2,
             name: h.weapon2,
             id: h.toggles.bombing ?? h.weaponId2,
             mode: h.toggles.bombing ?? '',
+            heat: 0,
+            hot: false,
+            wait: h.advReadyIn,
           },
     ),
   );
@@ -29,6 +41,15 @@ export function Ammo({ side }: { side: 1 | 2 }) {
       <WeaponIcon id={a.id} />
       <b>{Math.round(a.n)}</b>
       <small>{a.mode ? MODE_LABEL[a.mode] : a.name}</small>
+      {side === 1 ? (
+        <span className={`heat ${a.hot ? 'hot' : ''}`}>
+          <i style={{ width: `${a.heat * 100}%` }} />
+        </span>
+      ) : (
+        <span className={`adv ${a.wait > 0 ? '' : 'ready'}`}>
+          {a.wait > 0 ? `${a.wait.toFixed(1)}s` : 'READY'}
+        </span>
+      )}
       {a.n <= 0 && <span className="resup">RESUPPLY AT LAUNCH DECK</span>}
     </div>
   );
