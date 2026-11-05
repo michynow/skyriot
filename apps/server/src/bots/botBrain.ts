@@ -9,6 +9,7 @@ import {
   TICK_HZ,
   TURRET,
   WEAPONS,
+  bombingSecondary,
   isCloaked,
   mulberry32,
   sampleHeight,
@@ -24,6 +25,8 @@ import {
 // Skill: Bots fly like mediocre human pilots. Raise/lower these to make them harder/easier.
 /** Ticks between looks at the enemy: in between, a Bot steers at where it last saw it. */
 const REACTION_TICKS = 7;
+/** Two+ airborne enemies this close: the Anvil picks Wide Lock Mode over Air Barrage. */
+const WIDE_LOCK_PACK_M = 1200;
 /** Aim error (rad) on a fresh target; shrinks toward the floor only while the target is held. */
 const AIM_ERR_START_RAD = 0.22;
 const AIM_ERR_MIN_RAD = 0.04;
@@ -165,7 +168,7 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
 
   const fd = FRAMES[me.frame];
   const primary = WEAPONS[fd.primary]!;
-  const secondary = WEAPONS[fd.secondary]!;
+  const secondary = bombingSecondary(WEAPONS[fd.secondary]!, me.toggles.bombing);
   let claimed = claims.get(sim);
   if (!claimed) claims.set(sim, (claimed = new Map()));
   // Reaction delay: look at the enemy only every REACTION_TICKS; in between, steer at the stale sighting.
@@ -445,7 +448,12 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     !me.docked &&
     mem.rng() < SKILL_USE_CHANCE
   ) {
-    const wantMode = enemy.grounded || enemy.docked ? 'ground-strike-mode' : 'air-barrage-mode';
+    const wantMode =
+      enemy.grounded || enemy.docked
+        ? 'ground-strike-mode'
+        : airEnemiesNear(sim, me, WIDE_LOCK_PACK_M) >= 2
+          ? 'wide-lock-mode'
+          : 'air-barrage-mode';
     for (let slot = 0; slot < fd.hotbar.length; slot++) {
       const id = fd.hotbar[slot];
       const def = id ? SKILLS[id] : undefined;
@@ -520,6 +528,19 @@ function pickObjective(sim: Sim, me: ShipState): StructureState | null {
     } else if (st.kind === 'core') core = st;
   }
   return turret ?? station ?? core;
+}
+
+/** Airborne enemy Ships within `r` of the Bot (a pack worth the multi-target bombing mode). */
+function airEnemiesNear(sim: Sim, me: ShipState, r: number): number {
+  let n = 0;
+  for (const o of sim.ships()) {
+    if (!o.alive || o.nation === me.nation || o.launchPhase !== 'none' || o.grounded || o.docked)
+      continue;
+    const d2 =
+      (o.pos[0] - me.pos[0]) ** 2 + (o.pos[1] - me.pos[1]) ** 2 + (o.pos[2] - me.pos[2]) ** 2;
+    if (d2 <= r * r) n++;
+  }
+  return n;
 }
 
 /** Nearest enemy, but each other Bot already on a Ship makes it look DOGPILE_PENALTY_M farther. */

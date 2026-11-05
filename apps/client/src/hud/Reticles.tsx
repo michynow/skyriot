@@ -5,6 +5,7 @@ import {
   SIEGE,
   SIEGE_AIR,
   WEAPONS,
+  bombingSecondary,
   sampleHeight,
   type Heightfield,
   type ShipState,
@@ -140,7 +141,8 @@ export function Reticles() {
       const rangeMul = siegeMul?.rangeMul ?? 1;
       const coneMul = sieged && !isGrounded(own) ? SIEGE_AIR.lockConeMul : 1;
       const primary = weapon(def.primary);
-      const secondary = weapon(def.secondary);
+      const sec0 = weapon(def.secondary);
+      const secondary = sec0 && bombingSecondary(sec0, own.toggles.bombing);
       const primRange = (primary?.rangeM ?? 0) * rangeMul;
       const secRange = (secondary?.rangeM ?? 0) * rangeMul;
       const radar = def.radarRangeM;

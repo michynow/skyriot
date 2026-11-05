@@ -130,6 +130,15 @@ export const AIR_BARRAGE_COUNT = 3;
 export const AIR_BARRAGE_SPREAD_RAD = 0.035;
 /** Each of the salvo's rockets deals this fraction of the Secondary's damage. */
 export const AIR_BARRAGE_DAMAGE_MUL = 0.45;
+/** Wide Lock Mode: the Secondary's lock cone widens by this, its lock/fire range scales, and each salvo seeks up to N Ships. */
+export const WIDE_LOCK_CONE_ADD_RAD = 0.384; // ~22 degrees
+export const WIDE_LOCK_RANGE_MUL = 1.45;
+/** Lock time when the Secondary has none of its own (dumb rockets / bombs). */
+export const WIDE_LOCK_SEC = 0.8;
+export const WIDE_LOCK_TARGETS = 3;
+export const WIDE_LOCK_HOMING_TURN = 2.4;
+/** Each guided rocket deals this fraction of the Secondary's damage. */
+export const WIDE_LOCK_DAMAGE_MUL = 0.5;
 export const GROUND_STRIKE_GROUND_MUL = 1.4;
 export const GROUND_STRIKE_SPLASH_MUL = 1.3;
 export const BOMB_DROP_SPEED = 20;

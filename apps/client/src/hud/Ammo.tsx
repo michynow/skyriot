@@ -2,6 +2,12 @@ import { useShallow } from 'zustand/react/shallow';
 import { WeaponIcon } from './icons';
 import { useHud } from './hudStore';
 
+const MODE_LABEL: Record<string, string> = {
+  'air-barrage-mode': 'AIR BARRAGE',
+  'ground-strike-mode': 'GROUND STRIKE',
+  'wide-lock-mode': 'WIDE LOCK',
+};
+
 /** Compact rounds counter beside the reticle: weapon icon, count, small name. */
 export function Ammo({ side }: { side: 1 | 2 }) {
   const a = useHud(
@@ -22,9 +28,7 @@ export function Ammo({ side }: { side: 1 | 2 }) {
     <div className={`ammo a${side} ${low ? 'low' : ''}`}>
       <WeaponIcon id={a.id} />
       <b>{Math.round(a.n)}</b>
-      <small>
-        {a.mode ? (a.mode === 'air-barrage-mode' ? 'AIR BARRAGE' : 'GROUND STRIKE') : a.name}
-      </small>
+      <small>{a.mode ? MODE_LABEL[a.mode] : a.name}</small>
       {a.n <= 0 && <span className="resup">RESUPPLY AT LAUNCH DECK</span>}
     </div>
   );

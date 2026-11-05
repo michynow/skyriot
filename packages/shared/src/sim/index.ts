@@ -107,3 +107,4 @@ export {
   NOSE_OFFSET,
   ROLL_DURATION_SEC,
 } from './constants';
+export { bombingSecondary } from './combat';
