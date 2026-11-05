@@ -87,6 +87,8 @@ function mk(
     halted: false,
     landing: false,
     liftTicks: 0,
+    boostTicks: 0,
+    boostRamp: 0,
   };
 }
 
@@ -99,6 +101,17 @@ interface Opts {
 }
 
 /** Standalone render preview: fake ships + fake events, no network. Mount inside <Canvas>. */
+/** Demo boost: full level on or off (the live game derives it from the booster spool and speed). */
+function setDemoBoost(id: string, on: boolean): void {
+  if (on) {
+    world.boosting.add(id);
+    world.boostLevel.set(id, 1);
+  } else {
+    world.boosting.delete(id);
+    world.boostLevel.delete(id);
+  }
+}
+
 export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
   const map = RUSTWATER_CANYONS;
   const demo = useMemo(() => {
@@ -167,8 +180,7 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
         o.quaternion.setFromEuler(new THREE.Euler(0, 0, 0));
         s.rot = [o.quaternion.x, o.quaternion.y, o.quaternion.z, o.quaternion.w];
         s.sieged = k % 4 === 3 && Math.floor(t / 4) % 2 === 1;
-        if (k === 0 || k === 5) world.boosting.add(s.id);
-        else world.boosting.delete(s.id);
+        setDemoBoost(s.id, k === 0 || k === 5);
         continue;
       }
       if (i === 0 && location.search.includes('dock')) {
@@ -195,8 +207,7 @@ export function DemoScene({ quality, opts }: { quality: Quality; opts: Opts }) {
       s.pos = [x, y, z];
       s.rot = [o.quaternion.x, o.quaternion.y, o.quaternion.z, o.quaternion.w];
       s.sieged = false;
-      if (i === 0 || i % 3 === 0 || boostAll) world.boosting.add(s.id);
-      else world.boosting.delete(s.id);
+      setDemoBoost(s.id, i === 0 || i % 3 === 0 || boostAll);
       if (s.rollPhase >= 0) s.rollPhase = s.rollPhase + dt / 0.7 > 1 ? -1 : s.rollPhase + dt / 0.7;
       const dead = demo.deadUntil.get(s.id);
       if (dead !== undefined && t > dead) {

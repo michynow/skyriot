@@ -1338,7 +1338,7 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
       fx.trails.set(s.id, tr);
     }
     q.set(s.rot[0], s.rot[1], s.rot[2], s.rot[3]);
-    const boost = world.boosting.has(s.id);
+    const bl = world.boostLevel.get(s.id) ?? 0; // continuous boost intensity
     const sp = dx * dx + dy * dy + dz * dz > 500 * 500 ? TRAIL_SPACING * 3 : TRAIL_SPACING;
     const [ar, ag, ab] = trailRgb(s.nation, look.upgrade);
     const ub = 1 + look.upgrade * 0.03; // higher upgrades leave fatter, longer, brighter trails
@@ -1361,9 +1361,9 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
           const n = Math.min(24, Math.floor(d / sp));
           for (let k = 1; k <= n; k++) {
             const u = k / (n + 1);
-            const life = (boost ? 0.5 : 0.4) * (1 + look.upgrade * 0.03);
-            const sz = e.r * MODEL_SCALE * (boost ? 2.8 : 2.4) * ub;
-            if (boost && k % 6 === 0)
+            const life = (0.4 + 0.12 * bl) * (1 + look.upgrade * 0.03);
+            const sz = e.r * MODEL_SCALE * (2.4 + 0.5 * bl) * ub;
+            if (bl > 0.6 && k % 6 === 0)
               fx.puffs.emit(
                 t.x + mx * u,
                 t.y + my * u,
@@ -1380,38 +1380,22 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
                 0.05,
                 0.6,
               );
-            if (boost)
-              fx.glow.emit(
-                t.x + mx * u,
-                t.y + my * u,
-                t.z + mz * u,
-                0,
-                0,
-                0,
-                life,
-                sz,
-                sz * 0.25,
-                1.8,
-                1.25,
-                0.65,
-                0.14,
-              );
-            else
-              fx.glow.emit(
-                t.x + mx * u,
-                t.y + my * u,
-                t.z + mz * u,
-                0,
-                0,
-                0,
-                life,
-                sz,
-                sz * 0.3,
-                ar * 1.3,
-                ag * 1.3,
-                ab * 1.3,
-                0.16 + look.upgrade * 0.02,
-              );
+            // Nation trail warms toward a hot afterburner tint as the boost level rises.
+            fx.glow.emit(
+              t.x + mx * u,
+              t.y + my * u,
+              t.z + mz * u,
+              0,
+              0,
+              0,
+              life,
+              sz,
+              sz * (0.3 - 0.05 * bl),
+              ar * 1.3 + (1.8 - ar * 1.3) * bl,
+              ag * 1.3 + (1.25 - ag * 1.3) * bl,
+              ab * 1.3 + (0.65 - ab * 1.3) * bl,
+              0.16 + look.upgrade * 0.02 - 0.02 * bl,
+            );
             if (look.upgrade >= 8 && k % 4 === 0)
               // ember sparks shed off high-upgrade trails
               fx.glow.emit(

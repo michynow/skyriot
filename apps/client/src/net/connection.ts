@@ -82,6 +82,8 @@ function parseSnapshot(m: unknown): Snapshot | null {
     siegePending: s.siegePending === true,
     landing: s.landing === true,
     liftTicks: isNum(s.liftTicks) ? s.liftTicks : 0,
+    boostTicks: isNum(s.boostTicks) ? s.boostTicks : 0,
+    boostRamp: isNum(s.boostRamp) ? s.boostRamp : 0,
     incomingDist: isNum(s.incomingDist) ? s.incomingDist : -1,
     incomingTti: isNum(s.incomingTti) ? s.incomingTti : -1,
     canLock: s.canLock === true,

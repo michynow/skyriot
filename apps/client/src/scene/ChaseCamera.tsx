@@ -10,7 +10,9 @@ import { MODEL_SCALE } from '../frames/models';
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 
 const BASE_FOV = 60;
-const BOOST_FOV = -1.5; // boost narrows the view very slightly; never widens
+/** At full boost level the view widens this much (deg) and the camera sits this much further back. */
+const BOOST_FOV = 6;
+const BOOST_PULLBACK = 0.12;
 const POS_OMEGA = 9; // critically-damped spring angular frequency (1/s): higher = stiffer
 const ROT_RATE = 8;
 /** Share of the Ship's bank the camera follows: the rest shows as the Ship banking on screen. */
@@ -53,6 +55,7 @@ export function ChaseCamera() {
       pitch: 0,
       zoom: 1,
       shake: 0,
+      boost: 0,
       fp: 0,
       anc: new THREE.Vector3(),
       sp: new THREE.Vector3(),
@@ -126,7 +129,9 @@ export function ChaseCamera() {
     st.qs.copy(st.q).multiply(st.qo);
 
     // Sized by the hull so the whole Ship fits in frame, sitting below the centre crosshair.
-    const dist = Math.max(def.halfLength, def.radius) * 4.6 * st.zoom;
+    st.boost += ((world.boostLevel.get(ship.id) ?? 0) - st.boost) * (1 - Math.exp(-4 * dt));
+    const dist =
+      Math.max(def.halfLength, def.radius) * 4.6 * st.zoom * (1 + BOOST_PULLBACK * st.boost);
     const height = Math.max(dist * 0.2, def.radius * st.zoom);
     st.off.set(0, height, dist).applyQuaternion(st.qs);
     // Pitch so the screen-centre ray meets the Ship's flight line at AIM_DISTANCE: centred cursor = fly straight.
@@ -214,8 +219,7 @@ export function ChaseCamera() {
       st.shake *= Math.exp(-6 * dt);
     } else st.shake = 0;
 
-    const boost = world.boosting.has(ship.id) ? BOOST_FOV : 0;
-    st.fov += (BASE_FOV + boost - st.fov) * (1 - Math.exp(-5 * dt));
+    st.fov = BASE_FOV + BOOST_FOV * st.boost;
     if (Math.abs(camera.fov - st.fov) > 0.01) {
       camera.fov = st.fov;
       camera.updateProjectionMatrix();

@@ -76,9 +76,17 @@ export function FrameModel({
   useFrame((_, dt) => {
     const s = st.current;
     s.t += dt;
-    const b = boosting ?? (shipId ? world.boosting.has(shipId) : false);
+    const lvl =
+      boosting !== undefined
+        ? boosting
+          ? 1
+          : 0
+        : shipId
+          ? (world.boostLevel.get(shipId) ?? 0)
+          : 0;
+    const b = lvl > 0.12;
     const sg = sieged ?? (shipId ? !!world.ships.get(shipId)?.sieged : false);
-    s.boost += ((b ? 1 : 0) - s.boost) * (1 - Math.exp(-8 * dt));
+    s.boost += (lvl - s.boost) * (1 - Math.exp(-12 * dt));
     s.siege += ((sg ? 1 : 0) - s.siege) * (1 - Math.exp(-2.5 * dt));
     const gr0 = !!(
       shipId && (world.ships.get(shipId) as { grounded?: boolean } | undefined)?.grounded
