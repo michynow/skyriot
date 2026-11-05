@@ -24,7 +24,6 @@ const MAX_ALLY_LABELS = 2;
 const LABEL_ENEMY_M = 450;
 const LABEL_ALLY_M = 180;
 const LABEL_CONE_COS = Math.cos((9 * Math.PI) / 180);
-const LADDER = 8;
 const NOSE_DISTANCE = 500;
 export const NATION_COLOR = { concord: '#f2c24b', vex: '#ff5a3c' } as const;
 const ENEMY = '#ff4d4d';
@@ -99,7 +98,6 @@ export function Reticles() {
   const gunnerEl = useRef<HTMLDivElement>(null);
   const gunTag = useRef<HTMLDivElement>(null);
   const ringEl = useRef<SVGCircleElement>(null);
-  const ladderEls = useRef<(HTMLDivElement | null)[]>([]);
   const markerEls = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
@@ -288,7 +286,7 @@ export function Reticles() {
       if (cand && project(cand.pos[0], cand.pos[1], cand.pos[2], p))
         place(candEl.current, p.x, p.y, true);
 
-      // Range ladder + gunner info for first-person Siege.
+      // Gunner info for first-person Siege.
       const gun = gunnerEl.current;
       place(gun, cx, cy, sieged);
       // Siege gun lock (server-validated): GUN LOCK while held, LOCK LOST briefly when the sim drops it.
@@ -301,30 +299,6 @@ export function Reticles() {
         ringEl.current.style.strokeDashoffset = own.siegeLock ? '0' : String(RING_LEN);
       setText(gunTag.current, own.siegeLock ? 'GUN LOCK' : now < gunLostUntil ? 'LOCK LOST' : '');
       gunTag.current?.classList.toggle('lost', !own.siegeLock);
-      if (sieged) {
-        const hl = Math.hypot(fx, fz) || 1;
-        const hf = world.heightfield;
-        const maxR = secRange || primRange;
-        let lastY = -1e9; // rungs bunch up toward the horizon: drop any that would overprint the one before
-        for (let i = 0; i < LADDER; i++) {
-          const el = ladderEls.current[i] ?? null;
-          const r = ((i + 1) / LADDER) * maxR;
-          const wx = own.pos[0] + (fx / hl) * r;
-          const wz = own.pos[2] + (fz / hl) * r;
-          const wy = hf ? sampleHeight(hf, wx, wz) : own.pos[1];
-          const ok = project(wx, wy, wz, p);
-          if (el) {
-            const show = ok && Math.abs(p.y - lastY) > 14;
-            el.style.display = show ? 'block' : 'none';
-            if (show) {
-              el.style.transform = `translate(0px,${p.y - cy}px)`;
-              lastY = p.y;
-            }
-            setText(el.firstElementChild as HTMLElement, String(Math.round(r)));
-          }
-        }
-      }
-
       // Target marker, lead indicator, lock progress.
       if (!target || !rel) {
         place(leadEl.current, 0, 0, false);
@@ -479,13 +453,6 @@ export function Reticles() {
           <path d="M-44 0h24M20 0h24M0 -44v24M0 20v24" className="g-cross" />
         </svg>
         <div className="g-tag" ref={gunTag} />
-        <div className="ladder">
-          {Array.from({ length: LADDER }, (_, i) => (
-            <div key={i} ref={(el) => void (ladderEls.current[i] = el)} className="rung">
-              <span />
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
