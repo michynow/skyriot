@@ -121,8 +121,17 @@ function GameLoop() {
     if (mine) world.ships.set(ownId, mine);
 
     world.boosting.clear();
+    world.boostLevel.clear();
     for (const s of world.ships.values()) {
-      if (s.alive && s.speed > FRAMES[s.frame].maxSpeed * 1.02) world.boosting.add(s.id);
+      if (!s.alive) continue;
+      const fd = FRAMES[s.frame];
+      const over = Math.min(
+        1,
+        Math.max(0, (s.speed - fd.cruiseSpeed) / Math.max(1, fd.boostSpeed - fd.cruiseSpeed)),
+      );
+      const level = 0.55 * (s.boostRamp ?? 0) + 0.45 * over;
+      if (level > 0.01) world.boostLevel.set(s.id, level);
+      if (level > 0.35) world.boosting.add(s.id);
     }
   }, -1);
 

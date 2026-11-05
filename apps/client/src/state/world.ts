@@ -21,6 +21,8 @@ export interface ClientWorld {
   ships: Map<ShipId, ShipState>;
   /** Visual-only flags per Ship, set by the game loop. */
   boosting: Set<ShipId>;
+  /** Boost intensity 0..1 per Ship (booster spool + speed above cruise), set by the game loop; drives boost FX. */
+  boostLevel: Map<ShipId, number>;
   /** Events pushed by net layer; FX layer drains (splice) each frame. */
   fxQueue: SimEvent[];
   /** Normalised aim cursor in screen space (-1..1), written by input, read by HUD/camera. */
@@ -48,6 +50,7 @@ export const world: ClientWorld = {
   ownId: null,
   ships: new Map(),
   boosting: new Set(),
+  boostLevel: new Map(),
   fxQueue: [],
   cursor: { x: 0, y: 0 },
   freeLook: false,

@@ -3,6 +3,13 @@
 export const BRAKE_DECEL_MUL = 1.6;
 /** Easing off the throttle (S / release) slows at this fraction of accel: only Brake bleeds speed fast. */
 export const THROTTLE_DECEL_MUL = 0.5;
+/** Speed eases onto its target: within accel * this (s) of it the approach turns exponential (no hard stop). */
+export const SPEED_EASE_SEC = 0.25;
+/** Booster: spool-up / bleed-off times of the ramp, a tap's minimum burn, and fuel needed to light it. */
+export const BOOST_SPOOL_SEC = 0.6;
+export const BOOST_BLEED_SEC = 1;
+export const BOOST_MIN_SEC = 0.25;
+export const BOOST_MIN_FUEL = 0.08;
 export const BANK_MAX_RAD = 1.05;
 export const BANK_RATE_RAD = 9;
 /** Bank (rad) per rad/s of yaw rate. */

@@ -14,6 +14,10 @@ import {
   CEILING_PITCH_DOWN,
   CEILING_PUSH_SPEED,
   CEILING_SOFT_M,
+  BOOST_BLEED_SEC,
+  BOOST_MIN_FUEL,
+  BOOST_MIN_SEC,
+  BOOST_SPOOL_SEC,
   BRAKE_DECEL_MUL,
   DOCK_CLEARANCE,
   DOCK_TOUCH_MARGIN,
@@ -40,6 +44,7 @@ import {
   REVERSE_SPEED_MUL,
   SHIP_QUERY_GROUPS,
   SIEGE_LOCK_CONE_MUL,
+  SPEED_EASE_SEC,
   THROTTLE_DECEL_MUL,
   TURN_GAIN,
   TURN_SPEED_FALLOFF,
@@ -270,22 +275,37 @@ export function stepFlight(
     s.speed = 0;
     s.rollPhase = -1;
     s.rollDir = 0;
+    s.boostTicks = 0;
+    s.boostRamp = 0;
     for (let i = 0; i < 3; i++) rec.lat[i] = s.vel[i] = s.angVel[i] = 0;
     s.fuel = clamp(s.fuel + fd.fuelRegenPerSec * rec.mods.fuelRegenMul * dt, 0, 1);
     syncBody(ctx, rec);
     return;
   }
-  // Boost: Space with fuel, in normal flight (not sieged, halted, braking, reversing or dashing).
-  const boosting =
-    input.boost &&
-    s.fuel > 0 &&
+  // Boost: Space in normal flight (not sieged, grounded, braking, reversing, dashing or landing).
+  // Lighting it needs BOOST_MIN_FUEL (no flicker at an empty tank); once lit it burns while held (a tap
+  // for at least BOOST_MIN_SEC) until the tank is dry. The ramp spools up / bleeds off smoothly.
+  const canBoost =
     !sieged &&
-    !s.halted &&
     !grounded &&
     s.reverseTicks === 0 &&
     s.dashTicks === 0 &&
     !input.brake &&
-    !s.siegePending;
+    !s.siegePending &&
+    !s.landing &&
+    s.fuel > 0;
+  const lit =
+    s.boostTicks > 0
+      ? input.boost || s.boostTicks < BOOST_MIN_SEC * TICK_HZ
+      : input.boost && s.fuel >= BOOST_MIN_FUEL;
+  s.boostTicks = canBoost && lit ? s.boostTicks + 1 : 0;
+  const boosting = s.boostTicks > 0;
+  s.boostRamp = clamp(
+    s.boostRamp + (boosting ? dt / BOOST_SPOOL_SEC : -dt / BOOST_BLEED_SEC),
+    0,
+    1,
+  );
+  const ramp = s.boostRamp * s.boostRamp * (3 - 2 * s.boostRamp);
 
   // ---- orientation: ease the nose toward aim (angular velocity with time constant) ----
   forwardOf(s.rot, _f0);
@@ -354,7 +374,7 @@ export function stepFlight(
         rec.mods.turnRateMul *
         (sieged ? siegeMods(s).turnRateMul : 1) *
         (grounded ? 1 : speedTurnMul(fd, s.speed)) *
-        (boosting ? fd.boostTurnMul : 1);
+        (1 + (fd.boostTurnMul - 1) * ramp);
   const cosA = clamp(_f0[0]! * ax + _f0[1]! * ay + _f0[2]! * az, -1, 1);
   const angle = Math.acos(cosA);
   let cx = _f0[1]! * az - _f0[2]! * ay;
@@ -592,7 +612,7 @@ export function stepFlight(
       input.throttle >= 0
         ? fd.cruiseSpeed + (fd.maxSpeed - fd.cruiseSpeed) * input.throttle
         : fd.cruiseSpeed + (fd.cruiseSpeed - fd.minSpeed) * input.throttle;
-    if (s.dashTicks > 0 || boosting) target = fd.boostSpeed;
+    target = s.dashTicks > 0 ? fd.boostSpeed : target + (fd.boostSpeed - target) * ramp;
     target *= rec.mods.speedMul;
   }
   s.fuel = clamp(
@@ -601,14 +621,15 @@ export function stepFlight(
     1,
   );
   const delta = target - s.speed;
-  const rate2 =
-    (delta >= 0
-      ? 1
-      : input.brake || s.siegePending || sieged || s.landing
-        ? BRAKE_DECEL_MUL
-        : THROTTLE_DECEL_MUL) * accel;
+  const braking = input.brake || s.siegePending || sieged || s.landing;
+  let rate2 = (delta >= 0 ? 1 : braking ? BRAKE_DECEL_MUL : THROTTLE_DECEL_MUL) * accel;
+  // Boost surge / bleed track the ramp (smoothstep peaks at 1.5x the average slope).
+  const span = fd.boostSpeed - fd.cruiseSpeed;
+  if (delta >= 0 && boosting) rate2 = Math.max(rate2, ((1.5 * span) / BOOST_SPOOL_SEC) * dt);
+  else if (delta < 0 && !braking && s.speed > fd.maxSpeed)
+    rate2 = Math.max(rate2, ((1.5 * span) / BOOST_BLEED_SEC) * dt);
   if (s.reverseTicks > 0) s.speed = target;
-  else s.speed += clamp(delta, -rate2, rate2);
+  else s.speed += clamp(delta * (1 - Math.exp(-dt / SPEED_EASE_SEC)), -rate2, rate2);
 
   // ---- lateral / vertical velocity ----
   const hrx = -_f1[2]!,

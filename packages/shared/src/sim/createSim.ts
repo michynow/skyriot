@@ -214,6 +214,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.halted = false;
     s.landing = false;
     s.liftTicks = 0;
+    s.boostTicks = 0;
+    s.boostRamp = 0;
     rec.salvoLeft = rec.salvoCd = rec.siegeArm = 0;
     rec.salvoTarget = null;
     rec.wasSieged = false;
@@ -297,6 +299,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       halted: false,
       landing: false,
       liftTicks: 0,
+      boostTicks: 0,
+      boostRamp: 0,
     };
     const body = world.createRigidBody(
       R.RigidBodyDesc.kinematicPositionBased().setTranslation(at[0], at[1], at[2]),

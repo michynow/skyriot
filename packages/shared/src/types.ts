@@ -170,6 +170,10 @@ export interface ShipState {
   landing: boolean;
   /** Ticks left of the Bulwark's lift-off climb (C while Grounded). */
   liftTicks: number;
+  /** Ticks since the booster lit (0 = off). A tap still burns for BOOST_MIN_SEC. */
+  boostTicks: number;
+  /** Booster spool 0..1: rises over BOOST_SPOOL_SEC when lit, bleeds over BOOST_BLEED_SEC after. Drives speed and FX. */
+  boostRamp: number;
 }
 
 /**

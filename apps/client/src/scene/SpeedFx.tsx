@@ -24,7 +24,7 @@ void main(){
   float cell = fract(a * N);
   float h = h11(id), h2 = h11(id + 17.0), h3 = h11(id + 53.0);
   // streak exists only if its hash is under the density
-  float on = step(h, uAmt * 0.45 + uKick * 0.15);
+  float on = step(h, uAmt * 0.35 + uKick * 0.1);
   // thin line across the sector
   float w = 0.1 + 0.12 * h2;
   float line = smoothstep(0.5 - w, 0.5, cell) * smoothstep(0.5 + w, 0.5, cell);
@@ -33,7 +33,7 @@ void main(){
   float s = fract(r * 0.9 - uTime * speed - h2 * 3.0);
   float seg = smoothstep(0.0, 0.05, s) * smoothstep(0.55 + 0.3 * h, 0.0, s);
   float radial = smoothstep(0.32, 0.95, r);
-  float alpha = line * seg * on * radial * (0.35 * uAmt + 0.25 * uKick);
+  float alpha = line * seg * on * radial * (0.3 * uAmt + 0.2 * uKick);
   gl_FragColor = vec4(uTint * (0.9 + 0.4 * uKick), alpha);
 }`;
 
@@ -54,14 +54,16 @@ export function SpeedLines() {
   useFrame((_, rawDt) => {
     const dt = Math.min(rawDt, 0.1);
     const own = world.ownId;
-    const on = !!own && world.boosting.has(own);
+    // Continuous: the own Ship's boost level (spool + speed above cruise); a small flare when it lights.
+    const lvl = own ? (world.boostLevel.get(own) ?? 0) : 0;
+    const on = lvl > 0.12;
     if (on && !boostState.was) {
-      boostState.kick = 1;
+      boostState.kick = 0.6;
       const w = world as unknown as { shake?: number };
-      w.shake = Math.max(w.shake ?? 0, 0.15); // kick-in camera shake via the shared shake path
+      w.shake = Math.max(w.shake ?? 0, 0.1); // kick-in camera shake via the shared shake path
     }
     boostState.was = on;
-    boostState.sustained += ((on ? 1 : 0) - boostState.sustained) * (1 - Math.exp(-6 * dt));
+    boostState.sustained += (lvl - boostState.sustained) * (1 - Math.exp(-8 * dt));
     boostState.kick = Math.max(0, boostState.kick - dt / 0.35);
     // r3f clones the `uniforms` prop, so write through the live material, not the memo object
     const m = mat.current;
