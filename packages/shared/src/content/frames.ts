@@ -104,7 +104,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
       'air-barrage-mode',
       'ground-strike-mode',
       'overcharge-round',
-      null,
+      'wide-lock-mode',
       null,
       null,
       null,

@@ -130,6 +130,45 @@ place('anvil', 120);
   check('rocket proximity burst hits a near-miss', ship('foe').hp < hpProx);
 }
 
+// Wide Lock Mode: switches from another mode, locks the lockless bomb Secondary, one guided rocket per enemy in the cone.
+add('foe2', 'vex', 'wasp');
+add('foe3', 'vex', 'wasp');
+place('anvil', 300);
+{
+  const a = ship('anvil');
+  const [x, y, z, w] = a.rot;
+  const r = [1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y)];
+  const f = ship('foe').pos;
+  // ~15 degrees off the nose at 300 m: outside a plain cone, inside the widened one.
+  sim.teleport('foe2', [f[0] + r[0]! * 80, f[1] + r[1]! * 80, f[2] + r[2]! * 80]);
+  sim.teleport('foe3', [f[0] - r[0]! * 80, f[1] - r[1]! * 80, f[2] - r[2]! * 80]);
+  sim.castSkill('anvil', 'air-barrage-mode');
+  step(70);
+  sim.castSkill('anvil', 'wide-lock-mode');
+  check(
+    'wide-lock-mode replaces air-barrage-mode',
+    ship('anvil').toggles.bombing === 'wide-lock-mode',
+  );
+  step(30, { anvil: { target: 'foe' } });
+  check('wide-lock-mode locks the bomb Secondary', ship('anvil').lockTarget === 'foe');
+  const ammo = ship('anvil').ammo2;
+  const ev = sim.step(new Map([['anvil' as ShipId, input({ target: 'foe', fire2: true })]]));
+  const targets = new Set(
+    ev.flatMap((e) =>
+      e.type === 'projectileSpawned' && e.owner === 'anvil' && e.target ? [e.target] : [],
+    ),
+  );
+  check(
+    'wide-lock-mode salvo seeks 3 enemies',
+    targets.size === 3 && ammo - ship('anvil').ammo2 === 3,
+  );
+  sim.castSkill('anvil', 'wide-lock-mode');
+  check('wide-lock-mode toggles off', ship('anvil').toggles.bombing === undefined);
+  sim.removeShip('foe2');
+  sim.removeShip('foe3');
+  step(80);
+}
+
 // ---- Halo ----
 place('halo', 300);
 ship('wasp').hp = 300;

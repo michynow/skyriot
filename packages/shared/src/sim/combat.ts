@@ -49,6 +49,12 @@ import {
   PROJECTILE_RADIUS,
   RAY_QUERY_GROUPS,
   SPLASH_MIN_FRACTION,
+  WIDE_LOCK_CONE_ADD_RAD,
+  WIDE_LOCK_DAMAGE_MUL,
+  WIDE_LOCK_HOMING_TURN,
+  WIDE_LOCK_RANGE_MUL,
+  WIDE_LOCK_SEC,
+  WIDE_LOCK_TARGETS,
 } from './constants';
 import { breakCloak, dropBuffs } from './buffs';
 import { hitShip } from './damage';
@@ -258,6 +264,59 @@ function structureDamage(p: Projectile): number {
   return p.kind === 'tracer' ? p.damage * STRUCTURE_ARMOR.tracerMul : p.damage;
 }
 
+/**
+ * The Secondary as the active bombing mode shapes it. Wide Lock Mode widens the lock cone, stretches lock and
+ * flight range, and gives lockless rockets a lock time. Shared with the client HUD so its lock ring matches.
+ */
+export function bombingSecondary(w: WeaponDef, mode: string | undefined): WeaponDef {
+  if (mode !== 'wide-lock-mode') return w;
+  return {
+    ...w,
+    lockConeRad: w.lockConeRad + WIDE_LOCK_CONE_ADD_RAD,
+    lockTimeSec: w.lockTimeSec > 0 ? w.lockTimeSec : WIDE_LOCK_SEC,
+    rangeM: w.rangeM * WIDE_LOCK_RANGE_MUL,
+  };
+}
+
+const _wideIds: string[] = [];
+const _wideD: number[] = [];
+
+/**
+ * Wide Lock Mode targets: the locked Target first, then the nearest other enemy Ships inside the cone and range.
+ * Fills `_wideIds` (at most WIDE_LOCK_TARGETS).
+ */
+function wideLockTargets(ctx: SimCtx, rec: ShipRec, sec: WeaponDef): void {
+  const s = rec.state;
+  _wideIds.length = 0;
+  _wideD.length = 0;
+  if (s.lockTarget && lockable(ctx, s.lockTarget)) {
+    _wideIds.push(s.lockTarget);
+    _wideD.push(-1);
+  }
+  forwardOf(s.rot, _f);
+  const cosCone = Math.cos(sec.lockConeRad * rec.mods.lockConeMul);
+  for (const o of ctx.recList) {
+    const os = o.state;
+    if (os.nation === s.nation || os.id === s.lockTarget || !lockable(ctx, os.id)) continue;
+    const dx = os.pos[0] - s.pos[0],
+      dy = os.pos[1] - s.pos[1],
+      dz = os.pos[2] - s.pos[2];
+    const d = Math.hypot(dx, dy, dz);
+    if (d < 1 || d > sec.rangeM || (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d < cosCone)
+      continue;
+    // Insert sorted by distance, keep the nearest few.
+    let k = _wideIds.length;
+    while (k > 0 && _wideD[k - 1]! > d) k--;
+    if (k >= WIDE_LOCK_TARGETS) continue;
+    _wideIds.splice(k, 0, os.id);
+    _wideD.splice(k, 0, d);
+    if (_wideIds.length > WIDE_LOCK_TARGETS) {
+      _wideIds.length = WIDE_LOCK_TARGETS;
+      _wideD.length = WIDE_LOCK_TARGETS;
+    }
+  }
+}
+
 /** Missiles (and the siege mortar) lock only onto the selected target, if it is an enemy in cone and range. */
 function updateLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, sec: WeaponDef): void {
   const s = rec.state;
@@ -379,14 +438,14 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
   const s = rec.state;
   const fd = rec.fd;
   const weapons = rec.gear ? rec.gear.weapons : [WEAPONS[fd.primary]!, WEAPONS[fd.secondary]!];
-  const sec = weapons[1]!;
+  const sec = bombingSecondary(weapons[1]!, s.toggles.bombing);
   updateLock(ctx, rec, input, sec);
   updateSiegeLock(ctx, rec, input, weapons[0]!);
   const rewind = Math.min(Math.max(ctx.tick - input.viewTick, 0), MAX_REWIND_TICKS);
   const fire = s.halted || rec.mods.noAttack ? [false, false] : [input.fire1, input.fire2];
   for (let i = 0; i < 2; i++) {
     rec.fireCd[i] = Math.max(rec.fireCd[i]! - ctx.dt, -ctx.dt);
-    const w = weapons[i]!;
+    const w = i === 0 ? weapons[0]! : sec;
     const ammo = i === 0 ? s.ammo1 : s.ammo2;
     if (!fire[i] || rec.fireCd[i]! > 0 || ammo <= 0) continue;
     if (i === 0) s.ammo1--;
@@ -449,6 +508,50 @@ export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void 
           adz / al,
           rewind,
         );
+      }
+      continue;
+    }
+    if (mode === 'wide-lock-mode') {
+      // One guided rocket per target (locked Target first, then the nearest in the cone): the first is already
+      // paid, each extra costs 1. No target: a single rocket flies straight off the nose.
+      wideLockTargets(ctx, rec, w);
+      const count = Math.max(1, Math.min(_wideIds.length, 1 + s.ammo2));
+      s.ammo2 -= count - 1;
+      for (let k = 0; k < count; k++) {
+        const target = _wideIds[k] ?? null;
+        const off = (k - (count - 1) / 2) * AIR_BARRAGE_SPREAD_RAD;
+        const adx = _f[0]! + _r[0]! * off,
+          ady = _f[1]! + _r[1]! * off,
+          adz = _f[2]! + _r[2]! * off;
+        const al = Math.hypot(adx, ady, adz);
+        spawnProjectile(
+          ctx,
+          rec,
+          target ? 'missile' : w.kind,
+          w.id,
+          w.damage *
+            WIDE_LOCK_DAMAGE_MUL *
+            rec.mods.damageMul *
+            slotMul *
+            (mods ? mods.damageMul : 1),
+          w.splashRadius * rec.mods.splashMul,
+          w.speed,
+          w.rangeM * (mods ? mods.rangeMul : 1),
+          target ? WIDE_LOCK_HOMING_TURN : 0,
+          target,
+          ox,
+          oy,
+          oz,
+          adx / al,
+          ady / al,
+          adz / al,
+          rewind,
+        );
+      }
+      if (s.lockTarget) {
+        s.lockTarget = null;
+        rec.lockCand = null;
+        rec.lockTime = 0;
       }
       continue;
     }

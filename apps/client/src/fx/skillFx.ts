@@ -40,6 +40,13 @@ const C = {
   cyan: [0.4, 2.6, 3.0] as RGB,
 };
 
+/** Bombing mode activation colour. */
+const MODE_COL: Record<string, RGB> = {
+  'air-barrage-mode': C.air,
+  'ground-strike-mode': C.ground,
+  'wide-lock-mode': C.red,
+};
+
 /** Activation colour and spot per self-buff Skill: hex shell, a flash at the nose, or one at the tail. */
 const SELF: Record<string, [RGB, 'hex' | 'nose' | 'tail']> = {
   'gun-tune': [C.red, 'nose'],
@@ -252,8 +259,9 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
       break;
     }
     case 'air-barrage-mode':
-    case 'ground-strike-mode': {
-      const col = e.skill === 'air-barrage-mode' ? C.air : C.ground;
+    case 'ground-strike-mode':
+    case 'wide-lock-mode': {
+      const col = MODE_COL[e.skill]!;
       burst(fx, P, col, 30, R * 6, 0.6, 1.0);
       ring(fx, P, col, R * 5, 0.5);
       fx.sph.follow(e.id, col, 1.2, 0.5);

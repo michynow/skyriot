@@ -309,6 +309,24 @@ const SKILL: Record<string, { cat: Category; art: ReactNode }> = {
       </>
     ),
   },
+  'wide-lock-mode': {
+    cat: 'red',
+    art: (
+      <>
+        {/* Wide lock cone from the nose, three enemy Ships bracketed inside it */}
+        <path d="M24 44L3 10a30 30 0 0 1 42 0z" fill={G.red} opacity=".35" />
+        <path
+          d="M24 44L3 10M24 44L45 10M3 10a30 30 0 0 1 42 0"
+          fill="none"
+          stroke={G.red}
+          strokeWidth="3"
+          strokeLinejoin="round"
+        />
+        {[ship(12, 17, 0.42, WHITE), ship(24, 12, 0.42, WHITE), ship(36, 17, 0.42, WHITE)]}
+        <path d="M24 44l-4-8h8z" fill={WHITE} />
+      </>
+    ),
+  },
   'rally-field': {
     cat: 'green',
     art: (

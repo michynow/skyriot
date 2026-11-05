@@ -216,6 +216,13 @@ export const SKILLS: Record<string, SkillDef> = {
     ['anvil'],
     'bombing',
   ),
+  'wide-lock-mode': t(
+    'wide-lock-mode',
+    'Wide Lock Mode',
+    'Bombing mode (press again for off): Secondary lock cone widens by 22°, lock and range +45%, and each salvo sends a guided rocket at up to 3 enemy Ships in the cone.',
+    ['anvil'],
+    'bombing',
+  ),
   'overcharge-round': b(
     'overcharge-round',
     'Overcharge Round',
