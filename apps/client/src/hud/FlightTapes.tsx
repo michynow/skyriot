@@ -206,13 +206,12 @@ function headingScale(g: CanvasRenderingContext2D, headingDeg: number) {
 
 /**
  * Fighter-style flight instruments: radar-altitude tape (right, AGL, ground hatched), vertical-speed chevron,
- * heading scale with pitch readout. Speed lives in the status gauge.
+ * heading scale. Speed lives in the status gauge.
  */
 export function FlightTapes() {
   const altEl = useRef<HTMLCanvasElement>(null);
   const hdgEl = useRef<HTMLCanvasElement>(null);
   const wrap = useRef<HTMLDivElement>(null);
-  const pitchEl = useRef<HTMLSpanElement>(null);
   const vsEl = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
@@ -248,10 +247,6 @@ export function FlightTapes() {
       const fz = -(1 - 2 * (qx * qx + qy * qy));
       const heading = (Math.atan2(fx, -fz) * 180) / Math.PI;
       headingScale(gh, heading);
-      const pitch = Math.round((Math.asin(Math.max(-1, Math.min(1, fy))) * 180) / Math.PI);
-      const pitchText = `${pitch > 0 ? '+' : ''}${pitch}°`;
-      if (pitchEl.current && pitchEl.current.textContent !== pitchText)
-        pitchEl.current.textContent = pitchText;
       const vs = Math.round(own.vel[1]);
       const vsText = vs === 0 ? '—' : `${vs > 0 ? '▲' : '▼'} ${Math.abs(vs)}`;
       if (vsEl.current) {
@@ -273,9 +268,6 @@ export function FlightTapes() {
         </div>
         <div className="hdg">
           <canvas ref={hdgEl} style={{ width: HEADING_W, height: HEADING_H }} />
-          <span className="pitch">
-            PITCH <b ref={pitchEl} />
-          </span>
         </div>
       </div>
     </>

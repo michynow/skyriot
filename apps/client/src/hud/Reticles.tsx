@@ -15,7 +15,6 @@ import { world } from '../state/world';
 import { inputState } from '../input/input';
 import { isFlying, isGrounded, ownShip, targetView } from './hudStore';
 import { project } from './view';
-import { Ammo } from './Ammo';
 import { TargetWindow } from './TargetWindow';
 
 const MARKERS = 40;
@@ -306,6 +305,7 @@ export function Reticles() {
         const hl = Math.hypot(fx, fz) || 1;
         const hf = world.heightfield;
         const maxR = secRange || primRange;
+        let lastY = -1e9; // rungs bunch up toward the horizon: drop any that would overprint the one before
         for (let i = 0; i < LADDER; i++) {
           const el = ladderEls.current[i] ?? null;
           const r = ((i + 1) / LADDER) * maxR;
@@ -314,8 +314,12 @@ export function Reticles() {
           const wy = hf ? sampleHeight(hf, wx, wz) : own.pos[1];
           const ok = project(wx, wy, wz, p);
           if (el) {
-            el.style.display = ok ? 'block' : 'none';
-            if (ok) el.style.transform = `translate(0px,${p.y - cy}px)`;
+            const show = ok && Math.abs(p.y - lastY) > 14;
+            el.style.display = show ? 'block' : 'none';
+            if (show) {
+              el.style.transform = `translate(0px,${p.y - cy}px)`;
+              lastY = p.y;
+            }
             setText(el.firstElementChild as HTMLElement, String(Math.round(r)));
           }
         }
@@ -456,8 +460,6 @@ export function Reticles() {
         <span className="cr-dist" ref={crDist} />
         <span className="cr-tag" ref={crTag} />
         <span className="cr-max" ref={crMax} />
-        <Ammo side={1} />
-        <Ammo side={2} />
       </div>
       <div className="turnlock" ref={turnEl} style={{ display: 'none' }}>
         <i />
@@ -477,8 +479,6 @@ export function Reticles() {
           <path d="M-44 0h24M20 0h24M0 -44v24M0 20v24" className="g-cross" />
         </svg>
         <div className="g-tag" ref={gunTag} />
-        <Ammo side={1} />
-        <Ammo side={2} />
         <div className="ladder">
           {Array.from({ length: LADDER }, (_, i) => (
             <div key={i} ref={(el) => void (ladderEls.current[i] = el)} className="rung">

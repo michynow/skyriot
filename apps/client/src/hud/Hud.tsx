@@ -7,6 +7,7 @@ import { addChatLine, startHudFeed, useHud } from './hudStore';
 import { Floaters } from './Floaters';
 import { useSettings } from '../ui/settings';
 import { IconDefs, SkillIcon } from './icons';
+import { WeaponPanel } from './Ammo';
 import { Incoming } from './Incoming';
 import { ThreatRing } from './ThreatRing';
 import { Radar } from './Radar';
@@ -306,9 +307,6 @@ function SkillFx() {
   if (!fx) return null;
   return (
     <>
-      <div key={`b${fx.nonce}`} className="skill-banner">
-        {SKILLS[fx.skill]?.name.toUpperCase()}
-      </div>
       {fly && fly.nonce === fx.nonce && (
         <div
           key={`f${fly.nonce}`}
@@ -428,8 +426,6 @@ function Warnings() {
     useShallow((x) => ({
       locked: x.locked,
       alive: x.alive,
-      sieged: x.sieged,
-      grounded: x.grounded,
       evadedNonce: x.evadedNonce,
       outOfBounds: x.outOfBounds,
       flashes: x.damageFlashes,
@@ -469,13 +465,6 @@ function Warnings() {
       {h.evadedNonce > 0 && (
         <div key={h.evadedNonce} className="evaded">
           EVADED
-        </div>
-      )}
-      {h.sieged && (
-        <div className="siege">
-          {h.grounded
-            ? 'GROUND SIEGE · ×1.5 DMG · RANGE ×1.4'
-            : 'AIR SIEGE · ×1.15 DMG · RANGE ×1.15 · LOCK CONE ×1.4'}
         </div>
       )}
       {h.flashes.map((f) => (
@@ -647,7 +636,7 @@ export function Hud({ onLeave }: { onLeave(): void }) {
   useEffect(() => {
     const fit = () => {
       const scale = Math.max(
-        0.55,
+        0.36,
         Math.min(1, window.innerHeight / 1000, window.innerWidth / 1700),
       );
       document.documentElement.style.setProperty('--hud-scale', String(scale));
@@ -683,6 +672,7 @@ export function Hud({ onLeave }: { onLeave(): void }) {
       <Killfeed />
       <KillConfirm />
       <Chat />
+      <WeaponPanel />
       <Radar />
       <EscMenu onLeave={onLeave} />
     </div>
