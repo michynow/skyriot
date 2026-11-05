@@ -4,6 +4,7 @@ import {
   DECK,
   FRAMES,
   SIEGE,
+  HEAL_BEAM_RANGE,
   SKILLS,
   STRUCTURES,
   TICK_HZ,
@@ -454,6 +455,7 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     !me.docked &&
     mem.rng() < SKILL_USE_CHANCE
   ) {
+    const need = allyNeed(sim, me);
     const wantMode =
       enemy.grounded || enemy.docked
         ? 'ground-strike-mode'
@@ -466,7 +468,15 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       if (!id || !def || me.cooldowns[slot] !== 0) continue;
       if (!botMayCast(id, me, dist)) continue;
       if (HEAL_SKILLS.has(id)) {
-        if (me.hp < me.maxHp * HEAL_HP_FRACTION * 1.5 || me.shield < me.maxShield * 0.3) {
+        if (wantsHeal(id, need)) {
+          input.hotbar = slot;
+          break;
+        }
+        continue;
+      }
+      if (id === 'purge') {
+        // Shake a missile or shed enemy debuffs.
+        if (me.incomingDist > 0 || me.buffs.some((b) => SKILLS[b.skill]?.kind === 'skill')) {
           input.hotbar = slot;
           break;
         }
@@ -600,5 +610,32 @@ function botMayCast(id: string, me: ShipState, dist: number): boolean {
       return dist > 400;
     default:
       return true;
+  }
+}
+
+/** Lowest HP and shield fractions among live allies within heal reach (self included). */
+function allyNeed(sim: Sim, me: ShipState): { hp: number; shield: number } {
+  let hp = me.hp / me.maxHp,
+    shield = me.maxShield > 0 ? me.shield / me.maxShield : 1;
+  for (const o of sim.ships()) {
+    if (!o.alive || o.nation !== me.nation || o.launchPhase !== 'none') continue;
+    const d = Math.hypot(o.pos[0] - me.pos[0], o.pos[1] - me.pos[1], o.pos[2] - me.pos[2]);
+    if (d > HEAL_BEAM_RANGE) continue;
+    hp = Math.min(hp, o.hp / o.maxHp);
+    if (o.maxShield > 0) shield = Math.min(shield, o.shield / o.maxShield);
+  }
+  return { hp, shield };
+}
+
+/** Halo heal pick: big heals for big need, shield refills when shields are down. */
+function wantsHeal(id: string, need: { hp: number; shield: number }): boolean {
+  switch (id) {
+    case 'lifeline':
+      return need.hp < 0.35;
+    case 'mend-beam':
+    case 'renewal-pulse':
+      return need.hp < 0.65;
+    default:
+      return need.shield < 0.35; // charge-beam, recharge-pulse
   }
 }

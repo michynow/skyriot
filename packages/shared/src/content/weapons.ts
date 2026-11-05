@@ -1,11 +1,12 @@
 import type { SkillDef, WeaponDef } from '../types';
 
+// Halo (support) weapons hit softest: the support class trades attack for defence and heals.
 export const WEAPONS: Record<string, WeaponDef> = {
   'needle-cannon': w('needle-cannon', 'Needle Cannon', 'tracer', 20, 0.08, 900, 1100, 0.012),
   'flak-repeater': w('flak-repeater', 'Flak Repeater', 'tracer', 38, 0.18, 650, 800, 0.03, {
     splashRadius: 4,
   }),
-  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 24, 0.11, 800, 950, 0.015),
+  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 17, 0.11, 800, 950, 0.015),
   'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 34, 0.12, 750, 1000, 0.02),
   'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 384, 1.6, 250, 1500, 0, {
     homingTurnRate: 2.4,
@@ -13,7 +14,7 @@ export const WEAPONS: Record<string, WeaponDef> = {
     lockTimeSec: 1.2,
     splashRadius: 5,
   }),
-  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 272, 1.6, 240, 1300, 0, {
+  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 220, 1.6, 240, 1300, 0, {
     homingTurnRate: 2.5,
     lockConeRad: 0.5,
     lockTimeSec: 1,
@@ -34,8 +35,8 @@ export const WEAPONS: Record<string, WeaponDef> = {
   'thunder-flak': w('thunder-flak', 'Thunder Flak', 'tracer', 49, 0.16, 680, 860, 0.03, {
     splashRadius: 5,
   }),
-  'arc-blaster': w('arc-blaster', 'Arc Blaster', 'tracer', 27, 0.105, 820, 980, 0.015),
-  'prism-blaster': w('prism-blaster', 'Prism Blaster', 'tracer', 30, 0.1, 840, 1010, 0.014),
+  'arc-blaster': w('arc-blaster', 'Arc Blaster', 'tracer', 19, 0.105, 820, 980, 0.015),
+  'prism-blaster': w('prism-blaster', 'Prism Blaster', 'tracer', 21, 0.1, 840, 1010, 0.014),
   'twin-hammer': w('twin-hammer', 'Twin Hammer', 'tracer', 38, 0.115, 760, 1030, 0.02),
   'quad-autocannon': w('quad-autocannon', 'Quad Autocannon', 'tracer', 42, 0.11, 770, 1060, 0.02),
   'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 432, 1.55, 260, 1550, 0, {
@@ -50,13 +51,13 @@ export const WEAPONS: Record<string, WeaponDef> = {
     lockTimeSec: 1,
     splashRadius: 5.5,
   }),
-  'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 304, 1.55, 250, 1350, 0, {
+  'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 245, 1.55, 250, 1350, 0, {
     homingTurnRate: 2.6,
     lockConeRad: 0.5,
     lockTimeSec: 0.9,
     splashRadius: 5,
   }),
-  'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 344, 1.5, 260, 1400, 0, {
+  'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 275, 1.5, 260, 1400, 0, {
     homingTurnRate: 2.7,
     lockConeRad: 0.52,
     lockTimeSec: 0.8,

@@ -76,7 +76,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     name: 'Anvil',
     role: 'Bomber',
     ...engineStats('mule-turbine'),
-    maxHp: 1600,
+    maxHp: 1900,
     maxShield: 650,
     shieldRegenPerSec: 70,
     shieldRegenDelaySec: 5,
