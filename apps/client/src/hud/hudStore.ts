@@ -282,6 +282,8 @@ export interface IncomingMissile {
   bornMs: number;
 }
 export const incoming = new Map<number, IncomingMissile>();
+/** Ids announced by missileIncoming (target = own Ship) -> arrival time; removed by missileEnded. Drives the alarm. */
+export const warned = new Map<number, number>();
 
 let nextId = 1;
 const KILLFEED_MS = 6000;
@@ -388,6 +390,15 @@ export function targetView(id: string | null): TargetView | undefined {
 /** Route sim events the HUD cares about (killfeed, hit markers, damage numbers, impacts, deck). */
 export function handleHudEvent(ev: SimEvent): void {
   const ownId = world.ownId;
+  if (ev.type === 'missileIncoming') {
+    if (ev.target === ownId) for (const id of ev.missiles) warned.set(id, performance.now());
+    return;
+  }
+  if (ev.type === 'missileEnded') {
+    warned.delete(ev.id);
+    incoming.delete(ev.id);
+    return;
+  }
   if (ev.type === 'projectileSpawned') {
     if (ev.kind === 'missile' && ev.target === ownId) {
       incoming.set(ev.id, {
