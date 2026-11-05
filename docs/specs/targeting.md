@@ -2,6 +2,20 @@
 
 User's spec (Polish), pasted 2026-11-05. Implement its **mechanics** with SKYRIOT's own names: STD = Primary, ADV = Secondary; Gear classes map A→Bulwark, B→Anvil, I→Wasp, M→Halo; Siege Mode/Air Siege = our Ground Siege/Air Siege; GBM/ABM = Anvil's ground/air bombing modes; bundle = Bulwark Secondary salvo. Weapon, radar and item names in the tables are reference data only — never reuse them as names in the game. Tags: [ŹR] sourced, [ZAŁ] proposal to verify, [POTW] confirmed by the team (binding).
 
+| Spec term               | Project term                           |
+| ----------------------- | -------------------------------------- |
+| STD                     | Primary (LMB)                          |
+| ADV                     | Secondary (RMB)                        |
+| Gear A / B / I / M      | Frame: Bulwark / Anvil / Wasp / Halo   |
+| Siege / Air Siege       | Ground Siege / Air Siege               |
+| GBM / ABM               | Anvil Ground Strike / Air Barrage Mode |
+| Multitarget             | Anvil Wide Lock Mode                   |
+| Bundle                  | Bulwark salvo (Secondary)              |
+| Std / Adv Range (radar) | Primary / Secondary radar range        |
+| Target / cel            | Target                                 |
+| Lock                    | Lock                                   |
+| VA                      | Valid Angle                            |
+
 ---
 
 Ace Online – mechanika lockowania i strzelania (spec dla implementera)

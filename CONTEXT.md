@@ -102,14 +102,41 @@ _Avoid_: match, round
 **Docked**:
 A Ship resting on a Launch Deck, stationary and resupplying until it launches.
 
-**Target**:
-The single enemy Ship a Pilot has selected; missiles can only lock onto it.
-
 **Grounded**:
 A Bulwark that has landed and drives on terrain (or a hull in space).
 
 **Siege Mode**:
 Bulwark toggle that roots the Ship (full strength when Grounded, weaker hover-locked in the air), switches to first-person gunner view and extends damage, range and lock.
+
+## Targeting & firing
+
+**Target**:
+The single enemy Ship or Mob a Pilot has selected. With no Target, hovering an enemy selects it, and it sticks. Shift switches it to the object under the cursor. Secondary lock needs a Target.
+_Avoid_: lock target, selection
+
+**Lock**:
+State in which a Secondary can fire at the Target: Target inside Secondary radar range and within Valid Angle of the Frame's nose. Instant, with no lock timer. Leaving either bound drops it back to Target-only.
+_Avoid_: lock-on time, acquire
+
+**Valid Angle**:
+Cone around the Frame's nose axis (not the camera or cursor) in which a Secondary can Lock. Wide Lock Mode widens it.
+_Avoid_: VA (in prose), lock cone
+
+**Primary / Secondary radar range**:
+Two radar ranges per Frame. Primary range governs Target selection and Primary fire; Secondary range governs Lock. Also drives the minimap.
+_Avoid_: STD range, ADV range
+
+**Reattack**:
+Delay before the next Attack pattern. Secondary reattack counts from the end of its salvo.
+
+**Overheat**:
+Heat built by continuous Primary fire. At the Frame's overheat time, Primary stops until the heat cools off.
+
+**Attack pattern**:
+Shots per trigger pull, written N×M: N rounds per volley, M volleys (4×1 = four at once; 1×4 = four in a row).
+
+**Induction rate**:
+Turn speed of a homing Secondary, in °/s. 0 means straight flight (Bulwark salvo).
 
 ## Progression & economy
 
