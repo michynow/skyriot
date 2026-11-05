@@ -26,7 +26,7 @@ const rekey = new Map<number, number>();
 export function predictOwnShot(s: ShipState, input: PilotInput): Spawn | null {
   fireCd = Math.max(fireCd - TICK_DT, -TICK_DT);
   if (!s.alive || s.launchPhase !== 'none' || s.halted || !input.fire1 || fireCd > 0) return null;
-  if (s.ammo1 <= 0) return null;
+  if (s.ammo1 <= 0 || s.overheated) return null;
   const fd = FRAMES[s.frame];
   const w = WEAPONS[fd.primary];
   if (!w || w.kind !== 'tracer') return null;

@@ -105,22 +105,14 @@ export const GROUND_NORMAL_SAMPLE_M = 8;
 /** Bulwark lift-off (C while Grounded): climb at full vertical speed for this long. */
 export const LIFTOFF_SEC = 1;
 
-// Siege mortar lock
-export const MORTAR_LOCK_CONE_RAD = 0.2;
+/** Ground Siege widens the Secondary Valid Angle this much. */
 export const SIEGE_LOCK_CONE_MUL = 2;
-export const MORTAR_LOCK_SEC = 1.2;
 // Siege gun lock: acquired inside AIM_ASSIST.coneRad of the nose, held until the Target leaves this cone.
 export const SIEGE_GUN_BREAK_CONE_RAD = 0.5;
-export const SIEGE_GUN_SPREAD_MUL = 0.35;
-/** Gun-locked rounds home this hard (rad/s, effectively a direct track) and may fly this much past range. */
-export const SIEGE_GUN_HOMING_TURN = 60;
-export const SIEGE_GUN_RANGE_SLACK = 1.5;
 /** Overcharge Round: the armed Primary shot flies this much farther. */
 export const CHARGED_SHOT_RANGE_MUL = 2;
 /** Rocket / bomb proximity fuse: bursts when a hull is within this fraction of the blast radius. */
 export const ROCKET_FUSE_FRAC = 0.6;
-export const MORTAR_LOFT_RAD = 0.6;
-export const MORTAR_GUIDE_TURN = 0.9;
 
 // Barrel Roll: displacement = rollImpulse * factor over ROLL_DURATION_SEC (half-sine velocity curve).
 export const ROLL_DURATION_SEC = 1.1;
@@ -134,8 +126,6 @@ export const AIR_BARRAGE_DAMAGE_MUL = 0.45;
 /** Wide Lock Mode: the Secondary's lock cone widens by this, its lock/fire range scales, and each salvo seeks up to N Ships. */
 export const WIDE_LOCK_CONE_ADD_RAD = 0.384; // ~22 degrees
 export const WIDE_LOCK_RANGE_MUL = 1.45;
-/** Lock time when the Secondary has none of its own (dumb rockets / bombs). */
-export const WIDE_LOCK_SEC = 0.8;
 export const WIDE_LOCK_TARGETS = 3;
 export const WIDE_LOCK_HOMING_TURN = 2.4;
 /** Each guided rocket deals this fraction of the Secondary's damage. */
@@ -144,8 +134,7 @@ export const GROUND_STRIKE_GROUND_MUL = 1.4;
 export const GROUND_STRIKE_SPLASH_MUL = 1.3;
 export const BOMB_DROP_SPEED = 20;
 export const BOMB_GRAVITY = 30;
-/** Missile Secondaries fire this many per trigger pull (each costs 1 ammo), fanned this far apart. */
-export const MISSILE_SALVO = 2;
+/** Side-by-side Secondary rounds of one volley are fanned this far apart. */
 export const MISSILE_SALVO_SPREAD_RAD = 0.05;
 export const PURGE_RADIUS = 120;
 

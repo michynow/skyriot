@@ -1,66 +1,80 @@
 import type { SkillDef, WeaponDef } from '../types';
 
 // Halo (support) weapons hit softest: the support class trades attack for defence and heals.
+// Primary: `fireIntervalSec` is the reattack per pattern (count rounds at once); accuracy, pattern and overheat
+// follow the genre's gun table (fighter ~ gatling, bomber ~ automatic, support ~ vulcan, tank ~ dualist).
+// Secondary: missiles fire 1 x 2 (two in series) inside a narrow Valid Angle; the Bulwark salvo is 2 x 2 straight
+// shells; Anvil bombs are lockless.
 export const WEAPONS: Record<string, WeaponDef> = {
-  'needle-cannon': w('needle-cannon', 'Needle Cannon', 'tracer', 20, 0.08, 900, 1100, 0.012),
-  'flak-repeater': w('flak-repeater', 'Flak Repeater', 'tracer', 38, 0.18, 650, 800, 0.03, {
-    splashRadius: 4,
+  'needle-cannon': w('needle-cannon', 'Needle Cannon', 'tracer', 20, 0.32, 900, 1100, 0.012, {
+    ...gun(0.8, 4, 15),
   }),
-  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 17, 0.11, 800, 950, 0.015),
-  'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 34, 0.12, 750, 1000, 0.02),
+  'flak-repeater': w('flak-repeater', 'Flak Repeater', 'tracer', 38, 0.54, 650, 800, 0.03, {
+    splashRadius: 4,
+    ...gun(0.75, 3, 21),
+  }),
+  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 17, 0.44, 800, 950, 0.015, {
+    ...gun(0.65, 4, 15),
+  }),
+  'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 34, 0.24, 750, 1000, 0.02, {
+    ...gun(0.85, 2, 22),
+  }),
   'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 384, 1.6, 250, 1500, 0, {
-    homingTurnRate: 2.4,
-    lockConeRad: 0.45,
-    lockTimeSec: 1.2,
+    ...missile(6, 135),
     splashRadius: 5,
   }),
   'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 220, 1.6, 240, 1300, 0, {
-    homingTurnRate: 2.5,
-    lockConeRad: 0.5,
-    lockTimeSec: 1,
+    ...missile(8, 145),
     splashRadius: 5,
   }),
   'brick-bomb': w('brick-bomb', 'Brick Bomb', 'rocket', 520, 3.0, 140, 900, 0.01, {
     splashRadius: 22,
   }),
-  'mortar-battery': w('mortar-battery', 'Mortar Battery', 'shell', 380, 2.6, 220, 1600, 0.02, {
-    splashRadius: 10,
+  'mortar-battery': w('mortar-battery', 'Mortar Battery', 'shell', 110, 2.6, 600, 1600, 0, {
+    ...salvo(10),
+    splashRadius: 12,
   }),
   // ---- Shop variants (tiers 2–3); each sits in the line of the stock weapon above it ----
-  'quill-repeater': w('quill-repeater', 'Quill Repeater', 'tracer', 22, 0.076, 920, 1150, 0.012),
-  'lancet-cannon': w('lancet-cannon', 'Lancet Cannon', 'tracer', 24, 0.072, 950, 1200, 0.011),
-  'burst-flak': w('burst-flak', 'Burst Flak', 'tracer', 43, 0.17, 660, 830, 0.03, {
+  'quill-repeater': w('quill-repeater', 'Quill Repeater', 'tracer', 22, 0.304, 920, 1150, 0.012, {
+    ...gun(0.82, 4, 15),
+  }),
+  'lancet-cannon': w('lancet-cannon', 'Lancet Cannon', 'tracer', 24, 0.288, 950, 1200, 0.011, {
+    ...gun(0.85, 4, 16),
+  }),
+  'burst-flak': w('burst-flak', 'Burst Flak', 'tracer', 43, 0.51, 660, 830, 0.03, {
     splashRadius: 4.5,
+    ...gun(0.77, 3, 21),
   }),
-  'thunder-flak': w('thunder-flak', 'Thunder Flak', 'tracer', 49, 0.16, 680, 860, 0.03, {
+  'thunder-flak': w('thunder-flak', 'Thunder Flak', 'tracer', 49, 0.48, 680, 860, 0.03, {
     splashRadius: 5,
+    ...gun(0.8, 3, 22),
   }),
-  'arc-blaster': w('arc-blaster', 'Arc Blaster', 'tracer', 19, 0.105, 820, 980, 0.015),
-  'prism-blaster': w('prism-blaster', 'Prism Blaster', 'tracer', 21, 0.1, 840, 1010, 0.014),
-  'twin-hammer': w('twin-hammer', 'Twin Hammer', 'tracer', 38, 0.115, 760, 1030, 0.02),
-  'quad-autocannon': w('quad-autocannon', 'Quad Autocannon', 'tracer', 42, 0.11, 770, 1060, 0.02),
+  'arc-blaster': w('arc-blaster', 'Arc Blaster', 'tracer', 19, 0.42, 820, 980, 0.015, {
+    ...gun(0.67, 4, 15),
+  }),
+  'prism-blaster': w('prism-blaster', 'Prism Blaster', 'tracer', 21, 0.4, 840, 1010, 0.014, {
+    ...gun(0.7, 4, 16),
+  }),
+  'twin-hammer': w('twin-hammer', 'Twin Hammer', 'tracer', 38, 0.23, 760, 1030, 0.02, {
+    ...gun(0.87, 2, 22),
+  }),
+  'quad-autocannon': w('quad-autocannon', 'Quad Autocannon', 'tracer', 42, 0.22, 770, 1060, 0.02, {
+    ...gun(0.9, 2, 23),
+  }),
   'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 432, 1.55, 260, 1550, 0, {
-    homingTurnRate: 2.6,
-    lockConeRad: 0.45,
-    lockTimeSec: 1.1,
+    ...missile(5.5, 150),
     splashRadius: 5,
   }),
   'talon-missile': w('talon-missile', 'Talon Missile', 'missile', 480, 1.5, 270, 1600, 0, {
-    homingTurnRate: 2.8,
-    lockConeRad: 0.47,
-    lockTimeSec: 1,
+    ...missile(5, 160),
     splashRadius: 5.5,
   }),
   'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 245, 1.55, 250, 1350, 0, {
-    homingTurnRate: 2.6,
-    lockConeRad: 0.5,
-    lockTimeSec: 0.9,
+    ...missile(7.5, 150),
     splashRadius: 5,
   }),
   'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 275, 1.5, 260, 1400, 0, {
-    homingTurnRate: 2.7,
-    lockConeRad: 0.52,
-    lockTimeSec: 0.8,
+    ...missile(7, 155),
     splashRadius: 5.5,
   }),
   'slab-bomb': w('slab-bomb', 'Slab Bomb', 'rocket', 590, 2.9, 145, 920, 0.01, {
@@ -69,17 +83,34 @@ export const WEAPONS: Record<string, WeaponDef> = {
   'monolith-bomb': w('monolith-bomb', 'Monolith Bomb', 'rocket', 660, 2.8, 150, 950, 0.01, {
     splashRadius: 24,
   }),
-  'howler-battery': w('howler-battery', 'Howler Battery', 'shell', 430, 2.5, 225, 1650, 0.02, {
-    splashRadius: 11,
+  'howler-battery': w('howler-battery', 'Howler Battery', 'shell', 125, 2.5, 615, 1650, 0, {
+    ...salvo(10.5),
+    splashRadius: 13,
   }),
-  'quake-battery': w('quake-battery', 'Quake Battery', 'shell', 480, 2.4, 230, 1700, 0.02, {
-    splashRadius: 12,
+  'quake-battery': w('quake-battery', 'Quake Battery', 'shell', 140, 2.4, 630, 1700, 0, {
+    ...salvo(11),
+    splashRadius: 14,
   }),
   // Base Turret gun (not a Frame weapon).
   'turret-flak': w('turret-flak', 'Turret Flak', 'tracer', 24, 0.2, 700, 950, 0.02, {
     splashRadius: 5,
   }),
 };
+
+/** Primary: accuracy, rounds per pattern, overheat seconds. */
+function gun(accuracy: number, count: number, overheatSec: number): Partial<WeaponDef> {
+  return { accuracy, pattern: { count, series: 1 }, overheatSec };
+}
+
+/** Guided missile Secondary, 1 x 2. */
+function missile(validAngleDeg: number, inductionDegPerSec: number): Partial<WeaponDef> {
+  return { validAngleDeg, inductionDegPerSec, pattern: { count: 1, series: 2 } };
+}
+
+/** Bulwark salvo: 2 x 2 straight shells, the lock held through the whole salvo. */
+function salvo(validAngleDeg: number): Partial<WeaponDef> {
+  return { validAngleDeg, pattern: { count: 2, series: 2 } };
+}
 
 /*
  * Skill kits. Mechanics follow the genre's four gear classes (fighter / bomber / support / tank):
@@ -103,11 +134,11 @@ export const SKILLS: Record<string, SkillDef> = {
   'steady-hands': b(
     'steady-hands',
     'Steady Hands',
-    'Tighter guns and faster locks: -40% Primary spread, missile locks 20% faster.',
+    'Steadier aim: +10% Primary accuracy and a 20% wider missile Valid Angle.',
     'all',
     120,
     90,
-    { spreadMul: 0.6, lockTimeMul: 0.8 },
+    { accuracyAdd: 0.1, spreadMul: 0.6, lockConeMul: 1.2 },
   ),
   'hardened-hull': b('hardened-hull', 'Hardened Hull', 'Take 12% less damage.', 'all', 120, 90, {
     damageTakenMul: 0.88,
@@ -150,7 +181,7 @@ export const SKILLS: Record<string, SkillDef> = {
   overdrive: b(
     'overdrive',
     'Overdrive',
-    'Missile racks hot: Secondary +30% damage, +1 missile per salvo, 30% wider lock cone.',
+    'Missile racks hot: Secondary +30% damage, +1 missile per salvo, 30% wider Valid Angle.',
     ['wasp'],
     120,
     90,
@@ -470,7 +501,7 @@ function w(
   spread: number,
   extra: Partial<WeaponDef> = {},
 ): WeaponDef {
-  return {
+  const def: WeaponDef = {
     id,
     name,
     kind,
@@ -483,8 +514,16 @@ function w(
     lockConeRad: 0,
     lockTimeSec: 0,
     splashRadius: 0,
+    accuracy: 1,
+    pattern: { count: 1, series: 1 },
+    overheatSec: 0,
+    validAngleDeg: 0,
+    inductionDegPerSec: 0,
     ...extra,
   };
+  def.homingTurnRate = (def.inductionDegPerSec * Math.PI) / 180;
+  def.lockConeRad = (def.validAngleDeg * Math.PI) / 180;
+  return def;
 }
 
 function s(

@@ -1,4 +1,4 @@
-import { AIM_ASSIST, MISSILE_EVADE } from '../content/frames';
+import { AIM_ASSIST, MISSILE_EVADE, SIEGE, SIEGE_AIR, TARGETING } from '../content/frames';
 import { STRUCTURE_ARMOR } from '../content/bases';
 import { WEAPONS } from '../content/weapons';
 import { siegeLockConeMul, siegeMods } from './flight';
@@ -10,6 +10,7 @@ import {
   type ProjectileKind,
   type NationId,
   type ShipId,
+  type ShipState,
 } from '../types';
 import type { Projectile, ShipRec, SimCtx, StructureRec } from './ctx';
 import {
@@ -19,7 +20,6 @@ import {
   AIR_BARRAGE_SPREAD_RAD,
   BOMB_DROP_SPEED,
   BOMB_GRAVITY,
-  MISSILE_SALVO,
   MISSILE_SALVO_SPREAD_RAD,
   GROUND_STRIKE_GROUND_MUL,
   GROUND_STRIKE_SPLASH_MUL,
@@ -35,16 +35,10 @@ import {
   WEAVE_PERIOD_MIN_SEC,
   WEAVE_PERIOD_SPAN_SEC,
   WEAVE_RAMP_SEC,
-  MORTAR_GUIDE_TURN,
-  MORTAR_LOCK_CONE_RAD,
-  MORTAR_LOCK_SEC,
   SIEGE_GUN_BREAK_CONE_RAD,
-  SIEGE_GUN_HOMING_TURN,
-  SIEGE_GUN_RANGE_SLACK,
   CHARGED_SHOT_RANGE_MUL,
+  CLOAK_REVEAL_M,
   ROCKET_FUSE_FRAC,
-  SIEGE_GUN_SPREAD_MUL,
-  MORTAR_LOFT_RAD,
   NOSE_OFFSET,
   PROJECTILE_RADIUS,
   RAY_QUERY_GROUPS,
@@ -53,7 +47,6 @@ import {
   WIDE_LOCK_DAMAGE_MUL,
   WIDE_LOCK_HOMING_TURN,
   WIDE_LOCK_RANGE_MUL,
-  WIDE_LOCK_SEC,
   WIDE_LOCK_TARGETS,
 } from './constants';
 import { breakCloak, dropBuffs } from './buffs';
@@ -61,6 +54,7 @@ import { hitShip } from './damage';
 import { damageStructure, domeEntry, domeHitCore, splashStructures } from './structures';
 import { forwardOf, rightOf, upOf } from './math';
 
+const NO_SHIPS: ShipRec[] = [];
 const MAX_REWIND_TICKS = Math.floor((LAG_COMP_MAX_MS / 1000) * TICK_HZ);
 const _f = [0, 0, 0];
 const _r = [0, 0, 0];
@@ -213,6 +207,10 @@ export function spawnProjectile(
   p.gravity = 0;
   p.groundMul = 1;
   p.weaveAmp = 0;
+  p.visual = false;
+  p.strike = null;
+  p.strikeAt = 0;
+  p.warned = false;
   ctx.projectiles.push(p);
   ctx.events.push({
     type: 'projectileSpawned',
@@ -229,7 +227,9 @@ export function spawnProjectile(
   return p;
 }
 
+const DEG = Math.PI / 180;
 const _tp = [0, 0, 0];
+const ZERO = [0, 0, 0] as const;
 
 /**
  * A lock-on candidate by id: a live, uncloaked Ship or a live Base structure (aimed at its mid-height).
@@ -265,15 +265,16 @@ function structureDamage(p: Projectile): number {
 }
 
 /**
- * The Secondary as the active bombing mode shapes it. Wide Lock Mode widens the lock cone, stretches lock and
- * flight range, and gives lockless rockets a lock time. Shared with the client HUD so its lock ring matches.
+ * The Secondary as the active bombing mode shapes it. Wide Lock Mode widens the Valid Angle and stretches lock and
+ * flight range. Shared with the client HUD so its lock ring matches.
  */
 export function bombingSecondary(w: WeaponDef, mode: string | undefined): WeaponDef {
   if (mode !== 'wide-lock-mode') return w;
+  const validAngleDeg = w.validAngleDeg + WIDE_LOCK_CONE_ADD_RAD / DEG;
   return {
     ...w,
-    lockConeRad: w.lockConeRad + WIDE_LOCK_CONE_ADD_RAD,
-    lockTimeSec: w.lockTimeSec > 0 ? w.lockTimeSec : WIDE_LOCK_SEC,
+    validAngleDeg,
+    lockConeRad: validAngleDeg * DEG,
     rangeM: w.rangeM * WIDE_LOCK_RANGE_MUL,
   };
 }
@@ -294,7 +295,8 @@ function wideLockTargets(ctx: SimCtx, rec: ShipRec, sec: WeaponDef): void {
     _wideD.push(-1);
   }
   forwardOf(s.rot, _f);
-  const cosCone = Math.cos(sec.lockConeRad * rec.mods.lockConeMul);
+  const cosCone = Math.cos(sec.validAngleDeg * DEG * rec.mods.lockConeMul);
+  const range = advRadar(rec);
   for (const o of ctx.recList) {
     const os = o.state;
     if (os.nation === s.nation || os.id === s.lockTarget || !lockable(ctx, os.id)) continue;
@@ -302,8 +304,7 @@ function wideLockTargets(ctx: SimCtx, rec: ShipRec, sec: WeaponDef): void {
       dy = os.pos[1] - s.pos[1],
       dz = os.pos[2] - s.pos[2];
     const d = Math.hypot(dx, dy, dz);
-    if (d < 1 || d > sec.rangeM || (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d < cosCone)
-      continue;
+    if (d < 1 || d > range || (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d < cosCone) continue;
     // Insert sorted by distance, keep the nearest few.
     let k = _wideIds.length;
     while (k > 0 && _wideD[k - 1]! > d) k--;
@@ -317,86 +318,119 @@ function wideLockTargets(ctx: SimCtx, rec: ShipRec, sec: WeaponDef): void {
   }
 }
 
-/** Missiles (and the siege mortar) lock only onto the selected target, if it is an enemy in cone and range. */
-function updateLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, sec: WeaponDef): void {
+/** STD radar (m): Siege stretches it. */
+function stdRadar(rec: ShipRec): number {
+  return rec.fd.radarStdM * (rec.state.sieged ? siegeMods(rec.state).rangeMul : 1);
+}
+
+/** ADV radar (m): Wide Lock Mode stretches it. */
+function advRadar(rec: ShipRec): number {
+  return (
+    rec.fd.radarAdvM * (rec.state.toggles.bombing === 'wide-lock-mode' ? WIDE_LOCK_RANGE_MUL : 1)
+  );
+}
+
+/** Valid Angle (rad) of the Secondary with buffs, Siege and the server's lag tolerance. */
+function validAngle(rec: ShipRec, sec: WeaponDef): number {
   const s = rec.state;
-  let cone = sec.lockConeRad * rec.mods.lockConeMul;
-  let range = sec.rangeM;
-  let lockSec = sec.lockTimeSec * rec.mods.lockTimeMul;
-  if (cone <= 0) {
-    if (sec.kind === 'shell' && s.sieged) {
-      cone = MORTAR_LOCK_CONE_RAD;
-      lockSec = MORTAR_LOCK_SEC * rec.mods.lockTimeMul;
-    } else {
-      s.lockTarget = null;
-      s.canLock = false;
-      s.lockProgress = 0;
-      rec.lockCand = null;
-      rec.lockTime = 0;
-      return;
-    }
+  return (
+    (sec.validAngleDeg * rec.mods.lockConeMul * (s.sieged ? siegeLockConeMul(s) : 1) +
+      TARGETING.lockToleranceDeg) *
+    DEG
+  );
+}
+
+// The selected Target this tick as the server accepts it (set by stepWeapons): id, aim point, distance, velocity.
+let _tgt: { id: string; nation: NationId } | null = null;
+let _tx = 0,
+  _ty = 0,
+  _tz = 0,
+  _td = 0;
+let _tv: readonly number[] = ZERO;
+
+/**
+ * The Pilot's selected Target if the server accepts it: a live hostile Ship (a cloaked one only inside the reveal
+ * range) or a live hostile structure, inside the Frame's STD or ADV radar. Anything else counts as no Target.
+ */
+function selectTarget(ctx: SimCtx, rec: ShipRec, id: string | null): void {
+  const s = rec.state;
+  _tgt = null;
+  if (!id) return;
+  const sh = ctx.ships.get(id);
+  let t: { id: string; nation: NationId };
+  if (sh) {
+    const o = sh.state;
+    if (!o.alive || o.launchPhase !== 'none') return;
+    _tx = o.pos[0];
+    _ty = o.pos[1];
+    _tz = o.pos[2];
+    _tv = o.vel;
+    t = o;
+  } else {
+    const st = structureById(ctx, id);
+    if (!st || !st.state.alive) return;
+    _tx = st.state.pos[0];
+    _ty = st.state.pos[1] + st.height / 2;
+    _tz = st.state.pos[2];
+    _tv = ZERO;
+    t = st.state;
   }
-  if (s.sieged) {
-    const mods = siegeMods(s);
-    cone *= siegeLockConeMul(s);
-    range *= mods.rangeMul;
-  }
-  const t = input.target ? lockable(ctx, input.target) : null;
-  let valid = false;
-  if (t && t.nation !== s.nation) {
-    forwardOf(s.rot, _f);
-    const dx = _tp[0]! - s.pos[0],
-      dy = _tp[1]! - s.pos[1],
-      dz = _tp[2]! - s.pos[2];
-    const d = Math.hypot(dx, dy, dz);
-    valid = d <= range && d >= 1 && (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d >= Math.cos(cone);
-  }
-  s.canLock = valid;
-  if (!valid || !t) {
-    s.lockTarget = null;
-    s.lockProgress = 0;
-    rec.lockCand = null;
-    rec.lockTime = 0;
-    return;
-  }
-  if (rec.lockCand === t.id) rec.lockTime += ctx.dt;
-  else {
-    rec.lockCand = t.id;
-    rec.lockTime = 0;
-  }
-  s.lockTarget = rec.lockTime >= lockSec ? t.id : null;
-  s.lockProgress = Math.min(rec.lockTime / lockSec, 1);
+  if (t.nation === s.nation) return;
+  _td = Math.hypot(_tx - s.pos[0], _ty - s.pos[1], _tz - s.pos[2]);
+  if (_td < 1 || (sh?.mods.cloak && _td > CLOAK_REVEAL_M)) return;
+  if (_td > Math.max(stdRadar(rec), advRadar(rec)) * (1 + TARGETING.rangeTolerance)) return;
+  _tgt = t;
+}
+
+/** Cosine of the angle between the nose (`_f`, set by the caller) and the Target. */
+function targetCos(s: ShipState): number {
+  return ((_tx - s.pos[0]) * _f[0]! + (_ty - s.pos[1]) * _f[1]! + (_tz - s.pos[2]) * _f[2]!) / _td;
 }
 
 /**
- * Siege gun lock: the selected enemy Ship is acquired inside the aim-assist cone of the nose and held while it stays
- * inside the wider break cone, in Primary range and in terrain line of sight. Dropping out means re-aiming to re-lock.
+ * Secondary lock: instant and purely conditional. LOCKED = the Target is inside ADV radar and within the weapon's
+ * Valid Angle of the nose (cloaked Ships refuse locks). Lockless weapons (Valid Angle 0) never lock.
  */
-function updateSiegeLock(ctx: SimCtx, rec: ShipRec, input: PilotInput, w: WeaponDef): void {
+function updateLock(ctx: SimCtx, rec: ShipRec, sec: WeaponDef): void {
   const s = rec.state;
-  const id = s.sieged && input.target && ctx.ships.has(input.target) ? input.target : null;
-  const t = id ? lockable(ctx, id) : null;
+  const ok =
+    _tgt !== null &&
+    sec.validAngleDeg > 0 &&
+    !ctx.ships.get(_tgt.id)?.mods.cloak &&
+    _td <= advRadar(rec) * (1 + TARGETING.rangeTolerance) &&
+    targetCos(s) >= Math.cos(validAngle(rec, sec));
+  s.canLock = ok;
+  s.lockTarget = ok ? _tgt!.id : null;
+  s.lockProgress = ok ? 1 : 0;
+}
+
+/**
+ * Siege gun lock: the selected enemy Ship is acquired inside the aim-assist cone of the nose (on the tick Siege is
+ * entered: anywhere in the break cone, the snap) and held while it stays inside the break cone, in STD radar and
+ * in terrain line of sight. Dropping out means re-aiming to re-lock.
+ */
+function updateSiegeLock(ctx: SimCtx, rec: ShipRec, entering: boolean): void {
+  const s = rec.state;
+  const id = s.sieged && _tgt && ctx.ships.has(_tgt.id) ? _tgt.id : null;
   let keep = false;
-  if (t && t.nation !== s.nation) {
-    forwardOf(s.rot, _f);
-    const dx = _tp[0]! - s.pos[0],
-      dy = _tp[1]! - s.pos[1],
-      dz = _tp[2]! - s.pos[2];
-    const d = Math.hypot(dx, dy, dz);
-    const cone = s.siegeLock === id ? SIEGE_GUN_BREAK_CONE_RAD : AIM_ASSIST.coneRad;
+  if (id && !ctx.ships.get(id)!.mods.cloak) {
+    const dx = _tx - s.pos[0],
+      dy = _ty - s.pos[1],
+      dz = _tz - s.pos[2];
+    const cone = s.siegeLock === id || entering ? SIEGE_GUN_BREAK_CONE_RAD : AIM_ASSIST.coneRad;
     // Ground Siege: the hull stays level and the gun elevates, so only the heading counts.
     const cos = s.grounded
       ? (dx * _f[0]! + dz * _f[2]!) / (Math.hypot(dx, dz) * Math.hypot(_f[0]!, _f[2]!) || 1)
-      : (dx * _f[0]! + dy * _f[1]! + dz * _f[2]!) / d;
-    if (d >= 1 && d <= w.rangeM * siegeMods(s).rangeMul && cos >= Math.cos(cone)) {
+      : targetCos(s);
+    if (_td <= stdRadar(rec) * (1 + TARGETING.rangeTolerance) && cos >= Math.cos(cone)) {
       const ray = ctx.ray;
       ray.origin.x = s.pos[0];
       ray.origin.y = s.pos[1];
       ray.origin.z = s.pos[2];
-      ray.dir.x = dx / d;
-      ray.dir.y = dy / d;
-      ray.dir.z = dz / d;
-      keep = ctx.world.castRay(ray, d, true, undefined, RAY_QUERY_GROUPS) === null;
+      ray.dir.x = dx / _td;
+      ray.dir.y = dy / _td;
+      ray.dir.z = dz / _td;
+      keep = ctx.world.castRay(ray, _td, true, undefined, RAY_QUERY_GROUPS) === null;
     }
   }
   s.siegeLock = keep ? id : null;
@@ -433,275 +467,460 @@ export function interceptTime(
   return t;
 }
 
-/** Lock-on progress and Primary/Secondary fire for one Ship. */
+// Lead point (relative to the muzzle) of the last `leadAt` call, and its length.
+let _lx = 0,
+  _ly = 0,
+  _lz = 0,
+  _ll = 0;
+
+/** Lead point of a target at (tx,ty,tz) moving at `v`, for a round of `speed` fired from (ox,oy,oz). */
+function leadAt(
+  tx: number,
+  ty: number,
+  tz: number,
+  v: readonly number[],
+  ox: number,
+  oy: number,
+  oz: number,
+  speed: number,
+  maxSec: number,
+): void {
+  const rx = tx - ox,
+    ry = ty - oy,
+    rz = tz - oz;
+  const tt = Math.min(interceptTime(rx, ry, rz, v[0]!, v[1]!, v[2]!, speed), maxSec);
+  _lx = rx + v[0]! * tt;
+  _ly = ry + v[1]! * tt;
+  _lz = rz + v[2]! * tt;
+  _ll = Math.hypot(_lx, _ly, _lz) || 1;
+}
+
+// Direction register written by `jitter`.
+let _dx = 0,
+  _dy = 0,
+  _dz = 0;
+
+/** Unit (bx,by,bz) pushed off by a random offset of radius `min + span * sqrt(rng)` (uses `_r`/`_u`). */
+function jitter(ctx: SimCtx, bx: number, by: number, bz: number, min: number, span: number): void {
+  const ang = ctx.rng() * Math.PI * 2;
+  const rad = min + span * Math.sqrt(ctx.rng());
+  const sx = Math.cos(ang) * rad,
+    sy = Math.sin(ang) * rad;
+  _dx = bx + _r[0]! * sx + _u[0]! * sy;
+  _dy = by + _r[1]! * sx + _u[1]! * sy;
+  _dz = bz + _r[2]! * sx + _u[2]! * sy;
+  const l = Math.hypot(_dx, _dy, _dz);
+  _dx /= l;
+  _dy /= l;
+  _dz /= l;
+}
+
+/** Lock, Siege gun lock, and Primary/Secondary fire for one Ship. Server only. */
 export function stepWeapons(ctx: SimCtx, rec: ShipRec, input: PilotInput): void {
   const s = rec.state;
   const fd = rec.fd;
   const weapons = rec.gear ? rec.gear.weapons : [WEAPONS[fd.primary]!, WEAPONS[fd.secondary]!];
   const sec = bombingSecondary(weapons[1]!, s.toggles.bombing);
-  updateLock(ctx, rec, input, sec);
-  updateSiegeLock(ctx, rec, input, weapons[0]!);
+  const entering = s.sieged && !rec.wasSieged;
+  rec.wasSieged = s.sieged;
+  rec.siegeArm = entering ? SIEGE.armSec : Math.max(rec.siegeArm - ctx.dt, 0);
+  forwardOf(s.rot, _f);
+  rightOf(s.rot, _r);
+  upOf(s.rot, _u);
+  selectTarget(ctx, rec, input.target);
+  updateLock(ctx, rec, sec);
+  updateSiegeLock(ctx, rec, entering);
+  const cold = s.halted || rec.mods.noAttack;
+  stepPrimary(ctx, rec, weapons[0]!, !cold && input.fire1);
   const rewind = Math.min(Math.max(ctx.tick - input.viewTick, 0), MAX_REWIND_TICKS);
-  const fire = s.halted || rec.mods.noAttack ? [false, false] : [input.fire1, input.fire2];
-  for (let i = 0; i < 2; i++) {
-    rec.fireCd[i] = Math.max(rec.fireCd[i]! - ctx.dt, -ctx.dt);
-    const w = i === 0 ? weapons[0]! : sec;
-    const ammo = i === 0 ? s.ammo1 : s.ammo2;
-    if (!fire[i] || rec.fireCd[i]! > 0 || ammo <= 0) continue;
-    if (i === 0) s.ammo1--;
-    else s.ammo2--;
-    if (rec.mods.cloak) {
-      breakCloak(s);
-      rec.mods.cloak = false;
+  stepSecondary(ctx, rec, sec, !cold && input.fire2, cold, rewind);
+}
+
+function dropCloak(rec: ShipRec): void {
+  if (!rec.mods.cloak) return;
+  breakCloak(rec.state);
+  rec.mods.cloak = false;
+}
+
+/**
+ * Primary (STD): fires whenever reattack, heat and ammo allow; each round of the pattern is an accuracy roll
+ * against the selected Target. No Target (or out of STD radar, behind the nose, inside the Ground Siege minimum
+ * range, below an Air Siege) = visual tracers only. A Siege gun lock always hits. Winning rounds deal their damage
+ * when the tracer reaches the Target (see stepProjectiles).
+ */
+function stepPrimary(ctx: SimCtx, rec: ShipRec, w: WeaponDef, fire: boolean): void {
+  const s = rec.state;
+  rec.fireCd[0] = Math.max(rec.fireCd[0] - ctx.dt, -ctx.dt);
+  if (s.overheated || !fire) {
+    // Heat bleeds off in coolMul x overheatSec: the forced cool-down when overheated.
+    s.heat =
+      w.overheatSec > 0 ? Math.max(s.heat - ctx.dt / (TARGETING.coolMul * w.overheatSec), 0) : 0;
+    if (s.heat === 0) s.overheated = false;
+  }
+  if (!fire || s.overheated || rec.fireCd[0] > 0 || s.ammo1 <= 0) return;
+  if (s.sieged && rec.siegeArm > 0) return;
+  const interval = w.fireIntervalSec / rec.mods.fireRateMul;
+  rec.fireCd[0] += interval;
+  if (w.overheatSec > 0) {
+    s.heat = Math.min(s.heat + interval / w.overheatSec, 1);
+    if (s.heat >= 1) s.overheated = true;
+  }
+  dropCloak(rec);
+  // An armed Primary shot (consumed by this pattern's first round).
+  const shotMul = rec.mods.primaryShotMul;
+  const charged = shotMul !== 1;
+  if (charged) {
+    dropBuffs(s, (e) => e.primaryShotMul !== undefined);
+    rec.mods.primaryShotMul = 1;
+  }
+  const mods = s.sieged ? siegeMods(s) : null;
+  const range = w.rangeM * (mods ? mods.rangeMul : 1);
+  const damage =
+    w.damage * rec.mods.damageMul * rec.mods.primaryDamageMul * (mods ? mods.damageMul : 1);
+  // Hit chance this pattern; 0 = no damage, visual only.
+  let chance = 0;
+  const gunLock = _tgt !== null && s.siegeLock === _tgt.id;
+  if (_tgt && _td <= stdRadar(rec) * (1 + TARGETING.rangeTolerance)) {
+    const falloffRange = range * (charged ? CHARGED_SHOT_RANGE_MUL : 1);
+    if (gunLock) chance = 1;
+    else if (targetCos(s) >= Math.cos(TARGETING.stdConeRad))
+      chance =
+        (w.accuracy + rec.mods.accuracyAdd) *
+        (_td > falloffRange ? TARGETING.falloffBase ** ((_td / falloffRange - 1) * 100) : 1);
+    if (s.sieged && s.grounded && _td < SIEGE.minRangeM) chance = 0;
+    if (s.sieged && !s.grounded && (_ty - s.pos[1]) / _td < -Math.sin(SIEGE_AIR.maxDepressionRad))
+      chance = 0;
+  }
+  const nose = rec.fd.halfLength + NOSE_OFFSET;
+  const ox = s.pos[0] + _f[0]! * nose,
+    oy = s.pos[1] + _f[1]! * nose,
+    oz = s.pos[2] + _f[2]! * nose;
+  if (chance > 0) leadAt(_tx, _ty, _tz, _tv, ox, oy, oz, w.speed, range / w.speed);
+  const n = Math.min(w.pattern.count, s.ammo1);
+  s.ammo1 -= n;
+  const spread = w.spread * rec.mods.spreadMul;
+  for (let k = 0; k < n; k++) {
+    const hit = chance > 0 && ctx.rng() < chance;
+    if (chance <= 0) jitter(ctx, _f[0]!, _f[1]!, _f[2]!, 0, spread);
+    else if (hit) jitter(ctx, _lx / _ll, _ly / _ll, _lz / _ll, 0, spread * AIM_ASSIST.spreadMul);
+    else jitter(ctx, _lx / _ll, _ly / _ll, _lz / _ll, TARGETING.missSpreadRad, spread);
+    const roll = 1 + (ctx.rng() * 2 - 1) * TARGETING.damageSpread;
+    const p = spawnProjectile(
+      ctx,
+      rec,
+      w.kind,
+      w.id,
+      damage * roll * (charged && k === 0 ? shotMul : 1),
+      w.splashRadius * rec.mods.splashMul,
+      w.speed,
+      hit ? Math.max(range, _ll + 1) : range,
+      0,
+      hit ? _tgt!.id : null,
+      ox,
+      oy,
+      oz,
+      _dx,
+      _dy,
+      _dz,
+      0,
+    );
+    p.visual = !hit;
+    if (hit) {
+      p.strike = _tgt!.id;
+      p.strikeAt = _ll;
     }
-    rec.fireCd[i] =
-      rec.fireCd[i]! +
-      w.fireIntervalSec / (i === 0 ? rec.mods.fireRateMul : rec.mods.secondaryFireRateMul);
-    // Per-slot damage buffs, and an armed Primary shot (consumed by this round).
-    let slotMul = i === 0 ? rec.mods.primaryDamageMul : rec.mods.secondaryDamageMul;
-    const charged = i === 0 && rec.mods.primaryShotMul !== 1;
-    if (charged) {
-      slotMul *= rec.mods.primaryShotMul;
-      dropBuffs(s, (e) => e.primaryShotMul !== undefined);
-      rec.mods.primaryShotMul = 1;
-    }
-    forwardOf(s.rot, _f);
-    rightOf(s.rot, _r);
-    upOf(s.rot, _u);
-    const mods = s.sieged ? siegeMods(s) : null;
-    const nose = fd.halfLength + NOSE_OFFSET;
-    const ox = s.pos[0] + _f[0]! * nose,
-      oy = s.pos[1] + _f[1]! * nose,
-      oz = s.pos[2] + _f[2]! * nose;
-    const mode = i === 1 ? s.toggles.bombing : undefined;
-    if (mode === 'air-barrage-mode') {
-      // Forward salvo: the first rocket's ammo is already paid; each extra rocket costs 1.
-      const extra = Math.min(AIR_BARRAGE_COUNT - 1, s.ammo2);
-      s.ammo2 -= extra;
-      const count = 1 + extra;
-      for (let k = 0; k < count; k++) {
-        const off = (k - (count - 1) / 2) * AIR_BARRAGE_SPREAD_RAD;
-        const adx = _f[0]! + _r[0]! * off,
-          ady = _f[1]! + _r[1]! * off,
-          adz = _f[2]! + _r[2]! * off;
-        const al = Math.hypot(adx, ady, adz);
-        spawnProjectile(
-          ctx,
-          rec,
-          w.kind,
-          w.id,
-          w.damage *
-            AIR_BARRAGE_DAMAGE_MUL *
-            rec.mods.damageMul *
-            slotMul *
-            (mods ? mods.damageMul : 1),
-          w.splashRadius * rec.mods.splashMul,
-          w.speed,
-          w.rangeM * (mods ? mods.rangeMul : 1),
-          0,
-          null,
-          ox,
-          oy,
-          oz,
-          adx / al,
-          ady / al,
-          adz / al,
-          rewind,
-        );
-      }
-      continue;
-    }
-    if (mode === 'wide-lock-mode') {
-      // One guided rocket per target (locked Target first, then the nearest in the cone): the first is already
-      // paid, each extra costs 1. No target: a single rocket flies straight off the nose.
-      wideLockTargets(ctx, rec, w);
-      const count = Math.max(1, Math.min(_wideIds.length, 1 + s.ammo2));
-      s.ammo2 -= count - 1;
-      for (let k = 0; k < count; k++) {
-        const target = _wideIds[k] ?? null;
-        const off = (k - (count - 1) / 2) * AIR_BARRAGE_SPREAD_RAD;
-        const adx = _f[0]! + _r[0]! * off,
-          ady = _f[1]! + _r[1]! * off,
-          adz = _f[2]! + _r[2]! * off;
-        const al = Math.hypot(adx, ady, adz);
-        spawnProjectile(
-          ctx,
-          rec,
-          target ? 'missile' : w.kind,
-          w.id,
-          w.damage *
-            WIDE_LOCK_DAMAGE_MUL *
-            rec.mods.damageMul *
-            slotMul *
-            (mods ? mods.damageMul : 1),
-          w.splashRadius * rec.mods.splashMul,
-          w.speed,
-          w.rangeM * (mods ? mods.rangeMul : 1),
-          target ? WIDE_LOCK_HOMING_TURN : 0,
-          target,
-          ox,
-          oy,
-          oz,
-          adx / al,
-          ady / al,
-          adz / al,
-          rewind,
-        );
-      }
-      if (s.lockTarget) {
-        s.lockTarget = null;
-        rec.lockCand = null;
-        rec.lockTime = 0;
-      }
-      continue;
-    }
-    if (mode === 'ground-strike-mode') {
-      // Heavy bomb dropped straight down, inheriting the Ship's velocity, then falling under gravity.
-      const bvx = s.vel[0],
-        bvy = s.vel[1] - BOMB_DROP_SPEED,
-        bvz = s.vel[2];
-      const bs = Math.hypot(bvx, bvy, bvz) || 1;
-      const bomb = spawnProjectile(
-        ctx,
-        rec,
-        w.kind,
-        w.id,
-        w.damage * rec.mods.damageMul * slotMul * (mods ? mods.damageMul : 1),
-        w.splashRadius * GROUND_STRIKE_SPLASH_MUL * rec.mods.splashMul,
-        bs,
-        w.rangeM,
-        0,
-        null,
-        s.pos[0],
-        s.pos[1] - fd.radius - 1,
-        s.pos[2],
-        bvx / bs,
-        bvy / bs,
-        bvz / bs,
-        rewind,
-      );
-      bomb.gravity = BOMB_GRAVITY;
-      bomb.groundMul = GROUND_STRIKE_GROUND_MUL;
-      continue;
-    }
-    // Base direction: the nose, or (Primary aim assist) the Target's lead point.
-    let bx = _f[0]!,
-      by = _f[1]!,
-      bz = _f[2]!;
-    let spreadScale = 1;
-    let gunLock = false;
-    if (i === 0 && input.target) {
-      const t = ctx.ships.get(input.target);
-      if (t && t.state.alive && t.state.nation !== s.nation) {
-        const tx = t.state.pos[0] - s.pos[0],
-          ty = t.state.pos[1] - s.pos[1],
-          tz = t.state.pos[2] - s.pos[2];
-        const td = Math.hypot(tx, ty, tz) || 1;
-        // The assist cone is measured from the nose (the centre crosshair), not the steering aim.
-        const cosAim = (tx * _f[0]! + ty * _f[1]! + tz * _f[2]!) / td;
-        gunLock = s.siegeLock === t.state.id;
-        if (
-          gunLock ||
-          (td <= w.rangeM * (mods ? mods.rangeMul : 1) && cosAim >= Math.cos(AIM_ASSIST.coneRad))
-        ) {
-          const rx = t.state.pos[0] - ox,
-            ry = t.state.pos[1] - oy,
-            rz = t.state.pos[2] - oz;
-          const tt = Math.min(
-            interceptTime(rx, ry, rz, t.state.vel[0], t.state.vel[1], t.state.vel[2], w.speed),
-            w.rangeM / w.speed,
-          );
-          bx = rx + t.state.vel[0] * tt;
-          by = ry + t.state.vel[1] * tt;
-          bz = rz + t.state.vel[2] * tt;
-          const bl = Math.hypot(bx, by, bz) || 1;
-          bx /= bl;
-          by /= bl;
-          bz /= bl;
-          spreadScale = gunLock ? SIEGE_GUN_SPREAD_MUL : AIM_ASSIST.spreadMul;
-        }
+  }
+}
+
+/** Seconds of reattack for the Secondary (counted from the end of the salvo). */
+function secondaryInterval(rec: ShipRec, w: WeaponDef): number {
+  return w.fireIntervalSec / rec.mods.secondaryFireRateMul;
+}
+
+/**
+ * Secondary (ADV). Missiles and the Bulwark salvo fire only while LOCKED (same tick the lock comes in), as a
+ * count x series pattern; reattack counts from the end of the salvo. Missiles home at the salvo's Target;
+ * the Bulwark salvo flies straight at the lead point and needs the lock held for every volley (unlocked volleys
+ * go out along the nose). Anvil bombs and its bombing modes need no lock.
+ */
+function stepSecondary(
+  ctx: SimCtx,
+  rec: ShipRec,
+  w: WeaponDef,
+  fire: boolean,
+  cold: boolean,
+  rewind: number,
+): void {
+  const s = rec.state;
+  const interval = secondaryInterval(rec, w);
+  if (rec.salvoLeft <= 0) {
+    rec.fireCd[1] = Math.max(rec.fireCd[1] - ctx.dt, -ctx.dt);
+    if (fire && rec.fireCd[1] <= 0 && s.ammo2 > 0) {
+      const mode = s.toggles.bombing;
+      if (mode || w.validAngleDeg <= 0) {
+        rec.fireCd[1] += interval;
+        dropCloak(rec);
+        fireLockless(ctx, rec, w, mode, rewind);
+      } else if (s.lockTarget) {
+        rec.salvoLeft = w.pattern.series + (w.kind === 'missile' ? rec.mods.salvoAdd : 0);
+        rec.salvoCd = 0;
+        rec.salvoTarget = s.lockTarget;
+        dropCloak(rec);
       }
     }
-    // Missile salvo: the first missile's ammo is already paid; each extra one costs 1, fanned sideways.
-    const extra =
-      w.kind === 'missile' ? Math.min(MISSILE_SALVO - 1 + rec.mods.salvoAdd, s.ammo2) : 0;
-    if (extra > 0) s.ammo2 -= extra;
-    let usedLock = false;
-    for (let k = 0; k <= extra; k++) {
-      const fan = (k - extra / 2) * MISSILE_SALVO_SPREAD_RAD;
-      const ang = ctx.rng() * Math.PI * 2;
-      const rad = charged ? 0 : w.spread * spreadScale * rec.mods.spreadMul * Math.sqrt(ctx.rng());
-      const sx = Math.cos(ang) * rad,
-        sy = Math.sin(ang) * rad;
-      let dx = bx + _r[0]! * (sx + fan) + _u[0]! * sy;
-      let dy = by + _r[1]! * (sx + fan) + _u[1]! * sy;
-      let dz = bz + _r[2]! * (sx + fan) + _u[2]! * sy;
-      const dl = Math.hypot(dx, dy, dz);
-      dx /= dl;
-      dy /= dl;
-      dz /= dl;
-      let homing = w.homingTurnRate;
-      let target = homing > 0 ? s.lockTarget : null;
-      if (i === 1 && w.kind === 'shell' && s.sieged && s.lockTarget) {
-        // Siege mortar: loft toward the locked target, mild guidance pulls the shell down onto it.
-        const t = ctx.ships.get(s.lockTarget);
-        if (t) {
-          const tx = t.state.pos[0] - s.pos[0],
-            ty = t.state.pos[1] - s.pos[1],
-            tz = t.state.pos[2] - s.pos[2];
-          const tl = Math.hypot(tx, ty, tz) || 1;
-          dx = tx / tl;
-          dy = ty / tl + Math.tan(MORTAR_LOFT_RAD);
-          dz = tz / tl;
-          const ll = Math.hypot(dx, dy, dz);
-          dx /= ll;
-          dy /= ll;
-          dz /= ll;
-          homing = MORTAR_GUIDE_TURN;
-          target = s.lockTarget;
-        }
+  }
+  if (rec.salvoLeft > 0) {
+    if (cold || s.ammo2 <= 0) rec.salvoLeft = 0;
+    else {
+      rec.salvoCd -= ctx.dt;
+      if (rec.salvoCd <= 0) {
+        volley(ctx, rec, w);
+        rec.salvoCd += TARGETING.seriesSec;
+        rec.salvoLeft--;
       }
-      if (gunLock) {
-        // Gun-locked rounds home hard on the Target so every one lands (see stepProjectiles).
-        homing = SIEGE_GUN_HOMING_TURN;
-        target = s.siegeLock;
-      }
+    }
+    if (rec.salvoLeft <= 0) {
+      rec.salvoTarget = null;
+      rec.fireCd[1] = interval;
+    }
+  }
+  s.advReadyIn =
+    rec.salvoLeft > 0
+      ? Math.max(rec.salvoCd, 0) + (rec.salvoLeft - 1) * TARGETING.seriesSec + interval
+      : Math.max(rec.fireCd[1], 0);
+}
+
+const _ids: number[] = [];
+
+/** One volley of a locked salvo (see stepSecondary). */
+function volley(ctx: SimCtx, rec: ShipRec, w: WeaponDef): void {
+  const s = rec.state;
+  const mods = s.sieged ? siegeMods(s) : null;
+  const nose = rec.fd.halfLength + NOSE_OFFSET;
+  const ox = s.pos[0] + _f[0]! * nose,
+    oy = s.pos[1] + _f[1]! * nose,
+    oz = s.pos[2] + _f[2]! * nose;
+  const target = rec.salvoTarget;
+  const missile = w.kind === 'missile';
+  // Straight shells aim at the lead point, only while the lock holds.
+  const aimed = !missile && target !== null && s.lockTarget === target && lockable(ctx, target);
+  if (aimed) {
+    leadAt(
+      _tp[0]!,
+      _tp[1]!,
+      _tp[2]!,
+      ctx.ships.get(target)?.state.vel ?? ZERO,
+      ox,
+      oy,
+      oz,
+      w.speed,
+      w.rangeM / w.speed,
+    );
+    _lx /= _ll;
+    _ly /= _ll;
+    _lz /= _ll;
+  }
+  const count = Math.min(w.pattern.count, s.ammo2);
+  s.ammo2 -= count;
+  _ids.length = 0;
+  for (let k = 0; k < count; k++) {
+    const fan = (k - (count - 1) / 2) * MISSILE_SALVO_SPREAD_RAD;
+    const bx = aimed ? _lx : _f[0]!,
+      by = aimed ? _ly : _f[1]!,
+      bz = aimed ? _lz : _f[2]!;
+    jitter(
+      ctx,
+      bx + _r[0]! * fan,
+      by + _r[1]! * fan,
+      bz + _r[2]! * fan,
+      0,
+      w.spread * rec.mods.spreadMul,
+    );
+    const p = spawnProjectile(
+      ctx,
+      rec,
+      w.kind,
+      w.id,
+      w.damage * rec.mods.damageMul * rec.mods.secondaryDamageMul * (mods ? mods.damageMul : 1),
+      w.splashRadius * rec.mods.splashMul,
+      w.speed,
+      w.rangeM * (mods ? mods.rangeMul : 1),
+      missile ? w.homingTurnRate : 0,
+      missile || aimed ? target : null,
+      ox,
+      oy,
+      oz,
+      _dx,
+      _dy,
+      _dz,
+      0,
+    );
+    _ids.push(p.id);
+  }
+  if (target && (missile || aimed)) warn(ctx, s.id, target, w.id, _ids);
+}
+
+/** missileIncoming for a volley fired at a Ship; its projectiles will report missileEnded. */
+function warn(ctx: SimCtx, attacker: ShipId, target: string, weapon: string, ids: number[]): void {
+  if (!ctx.ships.has(target) || ids.length === 0) return;
+  for (const p of ctx.projectiles) if (ids.includes(p.id)) p.warned = true;
+  ctx.events.push({ type: 'missileIncoming', attacker, target, weapon, missiles: ids.slice() });
+}
+
+/** Anvil Secondary: bombs and bombing modes, no lock needed (Wide Lock guides at whatever it has). */
+function fireLockless(
+  ctx: SimCtx,
+  rec: ShipRec,
+  w: WeaponDef,
+  mode: string | undefined,
+  rewind: number,
+): void {
+  const s = rec.state;
+  const fd = rec.fd;
+  s.ammo2--;
+  const slotMul = rec.mods.secondaryDamageMul;
+  const mods = s.sieged ? siegeMods(s) : null;
+  const nose = fd.halfLength + NOSE_OFFSET;
+  const ox = s.pos[0] + _f[0]! * nose,
+    oy = s.pos[1] + _f[1]! * nose,
+    oz = s.pos[2] + _f[2]! * nose;
+  if (mode === 'air-barrage-mode') {
+    // Forward salvo: the first rocket's ammo is already paid; each extra rocket costs 1.
+    const extra = Math.min(AIR_BARRAGE_COUNT - 1, s.ammo2);
+    s.ammo2 -= extra;
+    const count = 1 + extra;
+    for (let k = 0; k < count; k++) {
+      const off = (k - (count - 1) / 2) * AIR_BARRAGE_SPREAD_RAD;
+      const adx = _f[0]! + _r[0]! * off,
+        ady = _f[1]! + _r[1]! * off,
+        adz = _f[2]! + _r[2]! * off;
+      const al = Math.hypot(adx, ady, adz);
       spawnProjectile(
         ctx,
         rec,
         w.kind,
         w.id,
-        w.damage * rec.mods.damageMul * slotMul * (mods ? mods.damageMul : 1),
+        w.damage *
+          AIR_BARRAGE_DAMAGE_MUL *
+          rec.mods.damageMul *
+          slotMul *
+          (mods ? mods.damageMul : 1),
         w.splashRadius * rec.mods.splashMul,
         w.speed,
-        w.rangeM *
-          (mods ? mods.rangeMul : 1) *
-          (gunLock ? SIEGE_GUN_RANGE_SLACK : 1) *
-          (charged ? CHARGED_SHOT_RANGE_MUL : 1),
-        homing,
-        target,
-        s.pos[0] + _f[0]! * nose,
-        s.pos[1] + _f[1]! * nose,
-        s.pos[2] + _f[2]! * nose,
-        dx,
-        dy,
-        dz,
-        // Gun-locked rounds lead the Target's current state, so they hit-test now, not in the rewound past.
-        gunLock ? 0 : rewind,
+        w.rangeM * (mods ? mods.rangeMul : 1),
+        0,
+        null,
+        ox,
+        oy,
+        oz,
+        adx / al,
+        ady / al,
+        adz / al,
+        rewind,
       );
-      if (target && !gunLock) usedLock = true;
     }
-    if (usedLock) {
-      s.lockTarget = null;
-      rec.lockCand = null;
-      rec.lockTime = 0;
-    }
+    return;
   }
+  if (mode === 'wide-lock-mode') {
+    // One guided rocket per target (locked Target first, then the nearest in the cone): the first is already
+    // paid, each extra costs 1. No target: a single rocket flies straight off the nose.
+    wideLockTargets(ctx, rec, w);
+    const count = Math.max(1, Math.min(_wideIds.length, 1 + s.ammo2));
+    s.ammo2 -= count - 1;
+    for (let k = 0; k < count; k++) {
+      const target = _wideIds[k] ?? null;
+      const off = (k - (count - 1) / 2) * AIR_BARRAGE_SPREAD_RAD;
+      const adx = _f[0]! + _r[0]! * off,
+        ady = _f[1]! + _r[1]! * off,
+        adz = _f[2]! + _r[2]! * off;
+      const al = Math.hypot(adx, ady, adz);
+      const p = spawnProjectile(
+        ctx,
+        rec,
+        target ? 'missile' : w.kind,
+        w.id,
+        w.damage *
+          WIDE_LOCK_DAMAGE_MUL *
+          rec.mods.damageMul *
+          slotMul *
+          (mods ? mods.damageMul : 1),
+        w.splashRadius * rec.mods.splashMul,
+        w.speed,
+        w.rangeM * (mods ? mods.rangeMul : 1),
+        target ? WIDE_LOCK_HOMING_TURN : 0,
+        target,
+        ox,
+        oy,
+        oz,
+        adx / al,
+        ady / al,
+        adz / al,
+        rewind,
+      );
+      if (target) {
+        _ids.length = 0;
+        _ids.push(p.id);
+        warn(ctx, s.id, target, w.id, _ids);
+      }
+    }
+    return;
+  }
+  if (mode === 'ground-strike-mode') {
+    // Heavy bomb dropped straight down, inheriting the Ship's velocity, then falling under gravity.
+    const bvx = s.vel[0],
+      bvy = s.vel[1] - BOMB_DROP_SPEED,
+      bvz = s.vel[2];
+    const bs = Math.hypot(bvx, bvy, bvz) || 1;
+    const bomb = spawnProjectile(
+      ctx,
+      rec,
+      w.kind,
+      w.id,
+      w.damage * rec.mods.damageMul * slotMul * (mods ? mods.damageMul : 1),
+      w.splashRadius * GROUND_STRIKE_SPLASH_MUL * rec.mods.splashMul,
+      bs,
+      w.rangeM,
+      0,
+      null,
+      s.pos[0],
+      s.pos[1] - fd.radius - 1,
+      s.pos[2],
+      bvx / bs,
+      bvy / bs,
+      bvz / bs,
+      rewind,
+    );
+    bomb.gravity = BOMB_GRAVITY;
+    bomb.groundMul = GROUND_STRIKE_GROUND_MUL;
+    return;
+  }
+  // Plain bomb: straight off the nose with a little spread.
+  jitter(ctx, _f[0]!, _f[1]!, _f[2]!, 0, w.spread * rec.mods.spreadMul);
+  spawnProjectile(
+    ctx,
+    rec,
+    w.kind,
+    w.id,
+    w.damage * rec.mods.damageMul * slotMul * (mods ? mods.damageMul : 1),
+    w.splashRadius * rec.mods.splashMul,
+    w.speed,
+    w.rangeM * (mods ? mods.rangeMul : 1),
+    0,
+    null,
+    ox,
+    oy,
+    oz,
+    _dx,
+    _dy,
+    _dz,
+    rewind,
+  );
 }
 
-function recycle(ctx: SimCtx, index: number): void {
+function recycle(ctx: SimCtx, index: number, reason: 'hit' | 'impact' | 'expired'): void {
   const list = ctx.projectiles;
   const p = list[index]!;
+  if (p.warned) ctx.events.push({ type: 'missileEnded', id: p.id, reason });
   const last = list.pop()!;
   if (last !== p) list[index] = last;
   ctx.pool.push(p);
@@ -777,10 +996,13 @@ function explode(
     y,
     z,
   );
+  // Splash sees Ships where the hit test did: in the shooter's past for unguided rounds (lag compensation).
+  const testTick = p.homing > 0 && p.target ? ctx.tick : ctx.tick - p.rewind;
   for (const o of ctx.recList) {
     const os = o.state;
     if (o === direct || !os.alive || os.nation === p.nation || os.launchPhase !== 'none') continue;
-    const d = Math.hypot(os.pos[0] - x, os.pos[1] - y, os.pos[2] - z) - ctx.frames[os.frame].radius;
+    poseAt(ctx, o, testTick);
+    const d = Math.hypot(_cx - x, _cy - y, _cz - z) - ctx.frames[os.frame].radius;
     if (d >= p.splash) continue;
     const fall = Math.max(1 - Math.max(d, 0) / p.splash, SPLASH_MIN_FRACTION);
     hitShip(ctx, o, p.damage * fall * victimMul(p, o), p.owner, p, x, y, z);
@@ -855,10 +1077,7 @@ export function stepProjectiles(ctx: SimCtx): void {
         tz /= tl;
         const missile = p.kind === 'missile';
         let broke: 'roll' | 'terrain' | 'lost' | null = null;
-        if (p.kind === 'tracer' && ctx.ships.get(p.owner)?.state.siegeLock !== ts.id) {
-          // Siege gun lock broke mid-flight: the round flies on unguided.
-          broke = 'lost';
-        } else if (missile) {
+        if (missile) {
           if (ts.rollTicks > 0 && tl < MISSILE_EVADE.rollBreakDistM && !t.mods.missileBlind) {
             broke = 'roll';
           } else if (
@@ -931,7 +1150,7 @@ export function stepProjectiles(ctx: SimCtx): void {
           if (missile && ts.rollTicks === 0 && tl <= ctx.frames[ts.frame].radius + MISSILE_FUSE_M) {
             explode(ctx, p, p.x, p.y, p.z, t, null);
             ctx.events.push({ type: 'projectileExpired', id: p.id, pos: [p.x, p.y, p.z] });
-            recycle(ctx, i);
+            recycle(ctx, i, 'hit');
             continue;
           }
           if (missile && !t.mods.missileBlind && (ts.incomingDist < 0 || tl < ts.incomingDist)) {
@@ -952,6 +1171,8 @@ export function stepProjectiles(ctx: SimCtx): void {
     let dome: StructureRec | null = null;
     let fused = false;
 
+    // Visual and rolled Primary rounds touch nothing but terrain (and their Target, below).
+    const physical = !p.visual && p.strike === null;
     if (step > 0) {
       ray.origin.x = p.x;
       ray.origin.y = p.y;
@@ -968,7 +1189,7 @@ export function stepProjectiles(ctx: SimCtx): void {
       // Favor the shooter for the whole flight: Ships where the shooter saw them, `rewind` ticks back.
       // Homing shots follow the live target (and everyone sees them from snapshots): no rewind.
       const testTick = p.homing > 0 && p.target ? ctx.tick : ctx.tick - p.rewind;
-      for (const o of ctx.recList) {
+      for (const o of physical ? ctx.recList : NO_SHIPS) {
         const os = o.state;
         if (!os.alive || os.nation === p.nation || os.rollTicks > 0 || os.launchPhase !== 'none')
           continue;
@@ -1002,7 +1223,9 @@ export function stepProjectiles(ctx: SimCtx): void {
         }
       }
       if (fused) structure = null;
-      const domeT = domeEntry(ctx, p.nation, p.x, p.y, p.z, p.dx, p.dy, p.dz, step);
+      const domeT = physical
+        ? domeEntry(ctx, p.nation, p.x, p.y, p.z, p.dx, p.dy, p.dz, step)
+        : Infinity;
       if (domeT < hitT) {
         hitT = domeT;
         victim = structure = null;
@@ -1010,14 +1233,30 @@ export function stepProjectiles(ctx: SimCtx): void {
       }
     }
 
+    // A rolled hit lands on its Target once the tracer gets there, unless terrain is in the way first.
+    const strikeT = p.strike !== null ? Math.max(p.strikeAt - p.travelled, 0) : Infinity;
+    if (strikeT <= step && strikeT < hitT) {
+      const sh = ctx.ships.get(p.strike!);
+      const st = sh ? undefined : structureById(ctx, p.strike!);
+      const hx = p.x + p.dx * strikeT,
+        hy = p.y + p.dy * strikeT,
+        hz = p.z + p.dz * strikeT;
+      if (sh) explode(ctx, p, sh.state.pos[0], sh.state.pos[1], sh.state.pos[2], sh, null);
+      else if (st) explode(ctx, p, hx, hy, hz, null, st);
+      ctx.events.push({ type: 'projectileExpired', id: p.id, pos: [hx, hy, hz] });
+      recycle(ctx, i, 'hit');
+      continue;
+    }
     if (hitT !== Infinity) {
       const hx = p.x + p.dx * hitT,
         hy = p.y + p.dy * hitT,
         hz = p.z + p.dz * hitT;
       if (dome) damageStructure(ctx, dome, structureDamage(p), p.owner, p.id, hx, hy, hz);
-      else explode(ctx, p, hx, hy, hz, victim, structure);
+      else if (physical) explode(ctx, p, hx, hy, hz, victim, structure);
+      else if (structure && structure.state.id === p.strike)
+        explode(ctx, p, hx, hy, hz, null, structure);
       ctx.events.push({ type: 'projectileExpired', id: p.id, pos: [hx, hy, hz] });
-      recycle(ctx, i);
+      recycle(ctx, i, fused ? 'hit' : 'impact');
       continue;
     }
     p.x = x1;
@@ -1028,7 +1267,7 @@ export function stepProjectiles(ctx: SimCtx): void {
     p.travelled += step;
     if (p.travelled >= p.range - 1e-6) {
       ctx.events.push({ type: 'projectileExpired', id: p.id, pos: [p.x, p.y, p.z] });
-      recycle(ctx, i);
+      recycle(ctx, i, 'expired');
     }
   }
 }

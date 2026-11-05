@@ -32,7 +32,7 @@ export interface BuffMods {
   maxHpMul: number;
   shieldRegenMul: number;
   fuelRegenMul: number;
-  lockTimeMul: number;
+  accuracyAdd: number;
   splashMul: number;
   hpRegenPerSec: number;
   cloak: boolean;
@@ -67,8 +67,13 @@ export interface ShipRec {
   lat: [number, number, number];
   fireCd: [number, number];
   shieldDelay: number;
-  lockCand: ShipId | null;
-  lockTime: number;
+  /** Secondary salvo in progress: volleys left, seconds to the next one, and its Target (server-only). */
+  salvoLeft: number;
+  salvoCd: number;
+  salvoTarget: string | null;
+  /** Seconds the Primary still holds fire after entering Siege; `wasSieged` detects the entry. */
+  siegeArm: number;
+  wasSieged: boolean;
   spawnCounter: number;
   /** Hits left on the absorbHits buff (Chaff Screen); set on cast, server-side. */
   absorbLeft: number;
@@ -100,6 +105,13 @@ export interface Projectile {
   rewind: number;
   /** Seconds the terrain has blocked line of sight to the target (missiles). */
   losTime: number;
+  /** Visual-only round (Primary with no valid Target, or a missed roll): collides with nothing, deals nothing. */
+  visual: boolean;
+  /** Primary round that won its roll: deals its damage to this Target once it has flown `strikeAt` metres. */
+  strike: string | null;
+  strikeAt: number;
+  /** Announced by missileIncoming: emits missileEnded when it goes. */
+  warned: boolean;
   /** Downward acceleration (bombs); 0 for straight-flying projectiles. */
   gravity: number;
   /** Damage multiplier vs Grounded/Docked victims (ground-strike bombs). */

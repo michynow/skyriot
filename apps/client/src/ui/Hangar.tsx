@@ -27,7 +27,7 @@ function statOf(def: ItemDefId, upgrade: number): string {
   const m = upgradeMul(upgrade);
   const w = WEAPONS[def];
   if (w)
-    return `${Math.round(w.damage * m)} dmg · ${Math.round((w.damage * m) / w.fireIntervalSec)} dps`;
+    return `${Math.round(w.damage * m)} dmg · ${Math.round((w.damage * m * w.pattern.count) / w.fireIntervalSec)} dps`;
   const e = ENGINES[def];
   return e ? `${Math.round(e.maxSpeed * m)} m/s · boost ${Math.round(e.boostSpeed * m)}` : '';
 }

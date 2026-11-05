@@ -247,6 +247,7 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     ty = objective.pos[1] + STRUCTURES[objective.kind].height / 2;
     tz = objective.pos[2];
     objectiveDist = Math.hypot(tx - me.pos[0], ty - me.pos[1], tz - me.pos[2]);
+    input.target = objective.id; // guns only damage the selected Target
     // Strafing run: break off when close, extend away, turn back in from far out.
     const hx = me.pos[0] - tx,
       hz = me.pos[2] - tz;
@@ -405,9 +406,14 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     const cos = f[0] * aimAt[0] + f[1] * aimAt[1] + f[2] * aimAt[2];
     const angle = Math.acos(Math.min(Math.max(cos, -1), 1));
     const rangeMul = me.sieged ? SIEGE.rangeMul : 1;
-    input.fire1 = burst && angle < FIRE_CONE_RAD && dist < primary.rangeM * rangeMul;
+    input.fire1 =
+      burst &&
+      !me.overheated &&
+      angle < FIRE_CONE_RAD &&
+      dist < Math.min(primary.rangeM, fd.radarStdM) * rangeMul;
+    // Missiles and the Bulwark salvo fire only while LOCKED (Target in the Valid Angle of the nose).
     input.fire2 =
-      secondary.lockConeRad > 0 || (me.sieged && secondary.kind === 'shell')
+      secondary.validAngleDeg > 0
         ? me.lockTarget !== null && mem.rng() < MISSILE_FIRE_CHANCE
         : burst && angle < FIRE_CONE_RAD && dist < secondary.rangeM * 0.6 * rangeMul;
   }
@@ -440,12 +446,14 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     const cos =
       (f[0] * (tx - me.pos[0]) + f[1] * (ty - me.pos[1]) + f[2] * (tz - me.pos[2])) / objectiveDist;
     const onTarget = cos > Math.cos(STRUCTURE_FIRE_CONE_RAD);
-    input.fire1 = onTarget && objectiveDist < primary.rangeM;
+    input.fire1 = onTarget && !me.overheated && objectiveDist < primary.rangeM;
     input.fire2 =
       me.frame === 'anvil'
         ? me.toggles.bombing === 'ground-strike-mode' &&
           bombOnTarget(me, objective.pos[0], objective.pos[1], objective.pos[2])
-        : onTarget && secondary.lockConeRad === 0 && objectiveDist < secondary.rangeM * 0.6;
+        : secondary.validAngleDeg > 0
+          ? me.lockTarget !== null && mem.rng() < MISSILE_FIRE_CHANCE
+          : onTarget && objectiveDist < secondary.rangeM * 0.6;
   }
 
   // Evade when taking damage (never while rooted).

@@ -13,7 +13,7 @@ export function createMods(): BuffMods {
     maxHpMul: 1,
     shieldRegenMul: 1,
     fuelRegenMul: 1,
-    lockTimeMul: 1,
+    accuracyAdd: 0,
     splashMul: 1,
     hpRegenPerSec: 0,
     cloak: false,
@@ -45,11 +45,17 @@ export function resolveMods(ctx: SimCtx, rec: ShipRec): void {
   const m = rec.mods;
   const s = rec.state;
   m.fireRateMul = m.speedMul = m.turnRateMul = m.damageMul = m.damageTakenMul = 1;
-  m.maxHpMul = m.shieldRegenMul = m.fuelRegenMul = m.lockTimeMul = m.splashMul = 1;
+  m.maxHpMul = m.shieldRegenMul = m.fuelRegenMul = m.splashMul = 1;
   m.primaryDamageMul = m.secondaryDamageMul = m.secondaryFireRateMul = m.spreadMul = 1;
   m.lockConeMul = m.shieldDamageTakenMul = m.secondaryDamageTakenMul = m.collisionDamageMul = 1;
   m.rollCooldownMul = m.groundSpeedMul = m.primaryShotMul = 1;
-  m.deflectAdd = m.hpRegenPerSec = m.damageAuraDps = m.salvoAdd = m.shieldRestorePerSec = 0;
+  m.deflectAdd =
+    m.accuracyAdd =
+    m.hpRegenPerSec =
+    m.damageAuraDps =
+    m.salvoAdd =
+    m.shieldRestorePerSec =
+      0;
   m.cloak = m.invulnerable = m.noAttack = m.missileBlind = false;
   for (const b of s.buffs) {
     const e = SKILLS[b.skill]?.buff;
@@ -62,7 +68,7 @@ export function resolveMods(ctx: SimCtx, rec: ShipRec): void {
     m.maxHpMul *= e.maxHpMul ?? 1;
     m.shieldRegenMul *= e.shieldRegenMul ?? 1;
     m.fuelRegenMul *= e.fuelRegenMul ?? 1;
-    m.lockTimeMul *= e.lockTimeMul ?? 1;
+    m.accuracyAdd += e.accuracyAdd ?? 0;
     m.splashMul *= e.splashMul ?? 1;
     m.deflectAdd += e.deflectAdd ?? 0;
     m.hpRegenPerSec += e.hpRegenPerSec ?? 0;
