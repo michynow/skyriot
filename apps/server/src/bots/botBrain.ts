@@ -74,6 +74,10 @@ const FAR_BOOST_DISTANCE = 1200;
 const DODGE_CHANCE = 0.3;
 const ROLL_CHANCE = 0.08;
 const HEAL_HP_FRACTION = 0.4;
+/** Repair/Shield Kits (4 s cooldown): only when low, never back to back, so a Bot can still be finished. */
+const KIT_HP_FRACTION = 0.3;
+const KIT_SHIELD_FRACTION = 0.2;
+const KIT_GAP_TICKS = 10 * TICK_HZ;
 const RESUPPLY_AMMO_FRACTION = 0.05;
 const DECK_APPROACH_HEIGHT = 20;
 const DECK_BRAKE_DISTANCE = 250;
@@ -144,6 +148,8 @@ export interface BotMemory {
   retreatTicks: number;
   /** Already rolled the dice on running away this time HP dropped low. */
   disengaged: boolean;
+  /** `seq` of the last Repair/Shield Kit. */
+  lastKitSeq: number;
 }
 
 /** Each Bot's current target, per Sim, so Bots can spread over targets. */
@@ -170,6 +176,7 @@ export function createBotMemory(hf: Heightfield, seed: number, decks: LaunchDeck
     burstPhase: Math.floor(rng() * BURST_PERIOD_TICKS),
     retreatTicks: 0,
     disengaged: false,
+    lastKitSeq: -Infinity,
   };
 }
 
@@ -490,8 +497,17 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       if (mem.rng() < 0.5) input.rollLeft = true;
       else input.rollRight = true;
     }
-  } else if (me.hp < me.maxHp * HEAL_HP_FRACTION && mem.rng() < SKILL_USE_CHANCE * 5) {
-    input.hotbar = fd.hotbar.indexOf(mem.rng() < 0.5 ? 'repair-kit' : 'shield-kit');
+  } else if (
+    me.hp < me.maxHp * KIT_HP_FRACTION &&
+    mem.seq - mem.lastKitSeq >= KIT_GAP_TICKS &&
+    mem.rng() < SKILL_USE_CHANCE * 5
+  ) {
+    const kit = me.shield < me.maxShield * KIT_SHIELD_FRACTION ? 'shield-kit' : 'repair-kit';
+    const slot = fd.hotbar.indexOf(kit);
+    if (slot >= 0 && me.cooldowns[slot] === 0) {
+      input.hotbar = slot;
+      mem.lastKitSeq = mem.seq;
+    }
   }
   // Anvil bombing mode, picked every tick: bombs for ground targets and structures, rockets up close,
   // guided salvos at range.
