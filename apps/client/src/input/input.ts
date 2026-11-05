@@ -451,7 +451,10 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
   if (!own || (inputState.targetId && !validTarget(own, inputState.targetId)))
     inputState.targetId = null;
   const hov = own ? hovered(own) : null;
-  if (hov && !inputState.targetId && !inputState.manualTarget) inputState.targetId = hov;
+  // In Siege with no gun lock yet, the enemy under the crosshair takes the gun (unless Shift just released it).
+  const siegePick = !!own?.sieged && !own.siegeLock && !inputState.manualTarget;
+  if (hov && (siegePick || (!inputState.targetId && !inputState.manualTarget)))
+    inputState.targetId = hov;
   inputState.candidateId = hov !== inputState.targetId ? hov : null;
 
   // Armed roll: resent every tick of the window; the sim ignores it once the roll has started.
