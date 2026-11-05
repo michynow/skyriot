@@ -1,4 +1,6 @@
 import {
+  BOMB_DROP_SPEED,
+  BOMB_GRAVITY,
   CLOAK_REVEAL_M,
   EMPTY_INPUT,
   DECK,
@@ -26,8 +28,16 @@ import {
 // Skill: Bots fly like mediocre human pilots. Raise/lower these to make them harder/easier.
 /** Ticks between looks at the enemy: in between, a Bot steers at where it last saw it. */
 const REACTION_TICKS = 7;
-/** Two+ airborne enemies this close: the Anvil picks Wide Lock Mode over Air Barrage. */
-const WIDE_LOCK_PACK_M = 1200;
+/** Anvil target pick: each point of the target's HP + shield costs this many metres of distance. */
+const ANVIL_TARGET_HEALTH_COST = 0.3;
+/** Anvil vs an air target: Air Barrage inside this range, Wide Lock (guided salvo) beyond it. */
+const BARRAGE_RANGE_M = 450;
+/** Anvil Secondary: rocket salvo cone, the guided salvo's minimum range, and its per-tick fire chance once locked. */
+const ROCKET_FIRE_CONE_RAD = 0.12;
+const WIDE_LOCK_MIN_M = 200;
+const WIDE_LOCK_FIRE_CHANCE = 0.06;
+/** Overcharge Round: armed only with the target this tight in the nose and inside Primary range. */
+const OVERCHARGE_CONE_RAD = 0.06;
 /** Aim error (rad) on a fresh target; shrinks toward the floor only while the target is held. */
 const AIM_ERR_START_RAD = 0.22;
 const AIM_ERR_MIN_RAD = 0.04;
@@ -401,13 +411,41 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
         ? me.lockTarget !== null && mem.rng() < MISSILE_FIRE_CHANCE
         : burst && angle < FIRE_CONE_RAD && dist < secondary.rangeM * 0.6 * rangeMul;
   }
+  if (enemy && danger <= 0 && !landing && !retreating && me.frame === 'anvil') {
+    // Bomber Secondary by mode: rockets at what's in the nose, guided salvos at range, bombs only on the ground.
+    const mode = me.toggles.bombing;
+    const f = noseOf(me);
+    const air = !enemy.grounded && !enemy.docked;
+    if (mode === 'air-barrage-mode') {
+      const a = norm3(tx - me.pos[0], ty - me.pos[1], tz - me.pos[2]);
+      const cos = f[0] * a[0] + f[1] * a[1] + f[2] * a[2];
+      input.fire2 = air && cos > Math.cos(ROCKET_FIRE_CONE_RAD) && dist < BARRAGE_RANGE_M + 100;
+    } else if (mode === 'wide-lock-mode') {
+      input.fire2 =
+        me.lockTarget !== null && dist > WIDE_LOCK_MIN_M && mem.rng() < WIDE_LOCK_FIRE_CHANCE;
+    } else input.fire2 = false; // Ground Strike: the bomb sight below decides
+    // An armed Overcharge Round goes out with the target in the nose, whatever the burst.
+    if (me.buffs.some((b) => b.skill === 'overcharge-round')) {
+      const aimAt = norm3(
+        enemy.pos[0] - me.pos[0],
+        enemy.pos[1] - me.pos[1],
+        enemy.pos[2] - me.pos[2],
+      );
+      const cos = f[0] * aimAt[0] + f[1] * aimAt[1] + f[2] * aimAt[2];
+      input.fire1 = cos > Math.cos(OVERCHARGE_CONE_RAD * 2) && dist < primary.rangeM * 2;
+    }
+  }
   if (objective && !mem.extending && danger <= 0 && !landing) {
     const f = noseOf(me);
     const cos =
       (f[0] * (tx - me.pos[0]) + f[1] * (ty - me.pos[1]) + f[2] * (tz - me.pos[2])) / objectiveDist;
     const onTarget = cos > Math.cos(STRUCTURE_FIRE_CONE_RAD);
     input.fire1 = onTarget && objectiveDist < primary.rangeM;
-    input.fire2 = onTarget && secondary.lockConeRad === 0 && objectiveDist < secondary.rangeM * 0.6;
+    input.fire2 =
+      me.frame === 'anvil'
+        ? me.toggles.bombing === 'ground-strike-mode' &&
+          bombOnTarget(me, objective.pos[0], objective.pos[1], objective.pos[2])
+        : onTarget && secondary.lockConeRad === 0 && objectiveDist < secondary.rangeM * 0.6;
   }
 
   // Evade when taking damage (never while rooted).
@@ -447,7 +485,37 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   } else if (me.hp < me.maxHp * HEAL_HP_FRACTION && mem.rng() < SKILL_USE_CHANCE * 5) {
     input.hotbar = fd.hotbar.indexOf(mem.rng() < 0.5 ? 'repair-kit' : 'shield-kit');
   }
-  // Engagement: use buff Skills off cooldown, and pick the Anvil bombing mode by target.
+  // Anvil bombing mode, picked every tick: bombs for ground targets and structures, rockets up close,
+  // guided salvos at range.
+  if (me.frame === 'anvil' && input.hotbar === -1) {
+    const groundTarget = enemy && (enemy.grounded || enemy.docked);
+    const wantMode =
+      groundTarget || objective
+        ? 'ground-strike-mode'
+        : !enemy
+          ? undefined
+          : dist > BARRAGE_RANGE_M
+            ? 'wide-lock-mode'
+            : 'air-barrage-mode';
+    const slot = wantMode ? fd.hotbar.indexOf(wantMode) : -1;
+    if (slot >= 0 && me.toggles.bombing !== wantMode && me.cooldowns[slot] === 0)
+      input.hotbar = slot;
+    // Overcharge Round: arm it with the target dead in the nose.
+    const oc = fd.hotbar.indexOf('overcharge-round');
+    if (
+      input.hotbar === -1 &&
+      enemy &&
+      oc >= 0 &&
+      me.cooldowns[oc] === 0 &&
+      dist < primary.rangeM
+    ) {
+      const f = noseOf(me);
+      const a = norm3(enemy.pos[0] - me.pos[0], enemy.pos[1] - me.pos[1], enemy.pos[2] - me.pos[2]);
+      if (f[0] * a[0] + f[1] * a[1] + f[2] * a[2] > Math.cos(OVERCHARGE_CONE_RAD))
+        input.hotbar = oc;
+    }
+  }
+  // Engagement: use buff Skills off cooldown.
   if (
     input.hotbar === -1 &&
     enemy &&
@@ -456,12 +524,6 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     mem.rng() < SKILL_USE_CHANCE
   ) {
     const need = allyNeed(sim, me);
-    const wantMode =
-      enemy.grounded || enemy.docked
-        ? 'ground-strike-mode'
-        : airEnemiesNear(sim, me, WIDE_LOCK_PACK_M) >= 2
-          ? 'wide-lock-mode'
-          : 'air-barrage-mode';
     for (let slot = 0; slot < fd.hotbar.length; slot++) {
       const id = fd.hotbar[slot];
       const def = id ? SKILLS[id] : undefined;
@@ -489,6 +551,7 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
         }
         continue;
       }
+      if (id === 'overcharge-round') continue; // aimed: armed above
       if (def.kind === 'buff' && !me.buffs.some((x) => x.skill === id)) {
         input.hotbar = slot;
         break;
@@ -499,21 +562,11 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
         input.hotbar = slot;
         break;
       }
-      if (
-        def.kind === 'toggle' &&
-        def.toggleGroup &&
-        id === wantMode &&
-        me.toggles[def.toggleGroup] !== id
-      ) {
-        input.hotbar = slot;
-        break;
-      }
     }
   }
-  // Ground-strike bombers fly over grounded targets and drop.
+  // Ground-strike bombers fly over grounded targets and drop when the bomb sight is on.
   if (enemy && me.toggles.bombing === 'ground-strike-mode' && (enemy.grounded || enemy.docked)) {
-    const horiz = Math.hypot(enemy.pos[0] - me.pos[0], enemy.pos[2] - me.pos[2]);
-    input.fire2 = horiz < BOMB_DROP_RADIUS && me.pos[1] > enemy.pos[1];
+    input.fire2 = bombOnTarget(me, enemy.pos[0], enemy.pos[1], enemy.pos[2]);
   }
   mem.lastBrake = input.brake;
   return input;
@@ -522,6 +575,17 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
 function norm3(x: number, y: number, z: number): [number, number, number] {
   const l = Math.hypot(x, y, z) || 1;
   return [x / l, y / l, z / l];
+}
+
+/** Bomb sight: a Ground Strike bomb dropped now (carrying the Ship's velocity, falling under gravity) lands near the point. */
+function bombOnTarget(me: ShipState, gx: number, gy: number, gz: number): boolean {
+  const h = me.pos[1] - gy;
+  if (h <= 0) return false;
+  const vy = me.vel[1] - BOMB_DROP_SPEED;
+  const t = (vy + Math.sqrt(vy * vy + 2 * BOMB_GRAVITY * h)) / BOMB_GRAVITY;
+  return (
+    Math.hypot(me.pos[0] + me.vel[0] * t - gx, me.pos[2] + me.vel[2] * t - gz) < BOMB_DROP_RADIUS
+  );
 }
 
 function pickObjective(sim: Sim, me: ShipState): StructureState | null {
@@ -546,19 +610,6 @@ function pickObjective(sim: Sim, me: ShipState): StructureState | null {
   return turret ?? station ?? core;
 }
 
-/** Airborne enemy Ships within `r` of the Bot (a pack worth the multi-target bombing mode). */
-function airEnemiesNear(sim: Sim, me: ShipState, r: number): number {
-  let n = 0;
-  for (const o of sim.ships()) {
-    if (!o.alive || o.nation === me.nation || o.launchPhase !== 'none' || o.grounded || o.docked)
-      continue;
-    const d2 =
-      (o.pos[0] - me.pos[0]) ** 2 + (o.pos[1] - me.pos[1]) ** 2 + (o.pos[2] - me.pos[2]) ** 2;
-    if (d2 <= r * r) n++;
-  }
-  return n;
-}
-
 /** Nearest enemy, but each other Bot already on a Ship makes it look DOGPILE_PENALTY_M farther. */
 function pickEnemy(
   sim: Sim,
@@ -578,8 +629,10 @@ function pickEnemy(
       (o.pos[0] - me.pos[0]) ** 2 + (o.pos[1] - me.pos[1]) ** 2 + (o.pos[2] - me.pos[2]) ** 2;
     if (d > CLOAK_REVEAL_M ** 2 && isCloaked(o)) continue;
     // Small bias to the current target so Bots don't flip between two at the same range.
-    const cost =
+    let cost =
       Math.sqrt(d) + DOGPILE_PENALTY_M * (load.get(o.id) ?? 0) - (o.id === current ? 100 : 0);
+    // A bomber can't win long turning fights against its big hull: it picks the softest, most hurt target.
+    if (me.frame === 'anvil') cost += ANVIL_TARGET_HEALTH_COST * (o.hp + o.shield);
     if (cost < bestCost) {
       bestCost = cost;
       best = o;
