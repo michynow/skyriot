@@ -486,7 +486,7 @@ export const SKILLS: Record<string, SkillDef> = {
   ),
 
   'repair-kit': c('repair-kit', 'Repair Kit', 'Restore 35% HP.', 4),
-  'shield-kit': c('shield-kit', 'Shield Kit', 'Restore full shield.', 20),
+  'shield-kit': c('shield-kit', 'Shield Kit', 'Restore full shield.', 4),
   'fuel-cell': c('fuel-cell', 'Fuel Cell', 'Refill booster fuel.', 15),
 };
 
