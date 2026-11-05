@@ -94,7 +94,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     rollFuelCost: 0.14,
     deflectChance: 0.1,
     ammo1Max: 1500,
-    ammo2Max: 36,
+    ammo2Max: 100,
     radarRangeM: 1300,
     radarStdM: 950,
     radarAdvM: 850,

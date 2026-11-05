@@ -237,14 +237,14 @@ export const SKILLS: Record<string, SkillDef> = {
   'air-barrage-mode': t(
     'air-barrage-mode',
     'Air Barrage Mode',
-    'Bombing mode (press again for off): Secondary fires a forward salvo of 3 proximity-fused rockets at air targets.',
+    'Bombing mode (press again for off): Secondary fires a tight forward salvo of 5 wide-burst proximity-fused rockets at air targets.',
     ['anvil'],
     'bombing',
   ),
   'ground-strike-mode': t(
     'ground-strike-mode',
     'Ground Strike Mode',
-    'Bombing mode (press again for off): Secondary drops heavy proximity-fused bombs straight down, +40% damage vs Grounded/Docked targets and splash.',
+    'Bombing mode (press again for off): Secondary drops a stick of 3 heavy proximity-fused bombs straight down, big blasts, +40% damage vs Grounded/Docked targets.',
     ['anvil'],
     'bombing',
   ),
@@ -402,7 +402,7 @@ export const SKILLS: Record<string, SkillDef> = {
     'Ground Siege',
     'Landed only: anchor to the ground, first-person gunner view, Target lock. x1.5 damage, x1.4 range, 25% less damage taken.',
     ['bulwark'],
-    1,
+    0.3,
     0,
   ),
   'air-siege': s(
@@ -410,7 +410,7 @@ export const SKILLS: Record<string, SkillDef> = {
     'Air Siege',
     'Airborne only: brake and hover-lock in place, gunner view, Target lock. x1.15 damage and range, wider lock cone, 15% less damage taken.',
     ['bulwark'],
-    1,
+    0.3,
     0,
   ),
   'blast-ward': b(
@@ -585,7 +585,7 @@ function t(
     name,
     description,
     frames,
-    cooldownSec: 2,
+    cooldownSec: 0.3,
     durationSec: 0,
     kind: 'toggle',
     toggleGroup,

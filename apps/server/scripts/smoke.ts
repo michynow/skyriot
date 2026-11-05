@@ -11,6 +11,9 @@ import {
   EMPTY_INPUT,
   TICK_DT,
   WEAPONS,
+  BOMB_DROP_SPEED,
+  BOMB_GRAVITY,
+  AIR_BARRAGE_COUNT,
   type FrameId,
   type PilotInput,
   type ShipId,
@@ -499,7 +502,7 @@ function buffTests() {
   let spawnedRockets = 0;
   const ev = sim2.step(new Map([['a', mk(1, { aim: [0, 0, -1], fire2: true })]]));
   for (const e of ev) if (e.type === 'projectileSpawned' && e.owner === 'a') spawnedRockets++;
-  const barrage = spawnedRockets === 3 && before - a.ammo2 === 3;
+  const barrage = spawnedRockets === AIR_BARRAGE_COUNT && before - a.ammo2 === AIR_BARRAGE_COUNT;
   idle(120, { a: {} });
   const gsSlot = FRAMES.anvil.hotbar.indexOf('ground-strike-mode');
   idle(1, { a: { hotbar: gsSlot } });
@@ -640,27 +643,49 @@ function stdTargetTest() {
 const stdRes = stdTargetTest();
 console.log('std target rule:', stdRes);
 
-// ADV: Target in ADV range but outside the Valid Angle = no missile; it fires the tick the nose brings it in.
+// ADV: Target in ADV range but outside the Valid Angle = the salvo dumb-fires (no Target, no homing, no
+// warning); with the nose on it the Target is LOCKED and the very tick the trigger is pulled the salvo is guided.
 function advAngleTest() {
-  const { sim2, t, sh } = duel('wasp', 700, 300); // ~23 degrees off the nose
-  let blockedSpawns = 0;
-  let lockTick = -1,
-    fireTick = -1;
-  for (let i = 0; i < 200 && fireTick < 0; i++) {
-    // First 30 ticks: nose held straight ahead. Then turn onto the Target, trigger held throughout.
+  const out = { dumb: 0, dumbGuided: 0, lockTick: -1, guidedTick: -1 };
+  {
+    const { sim2, t, sh } = duel('wasp', 700, 300); // ~23 degrees off the nose
+    for (let i = 0; i < 30; i++) {
+      const ev = sim2.step(
+        new Map([
+          ['t', mk(i, { aim: [0, 0, -1] })],
+          ['sh', mk(i, { aim: [0, 0, -1], fire2: true, target: 't' })],
+        ]),
+      );
+      for (const e of ev) {
+        if (e.type === 'projectileSpawned' && e.owner === 'sh') out.dumb++;
+        if (
+          (e.type === 'projectileSpawned' && e.owner === 'sh' && e.target) ||
+          e.type === 'missileIncoming'
+        )
+          out.dumbGuided++;
+      }
+    }
+    void t;
+    sim2.dispose();
+  }
+  const { sim2, t, sh } = duel('wasp', 700, 300);
+  for (let i = 0; i < 200 && out.guidedTick < 0; i++) {
+    const pull = out.lockTick >= 0; // pull the trigger the tick after the HUD shows LOCKED
     const ev = sim2.step(
       new Map([
         ['t', mk(i, { aim: [0, 0, -1] })],
-        ['sh', mk(i, { aim: i < 30 ? [0, 0, -1] : toT(sh, t), fire2: true, target: 't' })],
+        ['sh', mk(i, { aim: toT(sh, t), fire2: pull, target: 't' })],
       ]),
     );
-    const spawned = ev.some((e) => e.type === 'projectileSpawned' && e.owner === 'sh');
-    if (i < 30 && spawned) blockedSpawns++;
-    if (lockTick < 0 && sh.lockTarget === 't') lockTick = i;
-    if (spawned && i >= 30) fireTick = i;
+    if (
+      pull &&
+      ev.some((e) => e.type === 'projectileSpawned' && e.owner === 'sh' && e.target === 't')
+    )
+      out.guidedTick = i;
+    if (out.lockTick < 0 && sh.lockTarget === 't') out.lockTick = i;
   }
   sim2.dispose();
-  return { blockedSpawns, lockTick, fireTick };
+  return out;
 }
 const advRes = advAngleTest();
 console.log('adv valid angle:', advRes);
@@ -728,6 +753,74 @@ function salvoLockTest() {
 }
 const salvoRes = salvoLockTest();
 console.log('bulwark salvo lock:', JSON.stringify(salvoRes));
+
+// Anvil bombing modes: share of salvos that damage the Target, with a realistic aim error.
+// Air Barrage: a Wasp head-on from 600 m. Ground Strike: a grounded Bulwark, Anvil 120 m above.
+function barrageTrial(k: number): boolean {
+  // Head-on pass; the salvo is aimed at the Target's centre line with up to ~30 m error; the Target jinks.
+  const { sim2, t, sh } = duel('anvil', 600, ((k % 7) - 3) * 10);
+  t.pos[1] += ((k % 5) - 2) * 10;
+  t.rot[1] = 1;
+  t.rot[3] = 0;
+  sim2.castSkill('sh', 'air-barrage-mode');
+  let hit = false;
+  for (let i = 0; i < 150 && !hit; i++) {
+    const ev = sim2.step(
+      new Map([
+        ['t', mk(i, { aim: [Math.sin(i / 9 + k) * 0.15, Math.cos(i / 7 + k) * 0.1, 1] })],
+        ['sh', mk(i, { aim: [0, 0, -1], fire2: i === 3 })],
+      ]),
+    );
+    hit = ev.some((e) => e.type === 'hit' && e.victim === 't' && e.damage > 0);
+  }
+  sim2.dispose();
+  return hit;
+}
+function strikeTrial(k: number): boolean {
+  const sim2 = fresh(true);
+  let ox = 0;
+  const slope = (x: number) =>
+    Math.abs(sampleHeight(hf, x + 10, 0) - sampleHeight(hf, x - 10, 0)) +
+    Math.abs(sampleHeight(hf, x, 10) - sampleHeight(hf, x, -10));
+  for (let x = -1500; x <= 1500; x += 50) if (slope(x) < slope(ox)) ox = x;
+  const g = sampleHeight(hf, ox, 0);
+  sim2.addShip('t', spawn('bulwark', 'concord'), [ox, g + 3, 0]);
+  const t = sim2.getShip('t')!;
+  for (let i = 0; i < 200 && !t.grounded; i++)
+    sim2.step(new Map([['t', mk(i, { vertical: -1, throttle: -1, land: i === 0 })]]));
+  // Aim error: the drop point misses by up to ~40 m sideways and 20 m long/short.
+  const miss = ((k % 7) - 3) * 13;
+  sim2.addShip('sh', spawn('anvil'), [t.pos[0] + miss, t.pos[1] + 120, 900]);
+  const sh = sim2.getShip('sh')!;
+  sh.rot[0] = sh.rot[1] = sh.rot[2] = 0;
+  sh.rot[3] = 1;
+  sim2.castSkill('sh', 'ground-strike-mode');
+  let hit = false,
+    dropped = false;
+  for (let i = 0; i < 400 && !hit; i++) {
+    // Drop when the falling bomb lands on the Target's line (vel z only, ballistic fall).
+    const h = sh.pos[1] - t.pos[1];
+    const vy = sh.vel[1] - BOMB_DROP_SPEED;
+    const tf = (vy + Math.sqrt(vy * vy + 2 * BOMB_GRAVITY * h)) / BOMB_GRAVITY;
+    const fire: boolean = !dropped && sh.pos[2] + sh.vel[2] * tf <= t.pos[2] + ((k % 3) - 1) * 20;
+    dropped ||= fire;
+    const ev = sim2.step(
+      new Map([
+        ['t', mk(i, {})],
+        ['sh', mk(i, { aim: [0, 0, -1], fire2: fire })],
+      ]),
+    );
+    hit = ev.some((e) => e.type === 'hit' && e.victim === 't' && e.damage > 0);
+  }
+  sim2.dispose();
+  return hit;
+}
+const bombRes = { barrage: 0, strike: 0, of: 21 };
+for (let k = 0; k < bombRes.of; k++) {
+  if (barrageTrial(k)) bombRes.barrage++;
+  if (strikeTrial(k)) bombRes.strike++;
+}
+console.log('anvil bombing hit rate:', bombRes);
 
 // 3. Prediction equality: stepLocal (with reconcile + replay) vs server step, bit-compare.
 function prediction(
@@ -945,12 +1038,17 @@ check(
 );
 check(travelOk, 'travel token sign/verify/tamper');
 check(
+  bombRes.barrage >= bombRes.of * 0.8 && bombRes.strike >= bombRes.of * 0.8,
+  'Anvil bombing salvos near the Target should mostly hit: ' + JSON.stringify(bombRes),
+);
+check(
   stdRes.spawnedNone > 0 && stdRes.hitsNone === 0 && stdRes.hitsTarget > 0,
   'Primary with no Target must deal 0 damage (and hit with one): ' + JSON.stringify(stdRes),
 );
 check(
-  advRes.blockedSpawns === 0 && advRes.lockTick >= 30 && advRes.fireTick === advRes.lockTick,
-  'Secondary blocked outside the Valid Angle, fires the tick it enters: ' + JSON.stringify(advRes),
+  advRes.dumb > 0 && advRes.dumbGuided === 0 && advRes.guidedTick === advRes.lockTick + 1,
+  'Secondary dumb-fires outside the Valid Angle, guided the tick it is pulled while LOCKED: ' +
+    JSON.stringify(advRes),
 );
 check(
   Math.abs(heatRes.hotSec - heatRes.overheatSec) < 0.5 &&

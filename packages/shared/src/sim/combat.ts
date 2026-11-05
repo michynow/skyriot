@@ -18,6 +18,10 @@ import {
   AIR_BARRAGE_COUNT,
   AIR_BARRAGE_DAMAGE_MUL,
   AIR_BARRAGE_SPREAD_RAD,
+  AIR_BARRAGE_SPLASH_MUL,
+  GROUND_STRIKE_COUNT,
+  GROUND_STRIKE_DAMAGE_MUL,
+  GROUND_STRIKE_SPREAD_MPS,
   BOMB_DROP_SPEED,
   BOMB_GRAVITY,
   MISSILE_SALVO_SPREAD_RAD,
@@ -638,10 +642,10 @@ function secondaryInterval(rec: ShipRec, w: WeaponDef): number {
 }
 
 /**
- * Secondary (ADV). Missiles and the Bulwark salvo fire only while LOCKED (same tick the lock comes in), as a
- * count x series pattern; reattack counts from the end of the salvo. Missiles home at the salvo's Target;
- * the Bulwark salvo flies straight at the lead point and needs the lock held for every volley (unlocked volleys
- * go out along the nose). Anvil bombs and its bombing modes need no lock.
+ * Secondary (ADV), a count x series pattern; reattack counts from the end of the salvo. Fired while LOCKED
+ * (same tick the lock comes in), missiles home at the salvo's Target and the Bulwark salvo flies straight at
+ * its lead point, needing the lock held for every volley. Without a lock the salvo dumb-fires straight off the
+ * nose (contact or splash only). Anvil bombs and its bombing modes never lock.
  */
 function stepSecondary(
   ctx: SimCtx,
@@ -661,7 +665,8 @@ function stepSecondary(
         rec.fireCd[1] += interval;
         dropCloak(rec);
         fireLockless(ctx, rec, w, mode, rewind);
-      } else if (s.lockTarget) {
+      } else {
+        // LOCKED: guided at the Target. No lock: the same salvo dumb-fires straight off the nose.
         rec.salvoLeft = w.pattern.series + (w.kind === 'missile' ? rec.mods.salvoAdd : 0);
         rec.salvoCd = 0;
         rec.salvoTarget = s.lockTarget;
@@ -674,7 +679,7 @@ function stepSecondary(
     else {
       rec.salvoCd -= ctx.dt;
       if (rec.salvoCd <= 0) {
-        volley(ctx, rec, w);
+        volley(ctx, rec, w, rewind);
         rec.salvoCd += TARGETING.seriesSec;
         rec.salvoLeft--;
       }
@@ -693,7 +698,7 @@ function stepSecondary(
 const _ids: number[] = [];
 
 /** One volley of a locked salvo (see stepSecondary). */
-function volley(ctx: SimCtx, rec: ShipRec, w: WeaponDef): void {
+function volley(ctx: SimCtx, rec: ShipRec, w: WeaponDef, rewind: number): void {
   const s = rec.state;
   const mods = s.sieged ? siegeMods(s) : null;
   const nose = rec.fd.halfLength + NOSE_OFFSET;
@@ -753,7 +758,8 @@ function volley(ctx: SimCtx, rec: ShipRec, w: WeaponDef): void {
       _dx,
       _dy,
       _dz,
-      0,
+      // Dumb rounds hit-test where the shooter saw the world (lag compensation).
+      (missile && target) || aimed ? 0 : rewind,
     );
     _ids.push(p.id);
   }
@@ -805,7 +811,7 @@ function fireLockless(
           rec.mods.damageMul *
           slotMul *
           (mods ? mods.damageMul : 1),
-        w.splashRadius * rec.mods.splashMul,
+        w.splashRadius * AIR_BARRAGE_SPLASH_MUL * rec.mods.splashMul,
         w.speed,
         w.rangeM * (mods ? mods.rangeMul : 1),
         0,
@@ -866,32 +872,42 @@ function fireLockless(
     return;
   }
   if (mode === 'ground-strike-mode') {
-    // Heavy bomb dropped straight down, inheriting the Ship's velocity, then falling under gravity.
-    const bvx = s.vel[0],
-      bvy = s.vel[1] - BOMB_DROP_SPEED,
-      bvz = s.vel[2];
-    const bs = Math.hypot(bvx, bvy, bvz) || 1;
-    const bomb = spawnProjectile(
-      ctx,
-      rec,
-      w.kind,
-      w.id,
-      w.damage * rec.mods.damageMul * slotMul * (mods ? mods.damageMul : 1),
-      w.splashRadius * GROUND_STRIKE_SPLASH_MUL * rec.mods.splashMul,
-      bs,
-      w.rangeM,
-      0,
-      null,
-      s.pos[0],
-      s.pos[1] - fd.radius - 1,
-      s.pos[2],
-      bvx / bs,
-      bvy / bs,
-      bvz / bs,
-      rewind,
-    );
-    bomb.gravity = BOMB_GRAVITY;
-    bomb.groundMul = GROUND_STRIKE_GROUND_MUL;
+    // A stick of heavy bombs dropped straight down, inheriting the Ship's velocity, fanned sideways, then
+    // falling under gravity. The first bomb's ammo is already paid; each extra one costs 1.
+    const extra = Math.min(GROUND_STRIKE_COUNT - 1, s.ammo2);
+    s.ammo2 -= extra;
+    for (let k = 0; k <= extra; k++) {
+      const side = extra > 0 ? ((2 * k) / extra - 1) * GROUND_STRIKE_SPREAD_MPS : 0;
+      const bvx = s.vel[0] + _r[0]! * side,
+        bvy = s.vel[1] - BOMB_DROP_SPEED,
+        bvz = s.vel[2] + _r[2]! * side;
+      const bs = Math.hypot(bvx, bvy, bvz) || 1;
+      const bomb = spawnProjectile(
+        ctx,
+        rec,
+        w.kind,
+        w.id,
+        w.damage *
+          GROUND_STRIKE_DAMAGE_MUL *
+          rec.mods.damageMul *
+          slotMul *
+          (mods ? mods.damageMul : 1),
+        w.splashRadius * GROUND_STRIKE_SPLASH_MUL * rec.mods.splashMul,
+        bs,
+        w.rangeM,
+        0,
+        null,
+        s.pos[0],
+        s.pos[1] - fd.radius - 1,
+        s.pos[2],
+        bvx / bs,
+        bvy / bs,
+        bvz / bs,
+        rewind,
+      );
+      bomb.gravity = BOMB_GRAVITY;
+      bomb.groundMul = GROUND_STRIKE_GROUND_MUL;
+    }
     return;
   }
   // Plain bomb: straight off the nose with a little spread.
