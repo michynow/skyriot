@@ -626,7 +626,7 @@ export function stepFlight(
   // Boost surge / bleed track the ramp (smoothstep peaks at 1.5x the average slope).
   const span = fd.boostSpeed - fd.cruiseSpeed;
   if (delta >= 0 && boosting) rate2 = Math.max(rate2, ((1.5 * span) / BOOST_SPOOL_SEC) * dt);
-  else if (delta < 0 && !braking && s.speed > fd.maxSpeed)
+  else if (delta < 0 && !braking && (s.speed > fd.maxSpeed || s.boostRamp > 0))
     rate2 = Math.max(rate2, ((1.5 * span) / BOOST_BLEED_SEC) * dt);
   if (s.reverseTicks > 0) s.speed = target;
   else s.speed += clamp(delta * (1 - Math.exp(-dt / SPEED_EASE_SEC)), -rate2, rate2);
