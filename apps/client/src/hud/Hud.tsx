@@ -14,7 +14,7 @@ import { NATION_COLOR, Reticles } from './Reticles';
 import { EscMenu, openEscMenu } from '../ui/EscMenu';
 import { FlightTapes } from './FlightTapes';
 import { Launch } from './Launch';
-import { BattleBanner, BattleEnd, Objectives, StructureMarkers } from './Objectives';
+import { BattleBanner, BattleEnd, Objectives } from './Objectives';
 import { world } from '../state/world';
 import './hud.css';
 
@@ -670,7 +670,6 @@ export function Hud({ onLeave }: { onLeave(): void }) {
       <TopBar />
       <Reticles />
       <ThreatRing />
-      <StructureMarkers />
       <FlightTapes />
       <Warnings />
       <Floaters />

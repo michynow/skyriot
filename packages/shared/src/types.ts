@@ -143,6 +143,11 @@ export interface ShipState {
   lockProgress: number;
   /** Siege Mode gun lock: the Primary auto-tracks this Target until it leaves the break cone, range or sight. */
   siegeLock: ShipId | null;
+  /** Primary (STD) heat 0..1 from continuous fire; at 1 the gun is overheated until it cools. */
+  heat: number;
+  overheated: boolean;
+  /** Seconds until the Secondary (ADV) can fire again (reattack counted from the end of the last salvo). */
+  advReadyIn: number;
   // Launch Queue: after death a Ship waits in its Base's hangar, then is staged in a Launch Tunnel and catapulted.
   /** 'none' = flying (or dead, waiting for respawn); see LaunchPhase. */
   launchPhase: LaunchPhase;

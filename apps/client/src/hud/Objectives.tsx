@@ -1,18 +1,7 @@
-import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { MAPS, type NationId } from '@skyriot/shared';
-import { world } from '../state/world';
-import {
-  NATION_NAME,
-  enemyOf,
-  isFlying,
-  ownShip,
-  structureName,
-  useHud,
-  type BaseView,
-} from './hudStore';
+import type { NationId } from '@skyriot/shared';
+import { NATION_NAME, enemyOf, useHud, type BaseView } from './hudStore';
 import { NATION_COLOR } from './Reticles';
-import { project } from './view';
 
 function Base({ nation, b, side }: { nation: NationId; b: BaseView; side: 'ours' | 'theirs' }) {
   const corePct = Math.max(0, Math.min(1, b.coreHp / Math.max(1, b.coreMax)));
@@ -106,127 +95,6 @@ export function BattleEnd() {
       <p className="next">
         Next Battle in <b>{Math.ceil(h.restartIn)}</b> s
       </p>
-    </div>
-  );
-}
-
-const MARKERS = 5;
-const CENTRE_CLEAR_PX = 240;
-const p = { x: 0, y: 0 };
-
-/**
- * World markers for what the objective line points at: enemy Shield Stations while their shield is up, the enemy
- * Core once it is down, plus every Gate on the Map. On screen: a thin diamond with name and distance; off screen: a
- * chevron on the edge.
- */
-export function StructureMarkers() {
-  const els = useRef<(HTMLDivElement | null)[]>([]);
-  useEffect(() => {
-    let raf = 0;
-    const texts: string[] = [];
-    const placedX: number[] = [];
-    const placedY: number[] = [];
-    const frame = () => {
-      raf = requestAnimationFrame(frame);
-      const own = ownShip();
-      let n = 0;
-      if (own && isFlying(own) && world.match?.phase !== 'ended') {
-        const en = enemyOf(own.nation);
-        const shielded = world.match ? world.match.shielded[en] : true;
-        const W = window.innerWidth;
-        const H = window.innerHeight;
-        const targets: { pos: readonly number[]; lift: number; hp: number; label: string }[] = [];
-        for (const st of world.structures.values()) {
-          if (st.nation !== en || !st.alive) continue;
-          if (st.kind === 'turret' || (st.kind === 'core') === shielded) continue;
-          const frac = Math.max(0, st.hp / Math.max(1, st.maxHp));
-          const label = `${structureName(st).toUpperCase()} ${Math.ceil(frac * 100)}%`;
-          targets.push({ pos: st.pos, lift: 30, hp: frac, label });
-        }
-        for (const g of world.map?.gates ?? [])
-          targets.push({
-            pos: g.pos,
-            lift: 0,
-            hp: -1,
-            label: `GATE › ${MAPS[g.to]?.name ?? g.to}`,
-          });
-        for (const t of targets) {
-          if (n >= MARKERS) break;
-          const el = els.current[n];
-          if (!el) continue;
-          const d = Math.hypot(
-            t.pos[0]! - own.pos[0],
-            t.pos[1]! - own.pos[1],
-            t.pos[2]! - own.pos[2],
-          );
-          const on = project(t.pos[0]!, t.pos[1]! + t.lift, t.pos[2]!, p);
-          let dx = p.x - W / 2;
-          let dy = p.y - H / 2;
-          if (!on) {
-            dx = -dx;
-            dy = -dy;
-          }
-          // Edge markers stay clear of the objectives/heading block, the hotbar and the side widgets.
-          const edge = Math.min(
-            (W / 2 - 220) / Math.abs(dx || 1e-6),
-            (H / 2 - 190) / Math.abs(dy || 1e-6),
-          );
-          const offscreen = !on || edge < 1;
-          const x = offscreen ? W / 2 + dx * edge : p.x;
-          let y = offscreen ? H / 2 + dy * edge : p.y;
-          // Two stations in the same direction would land on the same edge spot: stack the second one.
-          for (let j = 0; j < n; j++)
-            if (Math.abs(placedX[j]! - x) < 130 && Math.abs(placedY[j]! - y) < 34)
-              y = placedY[j]! + 34;
-          placedX[n] = x;
-          placedY[n] = y;
-          el.style.display = 'block';
-          el.dataset.off = offscreen ? '1' : '0';
-          el.dataset.gate = t.hp < 0 ? '1' : '0';
-          el.style.transform = `translate(${x}px,${y}px)`;
-          // Markers drifting through the middle of the screen fade so they don't bury the crosshair and Ships.
-          el.style.opacity =
-            !offscreen && Math.hypot(x - W / 2, y - H / 2) < CENTRE_CLEAR_PX ? '0.25' : '1';
-          const chev = el.firstElementChild as HTMLElement;
-          chev.style.transform = offscreen
-            ? `rotate(${(Math.atan2(dy, dx) * 180) / Math.PI + 90}deg)`
-            : 'rotate(45deg)';
-          const hpEl = (el.children[1] as HTMLElement).firstElementChild as HTMLElement;
-          const frac = t.hp;
-          hpEl.style.width = `${frac * 100}%`;
-          hpEl.style.background = frac < 0.3 ? '#ff3b3b' : frac < 0.6 ? '#ffb347' : '#ff6a6a';
-          const text = `${t.label} · ${d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d)} m`}`;
-          if (texts[n] !== text) {
-            texts[n] = text;
-            (el.lastElementChild as HTMLElement).textContent = text;
-          }
-          n++;
-        }
-      }
-      for (let i = n; i < MARKERS; i++) {
-        const el = els.current[i];
-        if (el) el.style.display = 'none';
-      }
-    };
-    raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-  return (
-    <div className="hud-layer">
-      {Array.from({ length: MARKERS }, (_, i) => (
-        <div
-          key={i}
-          className="smk"
-          ref={(el) => void (els.current[i] = el)}
-          style={{ display: 'none' }}
-        >
-          <i />
-          <b className="smk-hp">
-            <u />
-          </b>
-          <span />
-        </div>
-      ))}
     </div>
   );
 }

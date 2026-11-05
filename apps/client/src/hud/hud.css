@@ -1704,68 +1704,7 @@
 }
 
 /* Structure markers in the world: diamond outline on screen, chevron at the edge when off screen. */
-.smk {
-  width: 0;
-  height: 0;
-}
-.smk i {
-  position: absolute;
-  left: -7px;
-  top: -7px;
-  width: 14px;
-  height: 14px;
-  border: 2px solid #ff6a6a;
-  opacity: 0.8;
-  filter: drop-shadow(0 0 3px #000);
-}
-.smk[data-off='1'] i {
-  left: -9px;
-  top: -9px;
-  width: 0;
-  height: 0;
-  border: 0;
-  border-left: 9px solid transparent;
-  border-right: 9px solid transparent;
-  border-bottom: 16px solid #ff6a6a;
-}
-.smk span {
-  position: absolute;
-  left: 50%;
-  top: 12px;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font:
-    700 11px 'Rajdhani',
-    sans-serif;
-  letter-spacing: 0.14em;
-  color: #ff8a8a;
-  opacity: 0.85;
-  text-shadow: 0 1px 3px #000;
-}
-.smk[data-off='1'] span {
-  top: 24px;
-}
 /* Structure health under the marker: a team has to grind it down. */
-.smk-hp {
-  position: absolute;
-  left: -36px;
-  top: 12px;
-  width: 72px;
-  height: 5px;
-  background: #0009;
-  border: 1px solid #ff6a6a88;
-}
-.smk-hp u {
-  display: block;
-  height: 100%;
-  transition: width 0.2s linear;
-}
-.smk span {
-  top: 20px;
-}
-.smk[data-off='1'] .smk-hp {
-  top: 14px;
-}
 
 /* Battle banner (events) at 24%: wide band, one authored in/out move. */
 .battle-banner {
@@ -2384,21 +2323,6 @@
 }
 
 /* Gate markers: same shape as structure markers, neutral colour, no health bar. */
-.smk[data-gate='1'] .smk-hp {
-  display: none;
-}
-.smk[data-gate='1'] i {
-  border-color: #7fe3c8;
-  border-bottom-color: #7fe3c8;
-}
-.smk[data-gate='1'][data-off='1'] i {
-  border-color: transparent;
-  border-bottom-color: #7fe3c8;
-}
-.smk[data-gate='1'] span {
-  top: 12px;
-  color: #9ff0da;
-}
 
 /* First-flight key card (right side, clear of tapes and radar). */
 .tips {
