@@ -218,7 +218,7 @@ export function Reticles() {
       }
       const distText = underD === null ? '' : `${Math.round(underD)} m`;
       setText(crDist.current, distText);
-      setText(crTag.current, locked ? 'LOCKED — FIRE' : inRange ? 'IN RANGE' : '');
+      setText(crTag.current, inRange && !locked ? 'IN RANGE' : '');
       setText(crMax.current, `R ${Math.round(primRange)}`);
 
       // Nose reticle (where the guns point).
@@ -366,7 +366,7 @@ export function Reticles() {
           }
           const k = Math.min(
             (cx - 60) / (Math.abs(dx) || 1e-6),
-            (cy - 60) / (Math.abs(dy) || 1e-6),
+            (cy - 130) / (Math.abs(dy) || 1e-6),
           );
           edge.style.transform = `translate(${cx + dx * k}px,${cy + dy * k}px)`;
           edge.dataset.far = far ? '1' : '0';
