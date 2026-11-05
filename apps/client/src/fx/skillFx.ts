@@ -405,7 +405,7 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
       break;
     }
     case 'scan-pulse':
-      fx.sph.wave(s.pos, [0.3, 1.4, 0.5], 0.9, R, SCAN_RADIUS);
+      fx.sph.wave(s.pos, [0.1, 0.5, 0.18], 0.9, R, SCAN_RADIUS);
       flatRing(fx, P, C.green, SCAN_RADIUS / 0.78, 1.0);
       for (const t of targetsOf(e)) {
         const ts = world.ships.get(t);
