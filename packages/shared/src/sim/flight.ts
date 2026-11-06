@@ -455,10 +455,12 @@ export function stepFlight(
     ux /= ul;
     uy /= ul;
     uz /= ul;
-    const d = _f1[0]! * ux + _f1[1]! * uy + _f1[2]! * uz;
-    let gx = _f1[0]! - d * ux,
-      gy = _f1[1]! - d * uy,
-      gz = _f1[2]! - d * uz;
+    // Onto the ground plane along world up, so the heading from the turn is kept (projecting along the normal
+    // drags it toward the slope's contour line every tick).
+    const d = (_f1[0]! * ux + _f1[1]! * uy + _f1[2]! * uz) / Math.max(uy, 1e-3);
+    let gx = _f1[0]!,
+      gy = _f1[1]! - d,
+      gz = _f1[2]!;
     const gl = Math.hypot(gx, gy, gz);
     gx /= gl;
     gy /= gl;
