@@ -214,6 +214,8 @@ export function spawnProjectile(
   p.losTime = 0;
   p.gravity = 0;
   p.groundMul = 1;
+  p.core = 0;
+  p.structMul = 1;
   p.weaveAmp = 0;
   p.visual = false;
   p.strike = null;
@@ -269,7 +271,7 @@ function structureById(ctx: SimCtx, id: string): StructureRec | undefined {
 
 /** Structures shrug off gunfire (see STRUCTURE_ARMOR). */
 function structureDamage(p: Projectile): number {
-  return p.kind === 'tracer' ? p.damage * STRUCTURE_ARMOR.tracerMul : p.damage;
+  return (p.kind === 'tracer' ? p.damage * STRUCTURE_ARMOR.tracerMul : p.damage) * p.structMul;
 }
 
 /**
@@ -778,6 +780,18 @@ function warn(ctx: SimCtx, attacker: ShipId, target: string, weapon: string, ids
   ctx.events.push({ type: 'missileIncoming', attacker, target, weapon, missiles: ids.slice() });
 }
 
+/** Old per-round share of the Secondary's damage vs Base structures, before the one-hit-kill bombing tune. */
+const BOMBING_STRUCTURE_SHARE = 0.4;
+
+/**
+ * Bombing-mode round: full damage anywhere inside its proximity-fuse radius (so a near miss still one-hits), and
+ * structures take only BOMBING_STRUCTURE_SHARE of the Secondary's damage, as before the tune.
+ */
+function bombingRound(p: Projectile, damageMul: number): void {
+  p.core = p.splash * ROCKET_FUSE_FRAC;
+  p.structMul = BOMBING_STRUCTURE_SHARE / damageMul;
+}
+
 /** Anvil Secondary: bombs and bombing modes, no lock needed (Wide Lock guides at whatever it has). */
 function fireLockless(
   ctx: SimCtx,
@@ -806,7 +820,7 @@ function fireLockless(
         ady = _f[1]! + _r[1]! * off,
         adz = _f[2]! + _r[2]! * off;
       const al = Math.hypot(adx, ady, adz);
-      spawnProjectile(
+      const p = spawnProjectile(
         ctx,
         rec,
         w.kind,
@@ -829,6 +843,7 @@ function fireLockless(
         adz / al,
         rewind,
       );
+      bombingRound(p, AIR_BARRAGE_DAMAGE_MUL);
     }
     return;
   }
@@ -868,6 +883,7 @@ function fireLockless(
         adz / al,
         rewind,
       );
+      bombingRound(p, WIDE_LOCK_DAMAGE_MUL);
       if (target) {
         _ids.length = 0;
         _ids.push(p.id);
@@ -913,6 +929,7 @@ function fireLockless(
       );
       bomb.gravity = BOMB_GRAVITY;
       bomb.groundMul = GROUND_STRIKE_GROUND_MUL;
+      bombingRound(bomb, GROUND_STRIKE_DAMAGE_MUL);
     }
     return;
   }
@@ -1026,7 +1043,8 @@ function explode(
     poseAt(ctx, o, testTick);
     const d = Math.hypot(_cx - x, _cy - y, _cz - z) - ctx.frames[os.frame].radius;
     if (d >= p.splash) continue;
-    const fall = Math.max(1 - Math.max(d, 0) / p.splash, SPLASH_MIN_FRACTION);
+    const fall =
+      d <= p.core ? 1 : Math.max(1 - (d - p.core) / (p.splash - p.core), SPLASH_MIN_FRACTION);
     hitShip(ctx, o, p.damage * fall * victimMul(p, o), p.owner, p, x, y, z);
   }
 }

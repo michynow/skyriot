@@ -4,12 +4,14 @@ import {
   AIR_BARRAGE_COUNT,
   AIR_BARRAGE_SPREAD_RAD,
   AIR_BARRAGE_RANGE_MUL,
+  AIR_BARRAGE_SPLASH_MUL,
   BOMB_DROP_SPEED,
   BOMB_FORWARD_KICK,
   BOMB_RANGE_MUL,
   BOMB_GRAVITY,
   FRAMES,
   GROUND_STRIKE_SPLASH_MUL,
+  GROUND_STRIKE_SPREAD_MPS,
   NOSE_OFFSET,
   TICK_DT,
   WEAPONS,
@@ -86,7 +88,9 @@ function trace(
 ): boolean {
   const hf = world.heightfield;
   let travelled = 0;
+  hit[3] = 0;
   for (let n = 0; n < MAX_STEPS; n++) {
+    hit[3] += TICK_DT;
     vy -= gravity * TICK_DT;
     const step = Math.min(Math.hypot(vx, vy, vz) * TICK_DT, range - travelled);
     const sp = Math.hypot(vx, vy, vz) || 1;
@@ -159,7 +163,7 @@ export function AimPreview() {
     group.add(sight);
     return { group, sight };
   }, []);
-  const hit = useMemo(() => [0, 0, 0], []);
+  const hit = useMemo(() => [0, 0, 0, 0], []);
   useEffect(
     () => () => {
       for (const m of sight.children as Mesh[]) {
@@ -202,7 +206,8 @@ export function AimPreview() {
       if (!landed) return; // bomb runs out of range in the air: no impact to mark
       const d = Math.hypot(hit[0]! - own.pos[0], hit[1]! - own.pos[1], hit[2]! - own.pos[2]);
       opacity = Math.min(Math.max((d - FADE_NEAR_M) / (FADE_FAR_M - FADE_NEAR_M), 0), 1);
-      radius = w.splashRadius * GROUND_STRIKE_SPLASH_MUL;
+      // The stick fans sideways at +-GROUND_STRIKE_SPREAD_MPS: cover the outer bombs' blasts too.
+      radius = w.splashRadius * GROUND_STRIKE_SPLASH_MUL + GROUND_STRIKE_SPREAD_MPS * hit[3]!;
       flat = true;
     } else if (mode === 'air-barrage-mode') {
       const nose = fd.halfLength + NOSE_OFFSET;
@@ -223,7 +228,7 @@ export function AimPreview() {
         mode === 'air-barrage-mode'
           ? d * AIR_BARRAGE_SPREAD_RAD * ((AIR_BARRAGE_COUNT - 1) / 2)
           : 0;
-      radius = w.splashRadius + fan;
+      radius = w.splashRadius * AIR_BARRAGE_SPLASH_MUL + fan;
     } else return;
 
     const camD = camera.position.distanceTo(sight.position.set(hit[0]!, hit[1]!, hit[2]!));

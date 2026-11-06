@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { Vec3 } from '@skyriot/shared';
-import { project } from './view';
+import { projectPinned } from './view';
 
 type Kind = 'shield' | 'hp' | 'defl' | 'struct' | 'absorb';
 interface Floater {
@@ -62,7 +62,8 @@ export function Floaters() {
         const el = els.current[i];
         const f = live[i];
         if (!el) continue;
-        if (!f || !project(f.pos[0], f.pos[1], f.pos[2], p)) {
+        // Off-screen victims: the number sticks to the screen edge in their direction.
+        if (!f || !projectPinned(f.pos[0], f.pos[1], f.pos[2], p)) {
           el.style.display = 'none';
           continue;
         }

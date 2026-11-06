@@ -761,7 +761,7 @@ console.log('bulwark salvo lock:', JSON.stringify(salvoRes));
 
 // Anvil bombing modes: share of salvos that damage the Target, with a realistic aim error.
 // Air Barrage: a Wasp head-on from 600 m. Ground Strike: a grounded Bulwark, Anvil 120 m above.
-function barrageTrial(k: number): boolean {
+function barrageTrial(k: number): number {
   // Head-on pass; the salvo is aimed at the Target's centre line with up to ~30 m error; the Target jinks.
   const { sim2, t, sh } = duel('anvil', 600, ((k % 7) - 3) * 10);
   t.pos[1] += ((k % 5) - 2) * 10;
@@ -773,15 +773,19 @@ function barrageTrial(k: number): boolean {
     const ev = sim2.step(
       new Map([
         ['t', mk(i, { aim: [Math.sin(i / 9 + k) * 0.15, Math.cos(i / 7 + k) * 0.1, 1] })],
-        ['sh', mk(i, { aim: [0, 0, -1], fire2: i === 3 })],
+        // No Target, no lock: bombing modes hit whatever their blast catches.
+        ['sh', mk(i, { aim: [0, 0, -1], fire2: i === 3, target: null })],
       ]),
     );
     hit = ev.some((e) => e.type === 'hit' && e.victim === 't' && e.damage > 0);
   }
+  // 2 = one salvo killed the Target from full HP + shield.
+  for (let i = 0; i < 60 && hit; i++) sim2.step(new Map([['t', mk(1000 + i, {})]]));
+  const dead = !sim2.getShip('t')!.alive;
   sim2.dispose();
-  return hit;
+  return hit ? (dead ? 2 : 1) : 0;
 }
-function strikeTrial(k: number): boolean {
+function strikeTrial(k: number): number {
   const sim2 = fresh(true);
   let ox = 0;
   const slope = (x: number) =>
@@ -814,18 +818,25 @@ function strikeTrial(k: number): boolean {
     const ev = sim2.step(
       new Map([
         ['t', mk(i, {})],
-        ['sh', mk(i, { aim: [0, 0, -1], fire2: fire })],
+        ['sh', mk(i, { aim: [0, 0, -1], fire2: fire, target: null })],
       ]),
     );
     hit = ev.some((e) => e.type === 'hit' && e.victim === 't' && e.damage > 0);
   }
+  // 2 = one salvo killed the Target from full HP + shield.
+  for (let i = 0; i < 60 && hit; i++) sim2.step(new Map([['t', mk(1000 + i, {})]]));
+  const dead = !sim2.getShip('t')!.alive;
   sim2.dispose();
-  return hit;
+  return hit ? (dead ? 2 : 1) : 0;
 }
-const bombRes = { barrage: 0, strike: 0, of: 21 };
+const bombRes = { barrage: 0, strike: 0, barrageKills: 0, strikeKills: 0, of: 21 };
 for (let k = 0; k < bombRes.of; k++) {
-  if (barrageTrial(k)) bombRes.barrage++;
-  if (strikeTrial(k)) bombRes.strike++;
+  const b = barrageTrial(k),
+    st = strikeTrial(k);
+  if (b) bombRes.barrage++;
+  if (b === 2) bombRes.barrageKills++;
+  if (st) bombRes.strike++;
+  if (st === 2) bombRes.strikeKills++;
 }
 console.log('anvil bombing hit rate:', bombRes);
 
@@ -1045,8 +1056,12 @@ check(
 );
 check(travelOk, 'travel token sign/verify/tamper');
 check(
-  bombRes.barrage >= bombRes.of * 0.8 && bombRes.strike >= bombRes.of * 0.8,
-  'Anvil bombing salvos near the Target should mostly hit: ' + JSON.stringify(bombRes),
+  bombRes.barrage >= bombRes.of * 0.8 &&
+    bombRes.strike >= bombRes.of * 0.8 &&
+    bombRes.barrageKills >= bombRes.of * 0.5 &&
+    bombRes.strikeKills >= bombRes.of * 0.5,
+  'Anvil unlocked bombing salvos near the Target should mostly hit and one-hit kill: ' +
+    JSON.stringify(bombRes),
 );
 check(
   stdRes.spawnedNone > 0 && stdRes.hitsNone === 0 && stdRes.hitsTarget > 0,
