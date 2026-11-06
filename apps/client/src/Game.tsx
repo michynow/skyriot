@@ -29,6 +29,7 @@ import { matchOwnShot, predictOwnShot } from './net/ownShots';
 import { createPredictor } from './net/predictor';
 import { session } from './net/session';
 import { QUALITY_DPR, useSettings } from './ui/settings';
+import { structureEvent } from './scene/Structures';
 import { useProfile } from './state/profile';
 import { music, setListener } from './audio/engine';
 import { handleAudioEvent, resetAudioSession, updateAudio } from './audio/sfxDriver';
@@ -201,6 +202,7 @@ export function Game({
         for (const ev of events) {
           world.fxQueue.push(ev);
           handleHudEvent(ev);
+          structureEvent(ev);
           // Own tracers already shown (and heard) when fired locally.
           const shown =
             ev.type === 'projectileSpawned' &&
