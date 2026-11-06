@@ -19,11 +19,11 @@ export const WEAPONS: Record<string, WeaponDef> = {
   'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 28, 0.24, 750, 1000, 0.02, {
     ...gun(0.85, 2, 8),
   }),
-  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 384, 4.5, 250, 1500, 0, {
+  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 384, 1.6, 250, 1500, 0, {
     ...missile(6, 135),
     splashRadius: 5,
   }),
-  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 220, 4.5, 240, 1300, 0, {
+  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 220, 1.6, 240, 1300, 0, {
     ...missile(8, 145),
     splashRadius: 5,
   }),
@@ -61,26 +61,26 @@ export const WEAPONS: Record<string, WeaponDef> = {
   'quad-autocannon': w('quad-autocannon', 'Quad Autocannon', 'tracer', 35, 0.22, 770, 1060, 0.02, {
     ...gun(0.9, 2, 8.5),
   }),
-  'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 432, 4.4, 260, 1550, 0, {
+  'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 432, 1.6, 260, 1550, 0, {
     ...missile(5.5, 150),
     splashRadius: 5,
   }),
-  'talon-missile': w('talon-missile', 'Talon Missile', 'missile', 480, 4.3, 270, 1600, 0, {
+  'talon-missile': w('talon-missile', 'Talon Missile', 'missile', 480, 1.6, 270, 1600, 0, {
     ...missile(5, 160),
     splashRadius: 5.5,
   }),
-  'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 245, 4.4, 250, 1350, 0, {
+  'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 245, 1.6, 250, 1350, 0, {
     ...missile(7.5, 150),
     splashRadius: 5,
   }),
-  'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 275, 4.3, 260, 1400, 0, {
+  'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 275, 1.6, 260, 1400, 0, {
     ...missile(7, 155),
     splashRadius: 5.5,
   }),
-  'slab-bomb': w('slab-bomb', 'Slab Bomb', 'rocket', 590, 2.9, 145, 920, 0.01, {
+  'slab-bomb': w('slab-bomb', 'Slab Bomb', 'rocket', 590, 3.0, 145, 920, 0.01, {
     splashRadius: 23,
   }),
-  'monolith-bomb': w('monolith-bomb', 'Monolith Bomb', 'rocket', 660, 2.8, 150, 950, 0.01, {
+  'monolith-bomb': w('monolith-bomb', 'Monolith Bomb', 'rocket', 660, 3.0, 150, 950, 0.01, {
     splashRadius: 24,
   }),
   'howler-battery': w('howler-battery', 'Howler Battery', 'shell', 75, 2.5, 615, 1650, 0, {
@@ -119,7 +119,7 @@ function salvo(validAngleDeg: number): Partial<WeaponDef> {
  */
 export const SKILLS: Record<string, SkillDef> = {
   // ---- Shared (all Frames): long buffs, turn-around, reverse burst, consumables ----
-  'gun-tune': b('gun-tune', 'Gun Tune', 'Primary deals +25% damage.', 'all', 120, 90, {
+  'gun-tune': b('gun-tune', 'Gun Tune', 'Primary deals +25% damage.', 'all', 300, 300, {
     primaryDamageMul: 1.25,
   }),
   'warhead-tune': b(
@@ -127,8 +127,8 @@ export const SKILLS: Record<string, SkillDef> = {
     'Warhead Tune',
     'Secondary deals +20% damage.',
     'all',
-    120,
-    90,
+    300,
+    300,
     { secondaryDamageMul: 1.2 },
   ),
   'steady-hands': b(
@@ -136,11 +136,11 @@ export const SKILLS: Record<string, SkillDef> = {
     'Steady Hands',
     'Steadier aim: +10% Primary accuracy and a 20% wider missile Valid Angle.',
     'all',
-    120,
-    90,
+    300,
+    300,
     { accuracyAdd: 0.1, spreadMul: 0.6, lockConeMul: 1.2 },
   ),
-  'hardened-hull': b('hardened-hull', 'Hardened Hull', 'Take 12% less damage.', 'all', 120, 90, {
+  'hardened-hull': b('hardened-hull', 'Hardened Hull', 'Take 12% less damage.', 'all', 300, 300, {
     damageTakenMul: 0.88,
   }),
   'jink-jets': b(
@@ -148,8 +148,8 @@ export const SKILLS: Record<string, SkillDef> = {
     'Jink Jets',
     '+12% Deflect chance (ignores the cap).',
     'all',
-    120,
-    90,
+    300,
+    300,
     { deflectAdd: 0.12 },
   ),
   'pivot-flip': s(
@@ -297,8 +297,8 @@ export const SKILLS: Record<string, SkillDef> = {
     'Rally Field',
     'Allies within 300 m deal +20% damage.',
     ['halo'],
-    240,
-    120,
+    300,
+    300,
     { damageMul: 1.2 },
     300,
   ),
@@ -307,8 +307,8 @@ export const SKILLS: Record<string, SkillDef> = {
     'Ward Lattice',
     'Allies within 300 m take 15% less damage.',
     ['halo'],
-    240,
-    120,
+    300,
+    300,
     { damageTakenMul: 0.85 },
     300,
   ),
@@ -317,8 +317,8 @@ export const SKILLS: Record<string, SkillDef> = {
     'Veer Field',
     'Allies within 300 m get +10% Deflect chance (ignores the cap).',
     ['halo'],
-    240,
-    120,
+    300,
+    300,
     { deflectAdd: 0.1 },
     300,
   ),
@@ -436,8 +436,8 @@ export const SKILLS: Record<string, SkillDef> = {
     'Crash Frame',
     'Terrain impacts cost half the HP.',
     ['bulwark'],
-    150,
-    120,
+    300,
+    300,
     { collisionDamageMul: 0.5 },
   ),
   'track-drive': b(
@@ -485,8 +485,8 @@ export const SKILLS: Record<string, SkillDef> = {
     0,
   ),
 
-  'repair-kit': c('repair-kit', 'Repair Kit', 'Restore 20% HP.', 20),
-  'shield-kit': c('shield-kit', 'Shield Kit', 'Restore half the shield.', 20),
+  'repair-kit': c('repair-kit', 'Repair Kit', 'Restore 20% HP.', 3),
+  'shield-kit': c('shield-kit', 'Shield Kit', 'Restore half the shield.', 3),
   'fuel-cell': c('fuel-cell', 'Fuel Cell', 'Refill booster fuel.', 15),
 };
 
