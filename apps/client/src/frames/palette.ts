@@ -100,6 +100,7 @@ export function getMaterials(nation: NationId, upgrade: number) {
       envMapIntensity: 0.6 + u * 0.05,
       emissive: tint,
       emissiveIntensity: glow,
+      fog: false, // Ships stay readable out to radar range
     });
   const accentCol = tint.clone();
   const rimCol = tint.clone();
@@ -128,6 +129,7 @@ export function getMaterials(nation: NationId, upgrade: number) {
       emissive: accentCol,
       emissiveIntensity: 0.9 + u * 0.16,
       roughness: 0.4,
+      fog: false,
     }),
     glass: new THREE.MeshStandardMaterial({
       color: p.glass,
@@ -138,12 +140,14 @@ export function getMaterials(nation: NationId, upgrade: number) {
       envMapIntensity: 2.2,
       transparent: true,
       opacity: 0.85,
+      fog: false,
     }),
     trim: new THREE.MeshStandardMaterial({
       color: new THREE.Color(p.trim).lerp(tint, u / 10),
       emissive: new THREE.Color(p.trim).lerp(tint, u / 10),
       emissiveIntensity: 2.6 + u * 0.12,
       roughness: 0.3,
+      fog: false,
     }),
   };
   for (const k of Object.keys(m) as (keyof typeof m)[]) m[k].envMap = shipEnvTex;
@@ -200,4 +204,39 @@ export function getAuraMaterial(nation: NationId) {
     auras.set(nation, a);
   }
   return a;
+}
+
+let glowTex: THREE.Texture | null = null;
+const beacons = new Map<string, THREE.SpriteMaterial>();
+/** Distance beacon: soft HDR dot, red-hot for enemies, nation accent for allies. Shared per kind. */
+export function getBeaconMaterial(nation: NationId, enemy: boolean) {
+  if (!glowTex) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d')!;
+    const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    r.addColorStop(0, 'rgba(255,255,255,1)');
+    r.addColorStop(0.25, 'rgba(255,255,255,0.6)');
+    r.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = r;
+    g.fillRect(0, 0, 64, 64);
+    glowTex = new THREE.CanvasTexture(c);
+  }
+  const key = `${nation}|${enemy}`;
+  let m = beacons.get(key);
+  if (!m) {
+    m = new THREE.SpriteMaterial({
+      map: glowTex,
+      color: enemy
+        ? new THREE.Color(3.2, 0.5, 0.25)
+        : new THREE.Color(PALETTES[nation].accent).multiplyScalar(1.6),
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+      fog: false,
+    });
+    beacons.set(key, m);
+  }
+  return m;
 }
