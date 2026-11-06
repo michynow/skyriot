@@ -29,6 +29,8 @@ export const NATION_COLOR = { concord: '#f2c24b', vex: '#ff5a3c' } as const;
 const ENEMY = '#ff4d4d';
 const ALLY = '#ffffff';
 const RING_LEN = 2 * Math.PI * 34;
+/** The "TURN TO LOCK" words show the first few times only; after that just the chevron. */
+const TURN_HINT_MAX = 4;
 const p = { x: 0, y: 0 };
 
 function place(el: HTMLElement | null, x: number, y: number, show: boolean) {
@@ -104,6 +106,11 @@ export function Reticles() {
     let raf = 0;
     let gunLockWas: string | null = null;
     let gunLostUntil = 0;
+    let turnShown = false;
+    let turnSeen = 0;
+    try {
+      turnSeen = Number(localStorage.getItem('turnLockSeen')) || 0;
+    } catch {}
     const labelCache: string[] = [];
     const labelX: number[] = [];
     const labelY: number[] = [];
@@ -254,6 +261,8 @@ export function Reticles() {
         let text = enemy
           ? (o.d < LABEL_ENEMY_M || cos > LABEL_CONE_COS) && enemyLabels < MAX_ENEMY_LABELS
           : o.d < LABEL_ALLY_M && allyLabels < MAX_ALLY_LABELS;
+        // never let a tag sit over the crosshair
+        if (text && p.x < cx + 40 && p.x + 170 > cx - 40 && Math.abs(p.y - cy) < 50) text = false;
         if (text) {
           for (let j = 0; j < placed; j++) {
             if (Math.abs(labelX[j]! - p.x) < 110 && Math.abs(labelY[j]! - p.y) < 22) {
@@ -348,7 +357,7 @@ export function Reticles() {
           ? 'LOCKED · FIRE RMB'
           : far
             ? `${Math.round(targetD)} m`
-            : secInRange
+            : secInRange && turnSeen <= TURN_HINT_MAX
               ? 'TURN TO LOCK'
               : '',
       );
@@ -381,6 +390,13 @@ export function Reticles() {
       if (tl) {
         const show = secInRange && !lockRange && onScreen;
         tl.style.display = show ? 'block' : 'none';
+        if (show && !turnShown) {
+          turnSeen++;
+          try {
+            localStorage.setItem('turnLockSeen', String(turnSeen));
+          } catch {}
+        }
+        turnShown = show;
         if (show)
           tl.style.transform = `translate(${cx}px,${cy}px) rotate(${(Math.atan2(p.y - cy, p.x - cx) * 180) / Math.PI + 90}deg)`;
       }
