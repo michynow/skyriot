@@ -8,6 +8,7 @@ import { world } from '../state/world';
 import { Gates } from './Gates';
 import { LaunchDecks } from './LaunchDecks';
 import { Scatter } from './Scatter';
+import { Structures } from './Structures';
 import { SkyDome, SUN_DIR } from './SkyDome';
 import { Terrain } from './Terrain';
 
@@ -96,6 +97,7 @@ export function MapScene({ map }: { map: MapDef }) {
       <Lights map={map} />
       <LaunchDecks map={map} />
       <Gates map={map} />
+      {map.bases && <Structures />}
       {atmos && (
         <Suspense fallback={null}>
           <Terrain map={map} hf={hf} />
