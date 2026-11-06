@@ -12,9 +12,9 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     name: 'Wasp',
     role: 'Agile fighter',
     ...engineStats('kestrel-jet'),
-    maxHp: 900,
-    maxShield: 400,
-    shieldRegenPerSec: 60,
+    maxHp: 2200,
+    maxShield: 800,
+    shieldRegenPerSec: 35,
     shieldRegenDelaySec: 4,
     strafeSpeed: 55,
     verticalSpeed: 50,
@@ -78,9 +78,9 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     name: 'Anvil',
     role: 'Bomber',
     ...engineStats('mule-turbine'),
-    maxHp: 1900,
-    maxShield: 650,
-    shieldRegenPerSec: 70,
+    maxHp: 2650,
+    maxShield: 900,
+    shieldRegenPerSec: 40,
     shieldRegenDelaySec: 5,
     strafeSpeed: 48,
     verticalSpeed: 44,
@@ -144,10 +144,10 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     name: 'Halo',
     role: 'Support',
     ...engineStats('lantern-drive'),
-    maxHp: 1800,
-    maxShield: 750,
-    shieldRegenPerSec: 90,
-    shieldRegenDelaySec: 3,
+    maxHp: 1400,
+    maxShield: 600,
+    shieldRegenPerSec: 35,
+    shieldRegenDelaySec: 4,
     strafeSpeed: 48,
     verticalSpeed: 42,
     lateralTauSec: 0.12,
@@ -212,7 +212,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     ...engineStats('crawler-rig'),
     maxHp: 2600,
     maxShield: 900,
-    shieldRegenPerSec: 60,
+    shieldRegenPerSec: 35,
     shieldRegenDelaySec: 5,
     strafeSpeed: 36,
     verticalSpeed: 24,
@@ -317,7 +317,7 @@ export const AIM_ASSIST = { coneRad: 0.2, spreadMul: 0.5 };
  * Targeting rules (server-side): the Primary resolves each round as an accuracy roll against the selected Target
  * if it is inside STD radar and within `stdConeRad` of the nose; beyond the weapon's range the hit chance falls
  * by `falloffBase` per percent of range (capped at 1). Damage varies by +-`damageSpread`. Continuous fire overheats
- * after the weapon's overheatSec; heat bleeds off in `coolMul` x overheatSec (the forced cool-down when overheated).
+ * after the weapon's overheatSec; heat bleeds off in `coolMul` x overheatSec (the forced cool-down when overheated takes OVERHEAT_COOL_MUL times longer).
  * Locks get the lag tolerance: +`lockToleranceDeg` Valid Angle, +`rangeTolerance` range. Series volleys are
  * `seriesSec` apart; a missed round flies at least `missSpreadRad` off the Target.
  */
@@ -325,7 +325,7 @@ export const TARGETING = {
   stdConeRad: 0.35,
   falloffBase: 0.983,
   damageSpread: 0.125,
-  coolMul: 0.5,
+  coolMul: 0.75,
   lockToleranceDeg: 1,
   rangeTolerance: 0.02,
   seriesSec: 0.2,

@@ -108,4 +108,6 @@ export {
   NOSE_OFFSET,
   ROLL_DURATION_SEC,
 } from './constants';
+// Heat HUD: the forced Primary cool-down length.
+export { OVERHEAT_COOL_MUL } from './constants';
 export { bombingSecondary } from './combat';

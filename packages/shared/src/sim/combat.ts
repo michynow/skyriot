@@ -44,6 +44,7 @@ import {
   CLOAK_REVEAL_M,
   ROCKET_FUSE_FRAC,
   NOSE_OFFSET,
+  OVERHEAT_COOL_MUL,
   PROJECTILE_RADIUS,
   RAY_QUERY_GROUPS,
   SPLASH_MIN_FRACTION,
@@ -556,9 +557,10 @@ function stepPrimary(ctx: SimCtx, rec: ShipRec, w: WeaponDef, fire: boolean): vo
   const s = rec.state;
   rec.fireCd[0] = Math.max(rec.fireCd[0] - ctx.dt, -ctx.dt);
   if (s.overheated || !fire) {
-    // Heat bleeds off in coolMul x overheatSec: the forced cool-down when overheated.
-    s.heat =
-      w.overheatSec > 0 ? Math.max(s.heat - ctx.dt / (TARGETING.coolMul * w.overheatSec), 0) : 0;
+    // Heat bleeds off in coolMul x overheatSec; the forced cool-down when overheated is OVERHEAT_COOL_MUL slower,
+    // so bursting under the limit out-damages holding the trigger into it.
+    const cool = TARGETING.coolMul * w.overheatSec * (s.overheated ? OVERHEAT_COOL_MUL : 1);
+    s.heat = w.overheatSec > 0 ? Math.max(s.heat - ctx.dt / cool, 0) : 0;
     if (s.heat === 0) s.overheated = false;
   }
   if (!fire || s.overheated || rec.fireCd[0] > 0 || s.ammo1 <= 0) return;

@@ -6,74 +6,74 @@ import type { SkillDef, WeaponDef } from '../types';
 // Secondary: missiles fire 1 x 2 (two in series) inside a narrow Valid Angle; the Bulwark salvo is 2 x 2 straight
 // shells; Anvil bombs are lockless.
 export const WEAPONS: Record<string, WeaponDef> = {
-  'needle-cannon': w('needle-cannon', 'Needle Cannon', 'tracer', 20, 0.32, 900, 1100, 0.012, {
-    ...gun(0.8, 4, 15),
+  'needle-cannon': w('needle-cannon', 'Needle Cannon', 'tracer', 26, 0.32, 900, 1100, 0.012, {
+    ...gun(0.85, 4, 6),
   }),
-  'flak-repeater': w('flak-repeater', 'Flak Repeater', 'tracer', 38, 0.54, 650, 800, 0.03, {
+  'flak-repeater': w('flak-repeater', 'Flak Repeater', 'tracer', 32, 0.54, 650, 800, 0.03, {
     splashRadius: 4,
-    ...gun(0.75, 3, 21),
+    ...gun(0.75, 3, 8),
   }),
-  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 17, 0.44, 800, 950, 0.015, {
-    ...gun(0.65, 4, 15),
+  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 30, 0.44, 800, 950, 0.015, {
+    ...gun(0.7, 4, 6),
   }),
-  'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 34, 0.24, 750, 1000, 0.02, {
-    ...gun(0.85, 2, 22),
+  'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 28, 0.24, 750, 1000, 0.02, {
+    ...gun(0.85, 2, 8),
   }),
-  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 384, 1.6, 250, 1500, 0, {
+  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 384, 4.5, 250, 1500, 0, {
     ...missile(6, 135),
     splashRadius: 5,
   }),
-  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 220, 1.6, 240, 1300, 0, {
+  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 220, 4.5, 240, 1300, 0, {
     ...missile(8, 145),
     splashRadius: 5,
   }),
   'brick-bomb': w('brick-bomb', 'Brick Bomb', 'rocket', 520, 3.0, 140, 900, 0.01, {
     splashRadius: 22,
   }),
-  'mortar-battery': w('mortar-battery', 'Mortar Battery', 'shell', 110, 2.6, 600, 1600, 0, {
+  'mortar-battery': w('mortar-battery', 'Mortar Battery', 'shell', 65, 2.6, 600, 1600, 0, {
     ...salvo(10),
     splashRadius: 12,
   }),
   // ---- Shop variants (tiers 2–3); each sits in the line of the stock weapon above it ----
-  'quill-repeater': w('quill-repeater', 'Quill Repeater', 'tracer', 22, 0.304, 920, 1150, 0.012, {
-    ...gun(0.82, 4, 15),
+  'quill-repeater': w('quill-repeater', 'Quill Repeater', 'tracer', 28, 0.304, 920, 1150, 0.012, {
+    ...gun(0.87, 4, 6),
   }),
-  'lancet-cannon': w('lancet-cannon', 'Lancet Cannon', 'tracer', 24, 0.288, 950, 1200, 0.011, {
-    ...gun(0.85, 4, 16),
+  'lancet-cannon': w('lancet-cannon', 'Lancet Cannon', 'tracer', 30, 0.288, 950, 1200, 0.011, {
+    ...gun(0.9, 4, 6.5),
   }),
-  'burst-flak': w('burst-flak', 'Burst Flak', 'tracer', 43, 0.51, 660, 830, 0.03, {
+  'burst-flak': w('burst-flak', 'Burst Flak', 'tracer', 36, 0.51, 660, 830, 0.03, {
     splashRadius: 4.5,
-    ...gun(0.77, 3, 21),
+    ...gun(0.77, 3, 8),
   }),
-  'thunder-flak': w('thunder-flak', 'Thunder Flak', 'tracer', 49, 0.48, 680, 860, 0.03, {
+  'thunder-flak': w('thunder-flak', 'Thunder Flak', 'tracer', 40, 0.48, 680, 860, 0.03, {
     splashRadius: 5,
-    ...gun(0.8, 3, 22),
+    ...gun(0.8, 3, 8.5),
   }),
-  'arc-blaster': w('arc-blaster', 'Arc Blaster', 'tracer', 19, 0.42, 820, 980, 0.015, {
-    ...gun(0.67, 4, 15),
+  'arc-blaster': w('arc-blaster', 'Arc Blaster', 'tracer', 32, 0.42, 820, 980, 0.015, {
+    ...gun(0.72, 4, 6),
   }),
-  'prism-blaster': w('prism-blaster', 'Prism Blaster', 'tracer', 21, 0.4, 840, 1010, 0.014, {
-    ...gun(0.7, 4, 16),
+  'prism-blaster': w('prism-blaster', 'Prism Blaster', 'tracer', 34, 0.4, 840, 1010, 0.014, {
+    ...gun(0.75, 4, 6.5),
   }),
-  'twin-hammer': w('twin-hammer', 'Twin Hammer', 'tracer', 38, 0.23, 760, 1030, 0.02, {
-    ...gun(0.87, 2, 22),
+  'twin-hammer': w('twin-hammer', 'Twin Hammer', 'tracer', 32, 0.23, 760, 1030, 0.02, {
+    ...gun(0.87, 2, 8),
   }),
-  'quad-autocannon': w('quad-autocannon', 'Quad Autocannon', 'tracer', 42, 0.22, 770, 1060, 0.02, {
-    ...gun(0.9, 2, 23),
+  'quad-autocannon': w('quad-autocannon', 'Quad Autocannon', 'tracer', 35, 0.22, 770, 1060, 0.02, {
+    ...gun(0.9, 2, 8.5),
   }),
-  'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 432, 1.55, 260, 1550, 0, {
+  'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 432, 4.4, 260, 1550, 0, {
     ...missile(5.5, 150),
     splashRadius: 5,
   }),
-  'talon-missile': w('talon-missile', 'Talon Missile', 'missile', 480, 1.5, 270, 1600, 0, {
+  'talon-missile': w('talon-missile', 'Talon Missile', 'missile', 480, 4.3, 270, 1600, 0, {
     ...missile(5, 160),
     splashRadius: 5.5,
   }),
-  'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 245, 1.55, 250, 1350, 0, {
+  'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 245, 4.4, 250, 1350, 0, {
     ...missile(7.5, 150),
     splashRadius: 5,
   }),
-  'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 275, 1.5, 260, 1400, 0, {
+  'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 275, 4.3, 260, 1400, 0, {
     ...missile(7, 155),
     splashRadius: 5.5,
   }),
@@ -83,11 +83,11 @@ export const WEAPONS: Record<string, WeaponDef> = {
   'monolith-bomb': w('monolith-bomb', 'Monolith Bomb', 'rocket', 660, 2.8, 150, 950, 0.01, {
     splashRadius: 24,
   }),
-  'howler-battery': w('howler-battery', 'Howler Battery', 'shell', 125, 2.5, 615, 1650, 0, {
+  'howler-battery': w('howler-battery', 'Howler Battery', 'shell', 75, 2.5, 615, 1650, 0, {
     ...salvo(10.5),
     splashRadius: 13,
   }),
-  'quake-battery': w('quake-battery', 'Quake Battery', 'shell', 140, 2.4, 630, 1700, 0, {
+  'quake-battery': w('quake-battery', 'Quake Battery', 'shell', 85, 2.4, 630, 1700, 0, {
     ...salvo(11),
     splashRadius: 14,
   }),
@@ -305,29 +305,29 @@ export const SKILLS: Record<string, SkillDef> = {
   'ward-lattice': b(
     'ward-lattice',
     'Ward Lattice',
-    'Allies within 300 m take 20% less damage.',
+    'Allies within 300 m take 15% less damage.',
     ['halo'],
     240,
     120,
-    { damageTakenMul: 0.8 },
+    { damageTakenMul: 0.85 },
     300,
   ),
   'veer-field': b(
     'veer-field',
     'Veer Field',
-    'Allies within 300 m get +15% Deflect chance (ignores the cap).',
+    'Allies within 300 m get +10% Deflect chance (ignores the cap).',
     ['halo'],
     240,
     120,
-    { deflectAdd: 0.15 },
+    { deflectAdd: 0.1 },
     300,
   ),
   'renewal-pulse': s(
     'renewal-pulse',
     'Renewal Pulse',
-    'Allies within 200 m (you too) instantly regain 20% max HP.',
+    'Allies within 200 m (you too) instantly regain 15% max HP.',
     ['halo'],
-    12,
+    40,
     0,
   ),
   'recharge-pulse': s(
@@ -335,23 +335,23 @@ export const SKILLS: Record<string, SkillDef> = {
     'Recharge Pulse',
     'Allies within 200 m (you too) instantly regain 30% max shield.',
     ['halo'],
-    12,
+    30,
     0,
   ),
   'mend-beam': s(
     'mend-beam',
     'Mend Beam',
-    'Heal the most hurt ally within 400 m (or yourself) for 30% max HP.',
+    'Heal the most hurt ally within 400 m (or yourself) for 20% max HP.',
     ['halo'],
-    6,
+    30,
     0,
   ),
   'charge-beam': s(
     'charge-beam',
     'Charge Beam',
-    'Recharge the ally within 400 m with the lowest shield (or yourself) for 40% max shield.',
+    'Recharge the ally within 400 m with the lowest shield (or yourself) for 30% max shield.',
     ['halo'],
-    6,
+    30,
     0,
   ),
   lifeline: s(
@@ -359,7 +359,7 @@ export const SKILLS: Record<string, SkillDef> = {
     'Lifeline',
     'Fully restore HP and shield of the most hurt ally within 400 m (or yourself).',
     ['halo'],
-    180,
+    300,
     0,
   ),
   sanctum: b(
@@ -425,11 +425,11 @@ export const SKILLS: Record<string, SkillDef> = {
   'shield-weave': b(
     'shield-weave',
     'Shield Weave',
-    'Rebuild the shield: restores 12% max shield per second for 8 s, even under fire.',
+    'Rebuild the shield: restores 8% max shield per second for 8 s, even under fire.',
     ['bulwark'],
-    24,
+    30,
     8,
-    { shieldRestorePerSec: 0.12 },
+    { shieldRestorePerSec: 0.08 },
   ),
   'crash-frame': b(
     'crash-frame',
@@ -485,8 +485,8 @@ export const SKILLS: Record<string, SkillDef> = {
     0,
   ),
 
-  'repair-kit': c('repair-kit', 'Repair Kit', 'Restore 35% HP.', 4),
-  'shield-kit': c('shield-kit', 'Shield Kit', 'Restore full shield.', 4),
+  'repair-kit': c('repair-kit', 'Repair Kit', 'Restore 20% HP.', 20),
+  'shield-kit': c('shield-kit', 'Shield Kit', 'Restore half the shield.', 20),
   'fuel-cell': c('fuel-cell', 'Fuel Cell', 'Refill booster fuel.', 15),
 };
 

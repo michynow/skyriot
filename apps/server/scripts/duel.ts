@@ -25,7 +25,7 @@ import {
 } from '../src/bots/botBrain';
 
 const N = Number(process.argv[2] ?? 20);
-const DUEL_SEC = 90;
+const DUEL_SEC = 150;
 const SIEGE_SEC = 120;
 const MATCH_SEC = 300;
 const TRACE = process.env.TRACE;
@@ -44,15 +44,22 @@ const ACE: BotSkill = {
   turnMul: 1,
   combatThrottle: 0.5,
   rollDodgeChance: 0.5,
+  panicRollChance: 0,
+  rollWindowMinM: 15,
+  rollWindowMaxM: 130,
   skillUseChance: 0.02,
   missileFireChance: 0.3,
   disengageChance: 0,
   turnBrake: true,
   pivotFlip: true,
   strafeGround: true,
+  standoffMinM: 60,
+  standoffMaxM: 180,
 };
 const HOLD: BotSkill = { ...ACE, heatCap: 1.01 };
 const NO_KITS: BotSkill = { ...ACE, kits: false };
+/** A human leaning on Kits: whichever is ready, whenever below 75% HP (both have 4 s cooldowns). */
+const KIT_SPAM: BotSkill = { ...ACE, kitHpFraction: 0.75, kitGapSec: 0 };
 
 await RAPIER.init();
 const FRAME_IDS = Object.keys(FRAMES) as FrameId[];
@@ -64,6 +71,13 @@ const flatHf = generateHeightfield(FLAT);
 const fullHf = generateHeightfield(RUSTWATER_CANYONS);
 const slot = (f: FrameId, weapon: string) => (FRAMES[f].primary === weapon ? 'P' : 'S');
 
+interface Guided {
+  n: number;
+  roll: number;
+  lost: number;
+  hit: number;
+}
+
 /** Per-weapon and per-pilot counters fed from sim events. */
 class Tally {
   shots = new Map<string, number>(); // weapon -> rounds/projectiles
@@ -71,15 +85,23 @@ class Tally {
   dmg = new Map<string, number>();
   overheats = 0;
   triggerTicks = 0;
-  volleys = 0; // guided volleys announced (missileIncoming)
-  guided = 0; // guided missiles announced
-  rollBeats = 0; // missiles broken by a Barrel Roll
-  lost = 0; // missiles out-turned, burnt out or blocked by terrain
+  /** Per weapon: announced (missileIncoming) rounds, broken by a Barrel Roll, out-flown/terrain, ended on a hull. */
+  guided = new Map<string, Guided>();
   rollsSpent = 0; // Barrel Rolls by this Pilot
-  guidedHits = 0; // announced missiles that ended on a hull
   kits = 0;
+  skills = new Map<string, number>();
+  /** HP + shield regained (regen, Kits, heals) and seconds alive. */
+  restored = 0;
+  aliveTicks = 0;
+  lastHealth = -1;
   private weaponOf = new Map<number, string>();
   private scored = new Set<number>();
+  private g(id: number): Guided {
+    const k = this.weaponOf.get(id) ?? '?';
+    let v = this.guided.get(k);
+    if (!v) this.guided.set(k, (v = { n: 0, roll: 0, lost: 0, hit: 0 }));
+    return v;
+  }
   add(m: Map<string, number>, k: string, v = 1) {
     m.set(k, (m.get(k) ?? 0) + v);
   }
@@ -99,21 +121,17 @@ class Tally {
           this.add(this.hits, key);
         }
       } else if (e.type === 'missileIncoming' && who.has(e.attacker)) {
-        this.volleys++;
-        this.guided += e.missiles.length;
+        for (const id of e.missiles) this.g(id).n++;
       } else if (e.type === 'missileEvaded' && this.weaponOf.has(e.id)) {
-        if (e.reason === 'roll') this.rollBeats++;
-        else this.lost++;
+        if (e.reason === 'roll') this.g(e.id).roll++;
+        else this.g(e.id).lost++;
       } else if (e.type === 'barrelRoll' && who.has(e.id)) {
         this.rollsSpent++;
       } else if (e.type === 'missileEnded' && e.reason === 'hit' && this.weaponOf.has(e.id)) {
-        this.guidedHits++;
-      } else if (
-        e.type === 'skillUsed' &&
-        who.has(e.id) &&
-        (e.skill === 'repair-kit' || e.skill === 'shield-kit')
-      ) {
-        this.kits++;
+        this.g(e.id).hit++;
+      } else if (e.type === 'skillUsed' && who.has(e.id)) {
+        this.add(this.skills, e.skill);
+        if (e.skill === 'repair-kit' || e.skill === 'shield-kit') this.kits++;
       }
     }
   }
@@ -159,6 +177,12 @@ function tick(sim: Sim, pilots: Pilot[], tally: Map<ShipId, Tally>): SimEvent[] 
     const t = tally.get(p.id)!;
     t.feed(sim, ev, new Set([p.id]));
     const s = sim.getShip(p.id);
+    if (s?.alive) {
+      const h = s.hp + s.shield;
+      if (t.lastHealth >= 0 && h > t.lastHealth) t.restored += h - t.lastHealth;
+      t.lastHealth = h;
+      t.aliveTicks++;
+    }
     if (s && s.overheated && !p.wasHot) t.overheats++;
     p.wasHot = !!s?.overheated;
   }
@@ -207,10 +231,12 @@ function duel(fa: FrameId, fb: FrameId, seed: number, sa: BotSkill, sb: BotSkill
       );
     }
     if (first < 0 && ev.some((e) => e.type === 'hit' && e.damage > 0)) first = t;
-    const dead = ev.find((e) => e.type === 'shipDestroyed');
-    if (dead && dead.type === 'shipDestroyed') {
+    // The survivor wins (a crash or a Core Breach that only takes its caster counts too); both down = draw.
+    if (ev.some((e) => e.type === 'shipDestroyed')) {
       end = t;
-      winner = dead.killer === 'a' ? 0 : dead.killer === 'b' ? 1 : -1;
+      const aUp = sim.getShip('a')!.alive,
+        bUp = sim.getShip('b')!.alive;
+      winner = aUp && !bUp ? 0 : bUp && !aUp ? 1 : -1;
       break;
     }
   }
@@ -238,20 +264,26 @@ if (TRACE) {
     process.exit(0);
   }
   const r = duel(fa as FrameId, fb as FrameId, Number(seed), ACE, ACE);
-  console.log(r.winner, r.engageSec, r.trigger);
+  console.log(
+    r.winner,
+    r.engageSec,
+    r.trigger,
+    r.tallies.map(
+      (t) =>
+        [...t.dmg].map(([k, v]) => `${k}=${v.toFixed(0)}`).join(' ') +
+        ` skills ${[...t.skills].map(([k, v]) => `${k}=${v}`).join(' ')} restored ${t.restored.toFixed(0)} shots ${[...t.shots].map(([k, v]) => `${k}=${v}`).join(' ')} kits ${t.kits}`,
+    ),
+  );
   process.exit(0);
 }
 // Per-weapon accumulators across all duels.
 const W = new Map<string, { shots: number; hits: number; dmg: number }>();
 let overheatsAll = 0,
   pilotsAll = 0,
-  volleysAll = 0,
-  guidedAll = 0,
-  rollAll = 0,
-  lostAll = 0,
-  rollsAll = 0,
-  guidedHitAll = 0;
+  rollsAll = 0;
+const G = new Map<string, Guided>();
 const frameWins = new Map<FrameId, { w: number; l: number }>();
+const frameIO = new Map<FrameId, { dmg: number; restored: number; sec: number; trig: number }>();
 function absorb(t: Tally) {
   for (const [k, v] of t.shots) {
     const e = W.get(k) ?? { shots: 0, hits: 0, dmg: 0 };
@@ -262,97 +294,136 @@ function absorb(t: Tally) {
   }
   overheatsAll += t.overheats;
   pilotsAll++;
-  volleysAll += t.volleys;
-  guidedAll += t.guided;
-  rollAll += t.rollBeats;
-  lostAll += t.lost;
   rollsAll += t.rollsSpent;
-  guidedHitAll += t.guidedHits;
+  for (const [k, v] of t.guided) {
+    const e = G.get(k) ?? { n: 0, roll: 0, lost: 0, hit: 0 };
+    e.n += v.n;
+    e.roll += v.roll;
+    e.lost += v.lost;
+    e.hit += v.hit;
+    G.set(k, e);
+  }
 }
 
-console.log(`\n== 1v1 duels (ace vs ace, ${N} per matchup, ${DUEL_SEC} s cap) ==`);
-console.log(
-  'matchup            A win  B win  draw  engage med/mean s  trigger(winner) s  overheats/pilot  kits/duel',
-);
-for (let i = 0; i < FRAME_IDS.length; i++)
-  for (let j = i; j < FRAME_IDS.length; j++) {
-    const fa = FRAME_IDS[i]!,
-      fb = FRAME_IDS[j]!;
-    let wa = 0,
-      wb = 0,
-      draw = 0,
-      oh = 0,
-      kits = 0;
-    const eng: number[] = [];
-    const trig: number[] = [];
-    for (let k = 0; k < N; k++) {
-      // Swap sides every other duel so spawn geometry doesn't favour a Frame.
-      const swap = k % 2 === 1;
-      const r = swap ? duel(fb, fa, 100 + k, ACE, ACE) : duel(fa, fb, 100 + k, ACE, ACE);
-      const wA = swap ? r.winner === 1 : r.winner === 0;
-      const wB = swap ? r.winner === 0 : r.winner === 1;
-      if (wA) wa++;
-      else if (wB) wb++;
-      else draw++;
-      if (r.winner >= 0) {
-        eng.push(r.engageSec);
-        trig.push(r.trigger[r.winner as 0 | 1]);
+if (process.env.ONLY !== 'series') {
+  console.log(`\n== 1v1 duels (ace vs ace, ${N} per matchup, ${DUEL_SEC} s cap) ==`);
+  console.log(
+    'matchup            A win  B win  draw  engage med/mean s  trigger(winner) s  overheats/pilot  kits/duel',
+  );
+  for (let i = 0; i < FRAME_IDS.length; i++)
+    for (let j = i; j < FRAME_IDS.length; j++) {
+      const fa = FRAME_IDS[i]!,
+        fb = FRAME_IDS[j]!;
+      let wa = 0,
+        wb = 0,
+        draw = 0,
+        oh = 0,
+        kits = 0;
+      const eng: number[] = [];
+      const trig: number[] = [];
+      for (let k = 0; k < N; k++) {
+        // Swap sides every other duel so spawn geometry doesn't favour a Frame.
+        const swap = k % 2 === 1;
+        const r = swap ? duel(fb, fa, 100 + k, ACE, ACE) : duel(fa, fb, 100 + k, ACE, ACE);
+        const wA = swap ? r.winner === 1 : r.winner === 0;
+        const wB = swap ? r.winner === 0 : r.winner === 1;
+        if (wA) wa++;
+        else if (wB) wb++;
+        else draw++;
+        if (r.winner >= 0) {
+          eng.push(r.engageSec);
+          trig.push(r.trigger[r.winner as 0 | 1]);
+        }
+        r.tallies.forEach((t, side) => {
+          const f = (side === 0) !== swap ? fa : fb;
+          const io = frameIO.get(f) ?? { dmg: 0, restored: 0, sec: 0, trig: 0 };
+          io.dmg += [...t.dmg.values()].reduce((x, y) => x + y, 0);
+          io.restored += t.restored;
+          io.sec += t.aliveTicks / TICK_HZ;
+          io.trig += t.triggerTicks / TICK_HZ;
+          frameIO.set(f, io);
+        });
+        for (const t of r.tallies) {
+          absorb(t);
+          oh += t.overheats;
+          kits += t.kits;
+        }
+        if (fa !== fb && r.winner >= 0) {
+          const winF = wA ? fa : fb,
+            loseF = wA ? fb : fa;
+          const w = frameWins.get(winF) ?? { w: 0, l: 0 };
+          w.w++;
+          frameWins.set(winF, w);
+          const l = frameWins.get(loseF) ?? { w: 0, l: 0 };
+          l.l++;
+          frameWins.set(loseF, l);
+        }
       }
-      for (const t of r.tallies) {
-        absorb(t);
-        oh += t.overheats;
-        kits += t.kits;
-      }
-      if (fa !== fb && r.winner >= 0) {
-        const winF = wA ? fa : fb,
-          loseF = wA ? fb : fa;
-        const w = frameWins.get(winF) ?? { w: 0, l: 0 };
-        w.w++;
-        frameWins.set(winF, w);
-        const l = frameWins.get(loseF) ?? { w: 0, l: 0 };
-        l.l++;
-        frameWins.set(loseF, l);
-      }
+      console.log(
+        `${(fa + ' v ' + fb).padEnd(18)} ${pct(wa, N).padStart(5)}  ${pct(wb, N).padStart(5)}  ${String(draw).padStart(4)}  ${(f1(median(eng)) + ' / ' + f1(mean(eng))).padStart(17)}  ${f1(mean(trig)).padStart(17)}  ${(oh / (2 * N)).toFixed(2).padStart(15)}  ${(kits / N).toFixed(1).padStart(9)}`,
+      );
     }
+  console.log(
+    '\nFrame vs other Frames (decisive duels): win%   dealt/s alive  dealt/s trigger  restored/s  trigger share',
+  );
+  for (const f of FRAME_IDS) {
+    const w = frameWins.get(f) ?? { w: 0, l: 0 };
+    const io = frameIO.get(f)!;
     console.log(
-      `${(fa + ' v ' + fb).padEnd(18)} ${pct(wa, N).padStart(5)}  ${pct(wb, N).padStart(5)}  ${String(draw).padStart(4)}  ${(f1(median(eng)) + ' / ' + f1(mean(eng))).padStart(17)}  ${f1(mean(trig)).padStart(17)}  ${(oh / (2 * N)).toFixed(2).padStart(15)}  ${(kits / N).toFixed(1).padStart(9)}`,
+      `  ${f.padEnd(8)} ${pct(w.w, w.w + w.l).padStart(4)}  (${w.w}-${w.l})`.padEnd(46) +
+        `${f1(io.dmg / io.sec).padStart(13)}  ${f1(io.dmg / io.trig).padStart(15)}  ${f1(io.restored / io.sec).padStart(10)}  ${pct(io.trig, io.sec).padStart(13)}`,
     );
   }
-console.log('\nFrame vs other Frames (decisive duels): win%');
-for (const f of FRAME_IDS) {
-  const w = frameWins.get(f) ?? { w: 0, l: 0 };
-  console.log(`  ${f.padEnd(8)} ${pct(w.w, w.w + w.l)}  (${w.w}-${w.l})`);
-}
-console.log('\nPer weapon (all duels): shots  hit%  damage/shot  share of Frame damage');
-for (const [k, v] of [...W].sort()) {
-  const frame = k.split(':')[0]!;
-  const tot = [...W].reduce((a, [kk, vv]) => a + (kk.startsWith(frame + ':') ? vv.dmg : 0), 0);
+  console.log('\nPer weapon (all duels): shots  hit%  damage/shot  share of Frame damage');
+  for (const [k, v] of [...W].sort()) {
+    const frame = k.split(':')[0]!;
+    const tot = [...W].reduce((a, [kk, vv]) => a + (kk.startsWith(frame + ':') ? vv.dmg : 0), 0);
+    console.log(
+      `  ${k.padEnd(10)} ${String(v.shots).padStart(6)}  ${pct(v.hits, v.shots).padStart(4)}  ${f1(v.dmg / v.shots).padStart(11)}  ${pct(v.dmg, tot).padStart(5)}`,
+    );
+  }
   console.log(
-    `  ${k.padEnd(10)} ${String(v.shots).padStart(6)}  ${pct(v.hits, v.shots).padStart(4)}  ${f1(v.dmg / v.shots).padStart(11)}  ${pct(v.dmg, tot).padStart(5)}`,
+    `Overheats per pilot per duel: ${(overheatsAll / pilotsAll).toFixed(2)}; Barrel Rolls per pilot ${(rollsAll / pilotsAll).toFixed(1)}.`,
   );
+  console.log('Guided Secondary rounds (fired while LOCKED): count  roll-beaten  out-flown  hit');
+  for (const [k, v] of [...G].sort())
+    console.log(
+      `  ${k.padEnd(10)} ${String(v.n).padStart(6)}  ${pct(v.roll, v.n).padStart(11)}  ${pct(v.lost, v.n).padStart(9)}  ${pct(v.hit, v.n).padStart(4)}`,
+    );
 }
-console.log(
-  `Overheats per pilot per duel: ${(overheatsAll / pilotsAll).toFixed(2)}. Guided volleys ${volleysAll}, missiles ${guidedAll}: roll-beaten ${pct(rollAll, guidedAll)}, out-flown ${pct(lostAll, guidedAll)}, hit ${pct(guidedHitAll, guidedAll)}; rolls per pilot ${(rollsAll / pilotsAll).toFixed(1)}.`,
-);
-
-if (process.env.ONLY === 'duels') process.exit(0);
+if (process.env.ONLY) {
+  if (process.env.ONLY === 'duels') process.exit(0);
+}
 
 // ---- Burst vs hold, kits on vs off (mirror duels) ----
 function series(label: string, sa: BotSkill, sb: BotSkill) {
   let wa = 0,
-    dec = 0;
+    dec = 0,
+    all = 0;
+  let ohA = 0,
+    ohB = 0;
   const eng: number[] = [];
-  for (const f of FRAME_IDS)
+  const draws: string[] = [];
+  for (const f of FRAME_IDS) {
+    let d = 0;
     for (let k = 0; k < N; k++) {
       const swap = k % 2 === 1;
       const r = swap ? duel(f, f, 300 + k, sb, sa) : duel(f, f, 300 + k, sa, sb);
-      if (r.winner < 0) continue;
+      all++;
+      ohA += r.tallies[swap ? 1 : 0].overheats;
+      ohB += r.tallies[swap ? 0 : 1].overheats;
+      if (r.winner < 0) {
+        d++;
+        continue;
+      }
       dec++;
       eng.push(r.engageSec);
       if ((r.winner === 0) !== swap) wa++;
     }
+    draws.push(`${f} ${d}`);
+  }
   console.log(
-    `  ${label.padEnd(30)} first side wins ${pct(wa, dec)} of ${dec} decisive; engage mean ${f1(mean(eng))} s`,
+    `  ${label.padEnd(30)} first side wins ${pct(wa, dec)} of ${dec} decisive, ${pct(all - dec, all)} draws (${draws.join(', ')}); engage mean ${f1(mean(eng))} s; overheats/duel ${(ohA / all).toFixed(2)} vs ${(ohB / all).toFixed(2)}`,
   );
 }
 console.log('\n== Mirror series (all Frames) ==');
@@ -360,6 +431,9 @@ series('burst (heat<0.85) vs hold', ACE, HOLD);
 series('kits vs kits', ACE, ACE);
 series('no kits vs no kits', NO_KITS, NO_KITS);
 series('kits vs no kits', ACE, NO_KITS);
+series('kit spam vs kit spam', KIT_SPAM, KIT_SPAM);
+series('kit spam vs no kits', KIT_SPAM, NO_KITS);
+if (process.env.ONLY === 'series') process.exit(0);
 
 // ---- Siege: a Ground-Sieged Bulwark vs attackers that keep coming ----
 function siege(attackers: FrameId[], seed: number) {

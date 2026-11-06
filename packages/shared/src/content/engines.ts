@@ -7,14 +7,14 @@ import type { EngineDef, FrameId } from '../types';
 export const ENGINES: Record<string, EngineDef> = {
   'kestrel-jet': e('kestrel-jet', 'Kestrel Jet', 90, 125, 190, 130, 2.4, 0.7),
   'mule-turbine': e('mule-turbine', 'Mule Turbine', 80, 112, 172, 110, 2.2, 0.68),
-  'lantern-drive': e('lantern-drive', 'Lantern Drive', 75, 105, 165, 90, 2.7, 0.65),
+  'lantern-drive': e('lantern-drive', 'Lantern Drive', 75, 105, 165, 90, 2.45, 0.65),
   'crawler-rig': e('crawler-rig', 'Crawler Rig', 45, 65, 105, 100, 1.15, 0.55),
   'falcon-jet': e('falcon-jet', 'Falcon Jet', 95, 132, 200, 138, 2.5, 0.7),
   'gyre-jet': e('gyre-jet', 'Gyre Jet', 100, 139, 210, 146, 2.6, 0.7),
   'ox-turbine': e('ox-turbine', 'Ox Turbine', 84, 118, 181, 117, 2.3, 0.68),
   'bison-turbine': e('bison-turbine', 'Bison Turbine', 88, 124, 190, 124, 2.4, 0.68),
-  'beacon-drive': e('beacon-drive', 'Beacon Drive', 80, 111, 174, 96, 2.8, 0.65),
-  'pharos-drive': e('pharos-drive', 'Pharos Drive', 84, 117, 183, 102, 2.9, 0.65),
+  'beacon-drive': e('beacon-drive', 'Beacon Drive', 80, 111, 174, 96, 2.55, 0.65),
+  'pharos-drive': e('pharos-drive', 'Pharos Drive', 84, 117, 183, 102, 2.65, 0.65),
   'tread-rig': e('tread-rig', 'Tread Rig', 48, 69, 111, 106, 1.2, 0.55),
   'titan-rig': e('titan-rig', 'Titan Rig', 50, 73, 117, 112, 1.25, 0.55),
 };

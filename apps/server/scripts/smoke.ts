@@ -14,6 +14,8 @@ import {
   BOMB_DROP_SPEED,
   BOMB_GRAVITY,
   AIR_BARRAGE_COUNT,
+  OVERHEAT_COOL_MUL,
+  TARGETING,
   type FrameId,
   type PilotInput,
   type ShipId,
@@ -697,7 +699,8 @@ function overheatTest() {
   let hotAt = -1,
     coolAt = -1,
     firedHot = 0;
-  for (let i = 0; i < Math.ceil(w.overheatSec * 1.8 * TICK_HZ) && coolAt < 0; i++) {
+  const coolSec = TARGETING.coolMul * w.overheatSec * OVERHEAT_COOL_MUL;
+  for (let i = 0; i < Math.ceil((w.overheatSec + coolSec + 1) * TICK_HZ) && coolAt < 0; i++) {
     const ev = sim2.step(
       new Map([
         ['t', mk(i, { aim: [0, 0, -1] })],
@@ -714,6 +717,7 @@ function overheatTest() {
   sim2.dispose();
   return {
     overheatSec: w.overheatSec,
+    wantCoolSec: coolSec,
     hotSec: hotAt / TICK_HZ,
     coolSec: (coolAt - hotAt) / TICK_HZ,
     firedHot,
@@ -1052,9 +1056,9 @@ check(
 );
 check(
   Math.abs(heatRes.hotSec - heatRes.overheatSec) < 0.5 &&
-    Math.abs(heatRes.coolSec - heatRes.overheatSec * 0.5) < 0.2 &&
+    Math.abs(heatRes.coolSec - heatRes.wantCoolSec) < 0.2 &&
     heatRes.firedHot === 0,
-  'overheat after overheatSec, cool for half: ' + JSON.stringify(heatRes),
+  'overheat after overheatSec, forced cool-down coolMul x overheatSec x OVERHEAT_COOL_MUL: ' + JSON.stringify(heatRes),
 );
 check(
   salvoRes.vols.length === 2 &&

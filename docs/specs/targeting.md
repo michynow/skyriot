@@ -110,7 +110,7 @@ STD strzela zawsze, gdy minął reattack, broń nieprzegrzana i jest amunicja; o
 
 ### 5.1 Bramka
 
-LPM; minął reattack (po modyfikatorach); nieprzegrzana (heat < overheat time) — stygnięcie [ZAŁ] = overheat × 0,5; amunicja > 0; żywy, nie warp, brak Invincibility; A-Gear w Siege: krótkie opóźnienie po włączeniu [ŹR].
+LPM; minął reattack (po modyfikatorach); nieprzegrzana (heat < overheat time) — stygnięcie [ZAŁ]: między seriami 0,75 × overheat, po przegrzaniu 1,5× wolniej (≈1,1 × overheat; balans: `apps/server/scripts/duel.ts`); amunicja > 0; żywy, nie warp, brak Invincibility; A-Gear w Siege: krótkie opóźnienie po włączeniu [ŹR].
 
 ### 5.2 Rozstrzygnięcie trafienia
 
@@ -168,7 +168,7 @@ Zwykły pocisk wymaga LOCKED; bundle lecą prosto (kontakt/wybuch); bomby GBM/AB
 
 9.1 Klient wybiera cel i pokazuje lock natychmiast; serwer jedynym arbitrem: przy każdym strzale sam sprawdza zasięg, VA, widoczność, cooldowny i sam rzuca na trafienie [ZAŁ]. Lock ADV: serwer liczy z tolerancją na lag (+1° VA, +2% zasięgu). Ostrzeżenie: serwer wysyła MissileIncoming (chyba że Silence). Utrata celu: serwer emituje TargetLost.
 
-9.2 Parametry: radar.stdRange/advRange; weapon.range/reattack/overheatTime/pattern/accuracy; adv.validAngleDeg/speed/inductionRateDegPerSec/explosionRadius; lockAcquireTime = brak [POTW]; overheatCooldown 0,5 × overheat [ZAŁ]; siege.minRange; siege.armDelay 0,5 s [ZAŁ]; net.vaTolerance 1°, rangeTolerance 2% [ZAŁ].
+9.2 Parametry: radar.stdRange/advRange; weapon.range/reattack/overheatTime/pattern/accuracy; adv.validAngleDeg/speed/inductionRateDegPerSec/explosionRadius; lockAcquireTime = brak [POTW]; overheatCooldown 0,75 × overheat, po przegrzaniu × 1,5 [ZAŁ]; siege.minRange; siege.armDelay 0,5 s [ZAŁ]; net.vaTolerance 1°, rangeTolerance 2% [ZAŁ].
 
 9.3 Pseudokod:
 

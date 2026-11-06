@@ -46,11 +46,14 @@ export const NOSE_OFFSET = 1;
 export const PROJECTILE_RADIUS = 0.6;
 export const DEFLECT_CAP = 0.15;
 export const DEFLECT_DAMAGE_MUL = 0.5;
+/** Overheated: the forced Primary cool-down runs this many times slower than heat bleeding off between bursts. */
+export const OVERHEAT_COOL_MUL = 1.5;
 export const SPLASH_MIN_FRACTION = 0.25;
 export const LAG_HISTORY_TICKS = 20; // > LAG_COMP_MAX_MS in ticks (18)
 
 // Skills
-export const REPAIR_KIT_FRACTION = 0.35;
+export const REPAIR_KIT_FRACTION = 0.2;
+export const SHIELD_KIT_FRACTION = 0.5;
 /** Pivot Flip: the steering aim is turned 180 degrees and turn rate is raised to this for the duration. */
 export const FLIP_TURN_RATE = 6.5;
 /** Backdraft: fly backwards at this fraction of boost speed, then resume at min speed. */
@@ -66,12 +69,12 @@ export const QUAKE_DAMAGE = 600;
 export const BREACH_RADIUS = 150;
 /** Renewal / Recharge Pulse: radius, HP and shield restored (fractions of max). */
 export const HEAL_FIELD_RADIUS = 200;
-export const HEAL_FIELD_HP = 0.2;
+export const HEAL_FIELD_HP = 0.15;
 export const HEAL_FIELD_SHIELD = 0.3;
 /** Mend Beam / Lifeline reach, and Mend Beam heal (fraction of max HP). */
 export const HEAL_BEAM_RANGE = 400;
-export const HEAL_BEAM_HP = 0.3;
-export const CHARGE_BEAM_SHIELD = 0.4;
+export const HEAL_BEAM_HP = 0.2;
+export const CHARGE_BEAM_SHIELD = 0.3;
 export const DISPEL_RANGE = 600;
 export const SCAN_RADIUS = 600;
 export const DAMAGE_AURA_RADIUS = 55;
@@ -131,7 +134,7 @@ export const AIR_BARRAGE_SPREAD_RAD = 0.025;
 /** Air Barrage rockets burst wider than the plain bomb. */
 export const AIR_BARRAGE_SPLASH_MUL = 1.4;
 /** Each of the salvo's rockets deals this fraction of the Secondary's damage. */
-export const AIR_BARRAGE_DAMAGE_MUL = 0.35;
+export const AIR_BARRAGE_DAMAGE_MUL = 0.25;
 /** Wide Lock Mode: the Secondary's lock cone widens by this, its lock/fire range scales, and each salvo seeks up to N Ships. */
 export const WIDE_LOCK_CONE_ADD_RAD = 0.384; // ~22 degrees
 export const WIDE_LOCK_RANGE_MUL = 1.45;

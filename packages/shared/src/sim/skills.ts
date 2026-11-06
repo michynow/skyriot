@@ -12,6 +12,7 @@ import {
   HEAL_BEAM_HP,
   CHARGE_BEAM_SHIELD,
   REPAIR_KIT_FRACTION,
+  SHIELD_KIT_FRACTION,
   SNARE_CONE_RAD,
   SNARE_RANGE,
   BREACH_RADIUS,
@@ -167,7 +168,7 @@ export function castSkill(
       s.hp = Math.min(s.maxHp, s.hp + s.maxHp * REPAIR_KIT_FRACTION);
       break;
     case 'shield-kit':
-      s.shield = s.maxShield;
+      s.shield = Math.min(s.maxShield, s.shield + s.maxShield * SHIELD_KIT_FRACTION);
       break;
     case 'fuel-cell':
       s.fuel = 1;

@@ -45,16 +45,26 @@ export const BOT_SKILL = {
   combatThrottle: 0.3,
   /** Per-tick chances: Barrel Roll an incoming missile in the break window, use a ready Skill, launch a locked missile. */
   rollDodgeChance: 0.1,
+  /** Chance of a (wasted) Barrel Roll when an evasive jink starts after taking damage. */
+  panicRollChance: 0.08,
+  /** Missile distance window (m) a Bot tries to Barrel Roll in. */
+  rollWindowMinM: 30,
+  rollWindowMaxM: 80,
   skillUseChance: 0.004,
   missileFireChance: 0.015,
   disengageChance: 0.5,
-  /** Uses Repair/Shield Kits at all. */
+  /** Uses Repair/Shield Kits at all; only below this HP fraction, at most once per this many seconds. */
   kits: true,
+  kitHpFraction: 0.3,
+  kitGapSec: 10,
   /** In a fight, cuts throttle (tighter turn) while the enemy is off the nose, and Pivot Flips when it is behind. */
   turnBrake: false,
   pivotFlip: false,
   /** Attacks a Grounded enemy with strafing runs (as on structures) instead of circling it. Anvils bomb instead. */
   strafeGround: false,
+  /** Air fights: closer than min (m), fly away from the enemy until beyond max, then turn back in (0 = off). */
+  standoffMinM: 0,
+  standoffMaxM: 0,
 };
 export type BotSkill = typeof BOT_SKILL;
 
@@ -90,19 +100,14 @@ const SLOW_SPEED_MUL = 1.3;
 const CRUISE_ALTITUDE = 160;
 const FAR_BOOST_DISTANCE = 1200;
 const DODGE_CHANCE = 0.3;
-const ROLL_CHANCE = 0.08;
 const HEAL_HP_FRACTION = 0.4;
 /** Repair/Shield Kits (4 s cooldown): only when low, never back to back, so a Bot can still be finished. */
-const KIT_HP_FRACTION = 0.3;
 const KIT_SHIELD_FRACTION = 0.2;
-const KIT_GAP_TICKS = 10 * TICK_HZ;
 const RESUPPLY_AMMO_FRACTION = 0.05;
 const DECK_APPROACH_HEIGHT = 20;
 const DECK_BRAKE_DISTANCE = 250;
 const BOT_EDGE_MARGIN = 600;
 const SIEGE_SLOT = 0; // siege-anchor is hotbar slot 0 on the Bulwark
-const ROLL_WINDOW_MIN_M = 30;
-const ROLL_WINDOW_MAX_M = 80;
 const BUFF_ENGAGE_DIST = 900;
 const BOMB_DROP_RADIUS = 60;
 /** Distance to the enemy under which a Bot fires each offensive Skill (roughly its effect reach). */
@@ -155,6 +160,8 @@ export interface BotMemory {
   lastBrake: boolean;
   /** Flying away from a structure to line up the next strafing run. */
   extending: boolean;
+  /** Opening the range on an air enemy that got too close (standoff). */
+  separating: boolean;
   /** Goes for the enemy Base, fighting only Ships that get very close. */
   raider: boolean;
   /** Current target and where it was last seen: [x, y, z, vx, vy, vz]. */
@@ -194,6 +201,7 @@ export function createBotMemory(
     lastBrake: false,
     raider: rng() < RAIDER_CHANCE,
     extending: false,
+    separating: false,
     target: null,
     seen: [0, 0, 0, 0, 0, 0],
     aimErr: skill.aimErrStartRad,
@@ -298,6 +306,14 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   }
   const groundRun =
     mem.skill.strafeGround && enemy?.grounded === true && me.frame !== 'anvil' && !retreating;
+  if (!enemy || enemy.grounded || dist > mem.skill.standoffMaxM) mem.separating = false;
+  else if (dist < mem.skill.standoffMinM) mem.separating = true;
+  if (enemy && mem.separating && !retreating) {
+    const away = norm3(me.pos[0] - enemy.pos[0], 0, me.pos[2] - enemy.pos[2]);
+    tx = me.pos[0] + away[0] * 500;
+    ty = Math.max(me.pos[1], enemy.pos[1]);
+    tz = me.pos[2] + away[2] * 500;
+  }
   if (enemy && groundRun) {
     const hx = me.pos[0] - enemy.pos[0],
       hz = me.pos[2] - enemy.pos[2];
@@ -433,9 +449,11 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       : slow || pullUp > 0
         ? 1
         : fighting
-          ? mem.skill.turnBrake && off > TURN_BRAKE_RAD && !groundRun
-            ? -1
-            : mem.skill.combatThrottle
+          ? mem.separating
+            ? 1
+            : mem.skill.turnBrake && off > TURN_BRAKE_RAD && !groundRun
+              ? -1
+              : mem.skill.combatThrottle
           : CRUISE_THROTTLE;
   input.boost =
     (retreating || Math.min(dist, objectiveDist) > FAR_BOOST_DISTANCE) &&
@@ -518,7 +536,7 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   ) {
     mem.dodgeTicks = 8 + Math.floor(mem.rng() * 10);
     mem.dodgeDir = mem.rng() < 0.5 ? -1 : 1;
-    if (mem.rng() < ROLL_CHANCE) {
+    if (mem.rng() < mem.skill.panicRollChance) {
       if (mem.dodgeDir < 0) input.rollLeft = true;
       else input.rollRight = true;
     }
@@ -532,8 +550,8 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   // Incoming guided missile: roll inside the break window.
   if (me.incomingDist > 0 && !me.sieged && !me.grounded) {
     if (
-      me.incomingDist < ROLL_WINDOW_MAX_M &&
-      me.incomingDist > ROLL_WINDOW_MIN_M &&
+      me.incomingDist < mem.skill.rollWindowMaxM &&
+      me.incomingDist > mem.skill.rollWindowMinM &&
       me.rollCooldownTicks === 0 &&
       me.fuel >= fd.rollFuelCost &&
       mem.rng() < mem.skill.rollDodgeChance
@@ -543,12 +561,15 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     }
   } else if (
     mem.skill.kits &&
-    me.hp < me.maxHp * KIT_HP_FRACTION &&
-    mem.seq - mem.lastKitSeq >= KIT_GAP_TICKS &&
+    me.hp < me.maxHp * mem.skill.kitHpFraction &&
+    mem.seq - mem.lastKitSeq >= mem.skill.kitGapSec * TICK_HZ &&
     mem.rng() < mem.skill.skillUseChance * 5
   ) {
-    const kit = me.shield < me.maxShield * KIT_SHIELD_FRACTION ? 'shield-kit' : 'repair-kit';
-    const slot = fd.hotbar.indexOf(kit);
+    // The Kit that fits, else the other one if it is ready.
+    const want = me.shield < me.maxShield * KIT_SHIELD_FRACTION ? 'shield-kit' : 'repair-kit';
+    const other = want === 'shield-kit' ? 'repair-kit' : 'shield-kit';
+    let slot = fd.hotbar.indexOf(want);
+    if (slot < 0 || me.cooldowns[slot] !== 0) slot = fd.hotbar.indexOf(other);
     if (slot >= 0 && me.cooldowns[slot] === 0) {
       input.hotbar = slot;
       mem.lastKitSeq = mem.seq;
