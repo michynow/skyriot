@@ -61,7 +61,6 @@ export function ChaseCamera() {
       fov: BASE_FOV,
       yaw: 0,
       pitch: 0,
-      zoom: 1,
       shake: 0,
       boost: 0,
       fp: 0,
@@ -128,8 +127,7 @@ export function ChaseCamera() {
     // rotation lag: exponential slerp toward ship orientation
     st.q.slerp(st.qs, 1 - Math.exp(-feel.rot * dt));
 
-    // zoom + free-look orbit (smoothed)
-    st.zoom += (world.cameraZoom - st.zoom) * (1 - Math.exp(-8 * dt));
+    // free-look orbit (smoothed)
     const ty = world.lookBack ? Math.PI : world.freeLook ? -world.cursor.x * Math.PI * 0.95 : 0;
     const tp = world.lookBack
       ? 0.12
@@ -144,10 +142,9 @@ export function ChaseCamera() {
 
     // Sized by the hull so the whole Ship fits in frame, sitting below the centre crosshair.
     st.boost += ((world.boostLevel.get(ship.id) ?? 0) - st.boost) * (1 - Math.exp(-4 * dt));
-    const dist =
-      Math.max(def.halfLength, def.radius) * 4.6 * st.zoom * (1 + BOOST_PULLBACK * st.boost);
+    const dist = Math.max(def.halfLength, def.radius) * 4.6 * (1 + BOOST_PULLBACK * st.boost);
     // Camera sits higher: the Ship frames low so targets under the crosshair stay visible.
-    const height = Math.max(dist * 0.3, def.radius * st.zoom);
+    const height = Math.max(dist * 0.3, def.radius);
     st.off.set(0, height, dist).applyQuaternion(st.qs);
     // Pitch so the screen-centre ray meets the Ship's flight line at AIM_DISTANCE: centred cursor = fly straight.
     st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(height, dist + AIM_DISTANCE));

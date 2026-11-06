@@ -24,6 +24,9 @@ import {
   GROUND_STRIKE_SPREAD_MPS,
   BOMB_DROP_SPEED,
   BOMB_GRAVITY,
+  BOMB_FORWARD_KICK,
+  AIR_BARRAGE_RANGE_MUL,
+  BOMB_RANGE_MUL,
   MISSILE_SALVO_SPREAD_RAD,
   GROUND_STRIKE_GROUND_MUL,
   GROUND_STRIKE_SPLASH_MUL,
@@ -815,7 +818,7 @@ function fireLockless(
           (mods ? mods.damageMul : 1),
         w.splashRadius * AIR_BARRAGE_SPLASH_MUL * rec.mods.splashMul,
         w.speed,
-        w.rangeM * (mods ? mods.rangeMul : 1),
+        w.rangeM * AIR_BARRAGE_RANGE_MUL * (mods ? mods.rangeMul : 1),
         0,
         null,
         ox,
@@ -874,15 +877,16 @@ function fireLockless(
     return;
   }
   if (mode === 'ground-strike-mode') {
-    // A stick of heavy bombs dropped straight down, inheriting the Ship's velocity, fanned sideways, then
-    // falling under gravity. The first bomb's ammo is already paid; each extra one costs 1.
+    // A stick of heavy bombs thrown forward (the Ship's velocity plus a level forward kick), fanned sideways,
+    // then falling under gravity. The first bomb's ammo is already paid; each extra one costs 1.
     const extra = Math.min(GROUND_STRIKE_COUNT - 1, s.ammo2);
     s.ammo2 -= extra;
+    const kick = BOMB_FORWARD_KICK / (Math.hypot(_f[0]!, _f[2]!) || 1);
     for (let k = 0; k <= extra; k++) {
       const side = extra > 0 ? ((2 * k) / extra - 1) * GROUND_STRIKE_SPREAD_MPS : 0;
-      const bvx = s.vel[0] + _r[0]! * side,
+      const bvx = s.vel[0] + _f[0]! * kick + _r[0]! * side,
         bvy = s.vel[1] - BOMB_DROP_SPEED,
-        bvz = s.vel[2] + _r[2]! * side;
+        bvz = s.vel[2] + _f[2]! * kick + _r[2]! * side;
       const bs = Math.hypot(bvx, bvy, bvz) || 1;
       const bomb = spawnProjectile(
         ctx,
@@ -896,7 +900,7 @@ function fireLockless(
           (mods ? mods.damageMul : 1),
         w.splashRadius * GROUND_STRIKE_SPLASH_MUL * rec.mods.splashMul,
         bs,
-        w.rangeM,
+        w.rangeM * BOMB_RANGE_MUL,
         0,
         null,
         s.pos[0],

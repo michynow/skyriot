@@ -30,7 +30,6 @@ export interface ClientWorld {
   freeLook: boolean;
   /** X held: the chase camera swings round to look behind the Ship. */
   lookBack: boolean;
-  cameraZoom: number;
   /**
    * Screen-shake intensity 0..1, set by the HUD on a bounced terrain impact and decayed by the game loop
    * (exp, ~0.15 s). B's ChaseCamera may read it to jitter the camera.
@@ -55,7 +54,6 @@ export const world: ClientWorld = {
   cursor: { x: 0, y: 0 },
   freeLook: false,
   lookBack: false,
-  cameraZoom: 1,
   shake: 0,
   missiles: new Map(),
   structures: new Map(),

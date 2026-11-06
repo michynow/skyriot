@@ -3,7 +3,10 @@ import { useFrame } from '@react-three/fiber';
 import {
   AIR_BARRAGE_COUNT,
   AIR_BARRAGE_SPREAD_RAD,
+  AIR_BARRAGE_RANGE_MUL,
   BOMB_DROP_SPEED,
+  BOMB_FORWARD_KICK,
+  BOMB_RANGE_MUL,
   BOMB_GRAVITY,
   FRAMES,
   GROUND_STRIKE_SPLASH_MUL,
@@ -24,8 +27,8 @@ import {
 import { world } from '../state/world';
 import { isFlying } from '../hud/hudStore';
 
-/** Air mode (and other dumb Secondaries): the sight floats this far down the aim at most, hidden past it. */
-const AIR_MARK_MAX_M = 650;
+/** Air mode: the sight floats this fraction of the rockets' range down the aim (nearer if terrain is in the way). */
+const AIR_MARK_RANGE_FRAC = 0.9;
 /** Ground-strike sight fades out as the Ship closes on the impact point (m). */
 const FADE_NEAR_M = 25;
 const FADE_FAR_M = 60;
@@ -112,9 +115,9 @@ function trace(
 /**
  * Where the Secondary will land: a bright gold toothed gun-sight ring (dark outline for contrast) over a
  * faint blast-area fill, sized to the real blast radius and drawn on top
- * of everything. Ground-strike bombs: flat on the terrain at the ballistic impact. Air mode and other dumb
- * ordnance: facing the camera where the shot meets terrain or AIR_MARK_MAX_M down the aim, whichever is
- * nearer. Homing missiles get the lock reticle instead.
+ * of everything. Ground-strike bombs: flat on the terrain at the ballistic impact of the forward throw. Air
+ * mode: facing the camera where the rockets meet terrain or AIR_MARK_RANGE_FRAC of their range down the aim,
+ * whichever is nearer.
  */
 export function AimPreview() {
   const { group, sight } = useMemo(() => {
@@ -178,16 +181,22 @@ export function AimPreview() {
     let radius: number;
     let opacity = 1;
     let flat = false;
+    const [qx, qy, qz, qw] = own.rot;
+    const fx = -2 * (qx * qz + qw * qy),
+      fy = -2 * (qy * qz - qw * qx),
+      fz = -(1 - 2 * (qx * qx + qy * qy));
     if (mode === 'ground-strike-mode') {
+      // Same throw as the sim's centre bomb: Ship velocity plus a level forward kick.
+      const kick = BOMB_FORWARD_KICK / (Math.hypot(fx, fz) || 1);
       const landed = trace(
         own.pos[0],
         own.pos[1] - fd.radius - 1,
         own.pos[2],
-        own.vel[0],
+        own.vel[0] + fx * kick,
         own.vel[1] - BOMB_DROP_SPEED,
-        own.vel[2],
+        own.vel[2] + fz * kick,
         BOMB_GRAVITY,
-        w.rangeM,
+        w.rangeM * BOMB_RANGE_MUL,
         hit,
       );
       if (!landed) return; // bomb runs out of range in the air: no impact to mark
@@ -196,10 +205,6 @@ export function AimPreview() {
       radius = w.splashRadius * GROUND_STRIKE_SPLASH_MUL;
       flat = true;
     } else if (mode === 'air-barrage-mode') {
-      const [qx, qy, qz, qw] = own.rot;
-      const fx = -2 * (qx * qz + qw * qy),
-        fy = -2 * (qy * qz - qw * qx),
-        fz = -(1 - 2 * (qx * qx + qy * qy));
       const nose = fd.halfLength + NOSE_OFFSET;
       trace(
         own.pos[0] + fx * nose,
@@ -209,7 +214,7 @@ export function AimPreview() {
         fy * w.speed,
         fz * w.speed,
         0,
-        Math.min(w.rangeM, AIR_MARK_MAX_M),
+        w.rangeM * AIR_BARRAGE_RANGE_MUL * AIR_MARK_RANGE_FRAC,
         hit,
       );
       const d = Math.hypot(hit[0]! - own.pos[0], hit[1]! - own.pos[1], hit[2]! - own.pos[2]);

@@ -13,6 +13,7 @@ import {
   WEAPONS,
   BOMB_DROP_SPEED,
   BOMB_GRAVITY,
+  BOMB_FORWARD_KICK,
   AIR_BARRAGE_COUNT,
   OVERHEAT_COOL_MUL,
   TARGETING,
@@ -802,11 +803,13 @@ function strikeTrial(k: number): boolean {
   let hit = false,
     dropped = false;
   for (let i = 0; i < 400 && !hit; i++) {
-    // Drop when the falling bomb lands on the Target's line (vel z only, ballistic fall).
+    // Drop when the thrown bomb lands on the Target's line (vel z only, ballistic fall).
     const h = sh.pos[1] - t.pos[1];
     const vy = sh.vel[1] - BOMB_DROP_SPEED;
     const tf = (vy + Math.sqrt(vy * vy + 2 * BOMB_GRAVITY * h)) / BOMB_GRAVITY;
-    const fire: boolean = !dropped && sh.pos[2] + sh.vel[2] * tf <= t.pos[2] + ((k % 3) - 1) * 20;
+    // Facing -z: the forward throw adds BOMB_FORWARD_KICK along -z.
+    const fire: boolean =
+      !dropped && sh.pos[2] + (sh.vel[2] - BOMB_FORWARD_KICK) * tf <= t.pos[2] + ((k % 3) - 1) * 20;
     dropped ||= fire;
     const ev = sim2.step(
       new Map([
