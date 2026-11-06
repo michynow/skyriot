@@ -156,8 +156,6 @@ export function Game({
   useEffect(() => {
     let current = true;
     let conn: Connection | null = null;
-    music.setMode('game');
-    music.setNation(options.nation);
     useHud.setState({ status: 'connecting', error: '', chat: [], killfeed: [], consoleLines: [] });
     const interp = createInterpolator();
     session.interp = interp;
@@ -236,7 +234,7 @@ export function Game({
     return () => {
       current = false;
       resetAudioSession();
-      music.setMode('lobby');
+      music.setMap(null);
       conn?.close();
       session.sim?.dispose();
       Object.assign(session, { conn: null, interp: null, predictor: null, sim: null });

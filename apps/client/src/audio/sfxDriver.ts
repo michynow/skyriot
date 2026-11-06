@@ -9,7 +9,7 @@ import {
 } from '@skyriot/shared';
 import { world } from '../state/world';
 import { incomingThreats } from '../hud/incomingMissiles';
-import { music, playSfx, startLoop, type LoopHandle, type SfxName } from './engine';
+import { playSfx, startLoop, type LoopHandle, type SfxName } from './engine';
 
 const FIRE_SFX: Record<string, SfxName> = {
   'needle-cannon': 'fire-needle',
@@ -18,7 +18,6 @@ const FIRE_SFX: Record<string, SfxName> = {
   'twin-autocannon': 'fire-autocannon',
 };
 const FIRE_CULL_M = 900;
-const COMBAT_MEMORY_S = 6;
 
 interface Tracked {
   kind: ProjectileKind;
@@ -29,7 +28,6 @@ interface Tracked {
   loop: LoopHandle | null;
 }
 const tracked = new Map<number, Tracked>();
-let lastCombat = -1e9;
 let wasBoosting = false;
 let engine: LoopHandle | null = null;
 let burner: LoopHandle | null = null;
@@ -61,7 +59,6 @@ export function handleAudioEvent(ev: SimEvent): void {
   const own = world.ownId;
   switch (ev.type) {
     case 'projectileSpawned': {
-      if (ev.owner === own) lastCombat = now();
       const mine = ev.owner === own;
       if (ev.kind === 'tracer') {
         const name = FIRE_SFX[ev.weapon] ?? 'fire-needle';
@@ -98,7 +95,6 @@ export function handleAudioEvent(ev: SimEvent): void {
     }
     case 'structureHit':
       if (ev.attacker === ownShip()?.id) {
-        lastCombat = now();
         playSfx(ev.shielded ? 'hit-shield' : 'hit-dealt', { volume: 0.9 });
       }
       break;
@@ -116,7 +112,6 @@ export function handleAudioEvent(ev: SimEvent): void {
           ? 'hit-shield'
           : 'hit-hull';
       if (ev.attacker === own) {
-        lastCombat = now();
         // Landed round: a tick that climbs with damage; shield hits ring higher, hull hits sit lower.
         playSfx('hit-dealt', {
           pitch: (layer === 'hit-shield' ? 1.3 : 0.9) + Math.min(0.5, ev.damage / 300),
@@ -124,7 +119,6 @@ export function handleAudioEvent(ev: SimEvent): void {
         });
         if (ev.deflected) playSfx('hit-deflect', { pos: ev.pos, volume: 0.6 });
       } else if (ev.victim === own) {
-        lastCombat = now();
         playSfx(layer, { volume: 1 });
       } else playSfx(layer, { pos: ev.pos, volume: 0.45 });
       break;
@@ -165,7 +159,7 @@ export function handleAudioEvent(ev: SimEvent): void {
   }
 }
 
-/** Per-frame: state-driven loops (engine, afterburner, lock, warnings), missile hiss tracking, music intensity. */
+/** Per-frame: state-driven loops (engine, afterburner, lock, warnings), missile hiss tracking. */
 export function updateAudio(): void {
   const t = now();
   const own = ownShip();
@@ -225,7 +219,6 @@ export function updateAudio(): void {
   // Missile siren: runs while any missile homes on us (none = silence); tempo rises as impact nears.
   const threat = alive ? incomingThreats(performance.now())[0] : undefined;
   if (threat) {
-    lastCombat = t;
     if (!sirening) console.debug('[audio] missile siren start');
     sirening = true;
     if (t >= nextWarn) {
@@ -255,25 +248,6 @@ export function updateAudio(): void {
       ],
     });
   }
-
-  // Music intensity: docked/dead idle, enemies near mid, recent combat high.
-  let I = 0;
-  if (alive && own && !own.docked) {
-    const radar = FRAMES[own.frame].radarRangeM;
-    let near = false;
-    for (const s of world.ships.values()) {
-      if (
-        s.alive &&
-        s.nation !== own.nation &&
-        Math.hypot(s.pos[0] - own.pos[0], s.pos[1] - own.pos[1], s.pos[2] - own.pos[2]) <= radar
-      ) {
-        near = true;
-        break;
-      }
-    }
-    I = t - lastCombat < COMBAT_MEMORY_S ? 1 : near ? 0.5 : 0.15;
-  }
-  music.setIntensity(I);
 }
 
 /** Stop everything tied to the session (leaving the game). */
@@ -285,5 +259,4 @@ export function resetAudioSession(): void {
   lockTone?.stop();
   engine = burner = lockTone = null;
   wasBoosting = false;
-  music.setIntensity(0);
 }

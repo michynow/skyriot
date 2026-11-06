@@ -8,7 +8,7 @@ import {
   type JoinOptions,
   type NationId,
 } from '@skyriot/shared';
-import { initAudio, music, playSfx } from '../audio/engine';
+import { initAudio, playSfx } from '../audio/engine';
 import { Controls } from './Controls';
 import { HangarCanvas, ShipStage } from './FramePreview';
 import './lobby.css';
@@ -114,7 +114,6 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
   );
   const set = (p: Partial<typeof sel>) => {
     setSel((s) => ({ ...s, ...p }));
-    if (p.nation) music.setNation(p.nation);
   };
   const frame = FRAMES[sel.frame];
 
@@ -164,10 +163,8 @@ export function Lobby({ onLaunch }: { onLaunch(options: JoinOptions): void }) {
     <div
       className={`lobby ${sel.nation}`}
       onPointerDown={(e) => {
-        // First press in the hangar unlocks audio and starts the calm theme.
+        // First press in the hangar unlocks audio.
         initAudio();
-        music.setMode('lobby');
-        music.setNation(sel.nation);
         if ((e.target as HTMLElement).closest('button')) playSfx('ui-click');
       }}
       onPointerOver={(e) => {

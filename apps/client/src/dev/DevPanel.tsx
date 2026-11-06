@@ -205,7 +205,7 @@ function Console() {
       const line = `reconcile err avg ${st.avg.toFixed(2)} m  max ${st.max.toFixed(2)} m  (${st.count} snaps / 10 s)`;
       const au = audioStats();
       setRec(
-        `${line}\naudio ${au.state} voices ${au.voices} (peak ${au.peak}, stolen ${au.dropped}) loops ${au.loops} music I=${au.music?.intensity.toFixed(2) ?? '-'}`,
+        `${line}\naudio ${au.state} voices ${au.voices} (peak ${au.peak}, stolen ${au.dropped}) loops ${au.loops}`,
       );
       if (++n % 20 === 0) console.log('[reconcile]', line);
     }, 500);

@@ -164,7 +164,7 @@ All award Glory; defenders get a bonus.
 
 ## 9b. Audio
 
-- Procedural Web Audio (no third-party samples in v1): positional SFX for weapons, missiles, hits, boost, rolls, locks/warnings, Skill activations, docking, impacts; generative futuristic war music with intensity layers (idle → radar contact → combat) and per-nation motif variants; separate hangar theme.
+- Procedural Web Audio SFX (no samples): positional weapons, missiles, hits, boost, rolls, locks/warnings, Skill activations, docking, impacts. Music is file-based per map: one looping track per map (warzone / Concord city / Vex city) from the gitignored `apps/client/public/music/`, faded between maps and on leaving; a missing file plays nothing; the Lobby is silent.
 - Master/SFX/music volume + mute (M). Sample-file adapter can replace synth recipes later without caller changes.
 
 ## 10. Tech (summary — see ARCHITECTURE.md)

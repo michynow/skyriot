@@ -1,9 +1,11 @@
-import type { MapDef, NationId, Vec3, Quat } from '@skyriot/shared';
+import type { Vec3, Quat } from '@skyriot/shared';
 import { useSettings } from '../ui/settings';
-import { createMusic, type Music, type MusicMode } from './music';
+import { AGENT_MUTE } from './music';
+
+export { music } from './music';
 
 /**
- * Web Audio engine: procedural SFX recipes + generative music. `playSfx(name)` is a plain lookup into RECIPES;
+ * Web Audio engine: procedural SFX recipes. `playSfx(name)` is a plain lookup into RECIPES;
  * a later sample adapter can map the same names to files in public/audio/ without touching callers.
  */
 export type SfxName =
@@ -58,10 +60,8 @@ const MAX_DISTANCE = 2000;
 let ac: AudioContext | null = null;
 let master: GainNode;
 let sfxBus: GainNode;
-let musicBus: GainNode;
 let reverb: GainNode;
 let noise: AudioBuffer;
-let musicEngine: Music | null = null;
 let voices: { end: number; gain: GainNode }[] = [];
 let loops = 0;
 const lastPlayed = new Map<string, { t: number; n: number }>();
@@ -317,13 +317,12 @@ function applyVolumes() {
   const t = ac.currentTime;
   master.gain.setTargetAtTime(s.muted ? 0 : s.master, t, 0.05);
   sfxBus.gain.setTargetAtTime(s.sfx, t, 0.05);
-  musicBus.gain.setTargetAtTime(s.music * 0.55, t, 0.05);
 }
 
 /** Create/resume the AudioContext. Must be called from a user gesture (LAUNCH click / first lobby press). */
 export function initAudio(): void {
   // Agent test runs (VITE_MUTE=1, or ?mute in the URL) never create an AudioContext: no sound at all.
-  if (import.meta.env.VITE_MUTE === '1' || new URLSearchParams(location.search).has('mute')) return;
+  if (AGENT_MUTE) return;
   if (!ac) {
     try {
       ac = new AudioContext();
@@ -340,9 +339,7 @@ export function initAudio(): void {
     comp.release.value = 0.2;
     master.connect(comp).connect(ac.destination);
     sfxBus = ac.createGain();
-    musicBus = ac.createGain();
     sfxBus.connect(master);
-    musicBus.connect(master);
     const conv = ac.createConvolver();
     conv.buffer = makeReverbIr(ac);
     reverb = ac.createGain();
@@ -350,29 +347,11 @@ export function initAudio(): void {
     reverb.connect(conv).connect(sfxBus);
     noise = makeNoise(ac);
     ac.listener.positionX.value = 0;
-    musicEngine = createMusic(ac, musicBus, noise);
     useSettings.subscribe(applyVolumes);
     applyVolumes();
-    musicEngine.start();
-    if (import.meta.env.DEV) {
-      setInterval(() => {
-        const m = musicEngine?.stats();
-        console.debug(
-          `[audio] ctx=${ac?.state} voices=${voices.length} peak=${peakVoices} dropped=${dropped} loops=${loops} music=${m?.mode} I=${m?.intensity.toFixed(2)} steps=${m?.steps}`,
-        );
-      }, 5000);
-    }
   }
   if (ac.state === 'suspended') void ac.resume();
 }
-
-/** Music control; safe to call before initAudio (no-ops). */
-export const music = {
-  setIntensity: (v: number) => musicEngine?.setIntensity(v),
-  setMode: (m: MusicMode) => musicEngine?.setMode(m),
-  setNation: (n: NationId) => musicEngine?.setNation(n),
-  setMap: (map: MapDef | null) => musicEngine?.setMap(map),
-};
 
 export function setListener(
   pos: Vec3 | { x: number; y: number; z: number },
@@ -475,7 +454,6 @@ export function audioStats() {
     peak: peakVoices,
     dropped,
     loops,
-    music: musicEngine?.stats() ?? null,
   };
 }
 
