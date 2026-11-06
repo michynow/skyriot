@@ -73,7 +73,9 @@ export function Floaters() {
         el.style.opacity = String(1 - age * age);
         // Pop in large, settle, then float up.
         const pop = 1 + Math.max(0, 1 - age / 0.12) * 0.8;
-        el.style.transform = `translate(${p.x + f.jx}px,${p.y - age * 90}px) scale(${pop})`;
+        // Bigger hits (and merged streaks) read bigger.
+        const size = 0.7 + Math.min(1, f.sum / BIG_DAMAGE) * 0.6;
+        el.style.transform = `translate(${p.x + f.jx}px,${p.y - age * 90}px) scale(${pop * (f.kind === 'defl' || f.kind === 'absorb' ? 1 : size)})`;
       }
     };
     raf = requestAnimationFrame(frame);

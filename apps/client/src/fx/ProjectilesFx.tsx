@@ -8,6 +8,7 @@ import {
   type NationId,
   type ProjectileKind,
   type ShipId,
+  type ShipState,
   type SimEvent,
 } from '@skyriot/shared';
 import { PALETTES, trailRgb } from '../frames/palette';
@@ -337,6 +338,28 @@ function handleEvents(fx: Fx, _dt: number) {
         }
         const nation = world.ships.get(e.owner)?.nation ?? 'concord';
         fx.proj.add(e, TRACER[nation]);
+        if (e.kind !== 'tracer')
+          for (let n = 0; n < 10; n++)
+            fx.puffs.emit(
+              e.origin[0] - e.dir[0] * rr(1, 5),
+              e.origin[1] - e.dir[1] * rr(1, 5),
+              e.origin[2] - e.dir[2] * rr(1, 5),
+              rr(-6, 6) - e.dir[0] * 8,
+              rr(-6, 6) - e.dir[1] * 8,
+              rr(-6, 6) - e.dir[2] * 8,
+              rr(0.8, 1.5),
+              2,
+              9,
+              0.95,
+              0.92,
+              0.88,
+              0.5,
+              1.2,
+              -0.2,
+              0.4,
+              0.38,
+              0.37,
+            );
         // muzzle flash
         const [c0, c1, c2] = TRACER[nation];
         fx.glow.emit(
@@ -387,7 +410,8 @@ function handleEvents(fx: Fx, _dt: number) {
           fx.proj.remove(i);
         }
         const victim = world.ships.get(e.victim);
-        sparks(fx, e.pos, e.deflected ? 12 : 8, e.deflected);
+        if (k === 0 && victim) tracerImpact(fx, e, victim);
+        else sparks(fx, e.pos, e.deflected ? 12 : 8, e.deflected);
         const own = world.ownId ? world.ships.get(world.ownId) : undefined;
         if (own && e.attacker === own.id) {
           // Own hits: a flash that stays a few pixels wide at any range, so you see you're connecting.
@@ -406,7 +430,7 @@ function handleEvents(fx: Fx, _dt: number) {
           );
         if (victim && (e.deflected || victim.shield > 0)) {
           const col = e.deflected ? ([1.6, 1.8, 2.4] as RGB) : ACCENT[victim.nation];
-          bubble(fx, e.victim, col, e.deflected ? 0.6 : 1);
+          bubble(fx, e.victim, col, e.deflected ? 0.6 : k === 0 ? Math.min(1, e.damage / 60) : 1);
         }
         break;
       }
@@ -586,6 +610,40 @@ function sparks(fx: Fx, p: [number, number, number], n: number, blue: boolean) {
     );
   }
   fx.glow.emit(p[0], p[1], p[2], 0, 0, 0, 0.1, 2.6, 0.5, 3, 2.6, 2, 1);
+}
+
+/**
+ * A landed Primary round, scaled by damage. Hull: orange sparks, a flash on the skin and chips of debris.
+ * Shield (inferred from the last snapshot): no sparks, a cool flash and ring on the bubble. The point is
+ * pulled from the Ship's centre out to its hull, towards the attacker.
+ */
+function tracerImpact(fx: Fx, e: Extract<SimEvent, { type: 'hit' }>, victim: ShipState) {
+  const rad = FRAMES[victim.frame].radius;
+  const a = world.ships.get(e.attacker);
+  const p: [number, number, number] = [e.pos[0], e.pos[1], e.pos[2]];
+  if (a) {
+    const dx = a.pos[0] - p[0],
+      dy = a.pos[1] - p[1],
+      dz = a.pos[2] - p[2];
+    const l = (rad * 0.8) / (Math.hypot(dx, dy, dz) || 1);
+    p[0] += dx * l;
+    p[1] += dy * l;
+    p[2] += dz * l;
+  }
+  const power = Math.min(3, Math.max(0.5, e.damage / 40));
+  if (e.deflected || victim.shield > 1) {
+    fx.glow.emit(p[0], p[1], p[2], 0, 0, 0, 0.14, rad * 0.5 * power, rad * 0.2, 0.8, 1.8, 3, 1);
+    fx.ringP.emit(p[0], p[1], p[2], 0, 0, 0, 0.3, 1, rad * 0.9 * power, 0.5, 1.4, 2.4, 0.8);
+    sparks(fx, p, e.deflected ? 8 : 2, true);
+    return;
+  }
+  sparks(fx, p, Math.round(4 + power * 5), false);
+  fx.glow.emit(p[0], p[1], p[2], 0, 0, 0, 0.1, rad * 0.6 * power, rad * 0.15, 3, 1.9, 0.9, 1);
+  const pal = PALETTES[victim.nation];
+  for (let i = 0; i < Math.round(power); i++) {
+    fx.c.set(i % 2 ? pal.primary : pal.dark);
+    spawnDebris(fx, p, [fx.c.r, fx.c.g, fx.c.b], rr(12, 30), rr(0.12, 0.3) * power);
+  }
 }
 
 function dust(fx: Fx, p: [number, number, number], k: number) {
@@ -913,7 +971,11 @@ function updateProjectiles(fx: Fx, dt: number) {
       dead = true;
       const pos: [number, number, number] = [f[o]!, f[o + 1]!, f[o + 2]!];
       if (k === 0) sparks(fx, pos, 4, false);
-      else {
+      else if (k === 1 && !P.target[i]) {
+        // Dumb-fired missile into the ground: a miss. Dirt and a small bang, no fireball.
+        dust(fx, pos, 1.4);
+        explosion(fx, pos, Math.max(0.4, f[o + 11]! / 16), false);
+      } else {
         explosion(
           fx,
           pos,
@@ -946,8 +1008,21 @@ function updateProjectiles(fx: Fx, dt: number) {
     if (k === 0) {
       const len = Math.min(26, Math.max(7, sp * 0.03));
       const s = len / sp;
-      fx.streaks.push(x, y, z, 0.5, r * 0.8, g * 0.8, b * 0.8, 0.75, vx * s, vy * s, vz * s);
-      fx.streaks.push(x, y, z, 0.14, 1.8, 1.8, 1.8, 0.9, vx * s * 0.7, vy * s * 0.7, vz * s * 0.7);
+      const fade = Math.min(1, f[o + 9]! / 150); // rounds that run out of range fade, they don't pop
+      fx.streaks.push(x, y, z, 0.5, r * 0.8, g * 0.8, b * 0.8, 0.75 * fade, vx * s, vy * s, vz * s);
+      fx.streaks.push(
+        x,
+        y,
+        z,
+        0.14,
+        1.8,
+        1.8,
+        1.8,
+        0.9 * fade,
+        vx * s * 0.7,
+        vy * s * 0.7,
+        vz * s * 0.7,
+      );
       i++;
       continue;
     }
@@ -1321,6 +1396,58 @@ function updateDebris(fx: Fx, dt: number) {
 }
 
 /** Engine trails, barrel-roll swooshes, damage smoke. */
+/** Own guns: muzzles glow hotter as heat builds; overheated, they sputter smoke and sparks. */
+function gunHeat(fx: Fx, s: ShipState, dt: number) {
+  const fd = FRAMES[s.frame];
+  const k = (s.heat - 0.5) * 2;
+  const flick = s.overheated ? (Math.sin(fx.time * 45) > 0 ? 1 : 0.25) : 1;
+  for (const side of [-1, 1]) {
+    fx.v.set(side * fd.radius * 0.4, 0, -fd.halfLength).applyQuaternion(fx.q.set(...s.rot));
+    const x = s.pos[0] + fx.v.x,
+      y = s.pos[1] + fx.v.y,
+      z = s.pos[2] + fx.v.z;
+    fx.glow.emit(x, y, z, 0, 0, 0, 0.07, (0.5 + k * 1.1) * flick, 0.2, 3, 0.9 + (1 - k), 0.25, 0.9);
+    if (s.overheated) {
+      if (rnd() < dt * 14)
+        fx.puffs.emit(
+          x,
+          y,
+          z,
+          rr(-1, 1),
+          rr(1, 3),
+          rr(-1, 1),
+          rr(0.7, 1.2),
+          0.8,
+          3,
+          0.5,
+          0.48,
+          0.46,
+          0.35,
+          0.5,
+          -0.5,
+        );
+      if (rnd() < dt * 10)
+        fx.glow.emit(
+          x,
+          y,
+          z,
+          rr(-8, 8),
+          rr(-4, 8),
+          rr(-8, 8),
+          rr(0.2, 0.4),
+          0.3,
+          0.05,
+          3,
+          1.4,
+          0.4,
+          1,
+          1,
+          14,
+        );
+    }
+  }
+}
+
 function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
   const v = fx.v,
     q = fx.q;
@@ -1427,6 +1554,7 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
       t.z = z;
       t.has = true;
     }
+    if (s.id === world.ownId && s.heat > 0.5) gunHeat(fx, s, dt);
     for (const bf of s.buffs) {
       if (bf.skill === 'overdrive' && rnd() < dt * 50) {
         // heat haze + ember shed behind the engines

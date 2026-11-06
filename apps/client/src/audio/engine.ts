@@ -19,6 +19,7 @@ export type SfxName =
   | 'hit-deflect'
   | 'hit-shield'
   | 'hit-hull'
+  | 'overheat'
   | 'boost-kick'
   | 'roll'
   | 'lock-beep'
@@ -195,6 +196,12 @@ const RECIPES: Record<SfxName, (r: R) => number> = {
     tone(r, 'square', 190, 70, 0.12, 0.35),
     burst(r, 'highpass', 3000, 2000, 1, 0.06, 0.25, 0.02),
     0.22
+  ),
+  // Guns overheating: two falling tones, harsher than the lock beeps.
+  overheat: (r) => (
+    tone(r, 'square', 900, 560, 0.12, 0.22),
+    tone(r, 'square', 700, 380, 0.16, 0.22, 0.13),
+    0.3
   ),
   'boost-kick': (r) => (
     tone(r, 'sine', 130, 40, 0.35, 0.8),
