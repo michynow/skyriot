@@ -7,7 +7,7 @@ import { SLOTS } from './bricks';
 import { BuffVisuals } from './BuffVisuals';
 import { fpv } from './fpv';
 import { MODEL_SCALE, getModel } from './models';
-import { getAuraMaterial, getFlameMaterials, getMaterials } from './palette';
+import { getAuraMaterial, getBeaconMaterial, getFlameMaterials, getMaterials } from './palette';
 
 export interface FrameModelProps {
   frame: FrameId;
@@ -34,6 +34,7 @@ const diamondMat = new THREE.MeshBasicMaterial({
 // Bulwark barrel root (model units): the gun swivels here toward its Siege gun lock.
 const GUN_PIVOT = new THREE.Vector3(0, 1.6, -1.0);
 const _gv = new THREE.Vector3();
+const _bp = new THREE.Vector3();
 const flameGeo = new THREE.ConeGeometry(1, 1, 10, 1, true)
   .translate(0, 0.5, 0)
   .rotateX(Math.PI / 2);
@@ -59,6 +60,7 @@ export function FrameModel({
   const diamonds = useRef<(THREE.Mesh | null)[]>([]);
   const padFlames = useRef<(THREE.Group | null)[]>([]);
   const hull = useRef<THREE.Group>(null);
+  const beacon = useRef<THREE.Sprite>(null);
   const hover = useRef<THREE.Group>(null);
   const gun = useRef<THREE.Group>(null);
   const st = useRef({
@@ -73,8 +75,22 @@ export function FrameModel({
     t: Math.random() * 100,
   });
 
-  useFrame((_, dt) => {
+  useFrame(({ camera }, dt) => {
     const s = st.current;
+    const bc = beacon.current;
+    if (bc) {
+      // min-size beacon: screen size ~ constant, fades in past 150 m so near Ships look as before
+      const d = _bp.setFromMatrixPosition(bc.parent!.matrixWorld).distanceTo(camera.position);
+      const k = Math.min(1, Math.max(0, (d - 150) / 250));
+      bc.visible = k > 0;
+      if (bc.visible) {
+        const own = world.ownId ? world.ships.get(world.ownId) : undefined;
+        const enemy = !!own && own.nation !== nation;
+        bc.material = getBeaconMaterial(nation, enemy);
+        bc.material.opacity = 1;
+        bc.scale.setScalar((d * (enemy ? 0.02 : 0.011) * (0.4 + 0.6 * k)) / MODEL_SCALE);
+      }
+    }
     s.t += dt;
     const lvl =
       boosting !== undefined
@@ -183,6 +199,7 @@ export function FrameModel({
 
   return (
     <group scale={MODEL_SCALE}>
+      <sprite ref={beacon} material={getBeaconMaterial(nation, false)} renderOrder={8} />
       <group ref={hull}>
         {SLOTS.map((slot) => {
           const g = data.body[slot];
