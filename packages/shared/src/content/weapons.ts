@@ -1,4 +1,4 @@
-import type { SkillDef, WeaponDef } from '../types';
+import type { SkillDef, WeaponDef, WeaponLook } from '../types';
 
 // Halo (support) weapons hit softest: the support class trades attack for defence and heals.
 // Primary: `fireIntervalSec` is the reattack per pattern (count rounds at once); accuracy, pattern and overheat
@@ -20,17 +20,21 @@ export const WEAPONS: Record<string, WeaponDef> = {
     ...gun(0.85, 2, 8),
   }),
   'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 384, 4.5, 250, 1500, 0, {
+    look: look('thin', 'dart', 'flash', [2.6, 1.3, 0.2]),
     ...missile(6, 135),
     splashRadius: 5,
   }),
   'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 220, 4.5, 240, 1300, 0, {
+    look: look('ion', 'pod', 'shrapnel', [0.2, 1.6, 3]),
     ...missile(8, 145),
     splashRadius: 5,
   }),
   'brick-bomb': w('brick-bomb', 'Brick Bomb', 'rocket', 520, 3.0, 140, 900, 0.01, {
+    look: look('billow', 'bomb', 'fireball', [3, 0.9, 0.1]),
     splashRadius: 22,
   }),
   'mortar-battery': w('mortar-battery', 'Mortar Battery', 'shell', 65, 2.6, 600, 1600, 0, {
+    look: look('arc', 'shell', 'plume', [1.8, 1.2, 0.4]),
     ...salvo(10),
     splashRadius: 12,
   }),
@@ -62,32 +66,40 @@ export const WEAPONS: Record<string, WeaponDef> = {
     ...gun(0.9, 2, 8.5),
   }),
   'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 432, 4.4, 260, 1550, 0, {
+    look: look('thin', 'dart', 'flash', [3, 0.45, 0.15]),
     ...missile(5.5, 150),
     splashRadius: 5,
   }),
   'talon-missile': w('talon-missile', 'Talon Missile', 'missile', 480, 4.3, 270, 1600, 0, {
+    look: look('thin', 'dart', 'flash', [1.6, 2.6, 0.3]),
     ...missile(5, 160),
     splashRadius: 5.5,
   }),
   'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 245, 4.4, 250, 1350, 0, {
+    look: look('ion', 'pod', 'shrapnel', [1.6, 0.4, 3]),
     ...missile(7.5, 150),
     splashRadius: 5,
   }),
   'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 275, 4.3, 260, 1400, 0, {
+    look: look('ion', 'pod', 'shrapnel', [0.3, 3, 0.9]),
     ...missile(7, 155),
     splashRadius: 5.5,
   }),
   'slab-bomb': w('slab-bomb', 'Slab Bomb', 'rocket', 590, 2.9, 145, 920, 0.01, {
+    look: look('billow', 'bomb', 'fireball', [3, 0.2, 0.2]),
     splashRadius: 23,
   }),
   'monolith-bomb': w('monolith-bomb', 'Monolith Bomb', 'rocket', 660, 2.8, 150, 950, 0.01, {
+    look: look('billow', 'bomb', 'fireball', [2.4, 0.2, 2.4]),
     splashRadius: 24,
   }),
   'howler-battery': w('howler-battery', 'Howler Battery', 'shell', 75, 2.5, 615, 1650, 0, {
+    look: look('arc', 'shell', 'plume', [1.2, 1.8, 0.4]),
     ...salvo(10.5),
     splashRadius: 13,
   }),
   'quake-battery': w('quake-battery', 'Quake Battery', 'shell', 85, 2.4, 630, 1700, 0, {
+    look: look('arc', 'shell', 'plume', [1.9, 0.8, 0.4]),
     ...salvo(11),
     splashRadius: 14,
   }),
@@ -96,6 +108,15 @@ export const WEAPONS: Record<string, WeaponDef> = {
     splashRadius: 5,
   }),
 };
+
+function look(
+  trail: WeaponLook['trail'],
+  warhead: WeaponLook['warhead'],
+  blast: WeaponLook['blast'],
+  color: WeaponLook['color'],
+): WeaponLook {
+  return { trail, warhead, blast, color };
+}
 
 /** Primary: accuracy, rounds per pattern, overheat seconds. */
 function gun(accuracy: number, count: number, overheatSec: number): Partial<WeaponDef> {
