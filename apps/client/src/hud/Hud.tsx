@@ -589,7 +589,7 @@ function FlightTips() {
         <kbd>SHIFT</kbd> switch Target · <kbd>TAB</kbd> next hotbar set · <kbd>C</kbd> land
       </p>
       <p>
-        <kbd>LMB</kbd> guns · <kbd>RMB</kbd> missile (needs a lock on the Target)
+        <kbd>LMB</kbd> guns · <kbd>RMB</kbd> missile (homes when locked, flies straight otherwise)
       </p>
       <p>
         <kbd>A</kbd>
