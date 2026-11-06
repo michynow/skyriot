@@ -189,7 +189,7 @@ A warp link between two Maps.
 _Avoid_: portal, warp point
 
 **Environment Profile**:
-Map data that tunes physics: gravity (for falling objects like bombs), what counts as ground. Ships never stall: any Frame can throttle to 0 and hover in place.
+Map data that tunes physics: gravity (for falling objects like bombs), what counts as ground. Ships never stall: they throttle down to their engine's minimum speed (0 = hover in place; the Wasp holds 50 m/s).
 
 ## Story & events
 

@@ -1058,7 +1058,8 @@ check(
   Math.abs(heatRes.hotSec - heatRes.overheatSec) < 0.5 &&
     Math.abs(heatRes.coolSec - heatRes.wantCoolSec) < 0.2 &&
     heatRes.firedHot === 0,
-  'overheat after overheatSec, forced cool-down coolMul x overheatSec x OVERHEAT_COOL_MUL: ' + JSON.stringify(heatRes),
+  'overheat after overheatSec, forced cool-down coolMul x overheatSec x OVERHEAT_COOL_MUL: ' +
+    JSON.stringify(heatRes),
 );
 check(
   salvoRes.vols.length === 2 &&

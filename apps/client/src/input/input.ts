@@ -32,8 +32,8 @@ export const inputState = {
   rollDeniedAt: 0,
   /** performance.now() of the last C with no own Launch Deck in landing range. */
   landDeniedAt: 0,
-  /** That denied double-tap came while boosting (no roll during boost). */
-  rollDeniedBoost: false,
+  /** Why that double-tap was denied: boost held, too little fuel, or still recharging. */
+  rollDeniedWhy: '' as '' | 'boost' | 'fuel' | 'cooldown',
   /** Hotbar bar the number keys fire (0-based); Tab cycles, F1-F3 pick. */
   hotbarBar: 0,
   /** Last aim direction sent (unit, world space); HUD range feedback raycasts along it from the Ship. */
@@ -223,11 +223,19 @@ export function attachInput(canvas: HTMLElement): () => void {
         rollArmUntil = performance.now() + ROLL_ARM_MS;
         lastUp[e.code] = -1e9;
         const own = world.ownId ? world.ships.get(world.ownId) : undefined;
-        // Boosting, or still recharging past the arm window: the roll won't happen, say so.
-        const boosting = !!own && keys.has('Space') && own.fuel > 0;
-        if (own && (boosting || own.rollCooldownTicks / TICK_HZ > ROLL_ARM_MS / 1000)) {
+        // The roll won't happen (boost held, tank too low, recharging past the arm window): say so, never fail silently.
+        const why = !own
+          ? ''
+          : keys.has('Space') && own.fuel > 0
+            ? 'boost'
+            : own.fuel < FRAMES[own.frame].rollFuelCost
+              ? 'fuel'
+              : own.rollCooldownTicks / TICK_HZ > ROLL_ARM_MS / 1000
+                ? 'cooldown'
+                : '';
+        if (why) {
           inputState.rollDeniedAt = performance.now();
-          inputState.rollDeniedBoost = boosting;
+          inputState.rollDeniedWhy = why;
         }
       }
     } else if (e.code === 'Tab') inputState.hotbarBar = (inputState.hotbarBar + 1) % HOTBAR_BARS;

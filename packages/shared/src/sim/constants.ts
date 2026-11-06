@@ -81,9 +81,9 @@ export const DAMAGE_AURA_RADIUS = 55;
 
 // Steering smoothing
 /** Desired turn rate = angle-to-aim * gain (capped at turnRate): eases out of turns. */
-export const TURN_GAIN = 9;
+export const TURN_GAIN = 7;
 /** Angular velocity blend time constant (s): eases into turns. */
-export const TURN_TAU_SEC = 0.06;
+export const TURN_TAU_SEC = 0.09;
 /** Turn rate gains/loses up to this fraction: +below cruise, −toward boost speed. */
 export const TURN_SPEED_FALLOFF = 0.35;
 
@@ -124,8 +124,9 @@ export const CHARGED_SHOT_RANGE_MUL = 2;
 /** Rocket / bomb proximity fuse: bursts when a hull is within this fraction of the blast radius. */
 export const ROCKET_FUSE_FRAC = 0.75;
 
-// Barrel Roll: displacement = rollImpulse * factor over ROLL_DURATION_SEC (half-sine velocity curve).
-export const ROLL_DURATION_SEC = 1.1;
+// Barrel Roll: displacement = rollImpulse * factor over ROLL_DURATION_SEC. Velocity curve p(1-p)^2: quick
+// rise (peak at a third of the roll), long smooth settle to zero (no hitch at the end).
+export const ROLL_DURATION_SEC = 0.8;
 export const ROLL_DISPLACEMENT_PER_IMPULSE = 0.25;
 
 // Frame core kits

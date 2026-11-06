@@ -31,6 +31,7 @@ export function rollAngle(s: ShipState): number {
     r.done = true;
     return 0;
   }
-  const e = (1 - Math.cos(Math.PI * phase)) / 2; // ease in-out sine: peak spin ~1.6x average, no whip
+  // Spin follows the sim's lateral push (integral of p(1-p)^2): quick start, long smooth settle, no end hitch.
+  const e = phase * phase * (6 - 8 * phase + 3 * phase * phase);
   return e * Math.PI * 2 * r.dir;
 }

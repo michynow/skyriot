@@ -4,7 +4,7 @@ import './controls.css';
 const BINDINGS: [key: string, action: string][] = [
   ['MOUSE', 'steer / aim'],
   ['LMB · RMB', 'fire Primary / Secondary'],
-  ['W · S', 'throttle up / down to a stop (hover in place)'],
+  ['W · S', 'throttle up / down to min speed (hover in place; Wasp 50 m/s)'],
   ['A · D', 'strafe — double-tap to Barrel Roll'],
   ['Q · E', 'descend / climb'],
   ['SPACE', 'boost'],

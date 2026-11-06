@@ -153,7 +153,7 @@ function ownDeck(ctx: SimCtx, s: ShipState, reach: number) {
   return null;
 }
 
-/** Barrel Roll lateral velocity: a smooth half-sine bump whose integral is the roll displacement. */
+/** Barrel Roll lateral velocity: a front-loaded p(1-p)^2 bump whose integral is the roll displacement. */
 function rollVelocity(
   fd: { rollImpulse: number },
   s: ShipState,
@@ -164,8 +164,9 @@ function rollVelocity(
   out[0] = out[1] = out[2] = 0;
   if (s.rollPhase < 0) return;
   const displacement = fd.rollImpulse * ROLL_DISPLACEMENT_PER_IMPULSE;
-  const peak = (displacement * Math.PI) / (2 * ROLL_DURATION_SEC);
-  const mag = s.rollDir * peak * Math.sin(Math.PI * s.rollPhase);
+  const p = s.rollPhase;
+  // ∫0..1 p(1-p)^2 dp = 1/12.
+  const mag = ((s.rollDir * 12 * displacement) / ROLL_DURATION_SEC) * p * (1 - p) * (1 - p);
   const hx = -fz;
   const hl = Math.hypot(hx, fx) || 1;
   out[0] = (hx / hl) * mag;
@@ -529,7 +530,7 @@ export function stepFlight(
     s.rollCooldownTicks === 0 &&
     s.fuel >= fd.rollFuelCost &&
     s.rollPhase < 0 &&
-    !boosting &&
+    !(boosting && input.boost) && // only while boost is held: the bleed or a tap's tail never blocks a roll
     !sieged &&
     !grounded
   ) {
