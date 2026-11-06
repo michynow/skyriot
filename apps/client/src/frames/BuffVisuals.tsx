@@ -51,6 +51,15 @@ const AURA = {
   breaker: auraMat([2.8, 0.5, 0.3], true, 0.4),
   veil: auraMat([1.2, 0.8, 2.6], false, 0.25),
 };
+/** Own Ship seen from its chase camera: same shells, rim-only and faint so they don't blanket the screen. */
+const AURA_OWN = Object.fromEntries(
+  Object.entries(AURA).map(([k, m]) => {
+    const c = m.clone();
+    c.uniforms.uTime = time;
+    c.uniforms.uK = { value: m.uniforms.uK!.value * 0.22 };
+    return [k, c];
+  }),
+) as typeof AURA;
 /** Buff Skill -> aura shell and its scale (x hull radius). Debuffs show on the victim. */
 const BUFF_AURA: Record<string, [keyof typeof AURA, number]> = {
   'rally-field': ['rally', 1.15],
@@ -189,6 +198,7 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       const m = auras.current[k];
       if (!m) return;
       m.visible = on;
+      m.material = (shipId === world.ownId ? AURA_OWN : AURA)[k as keyof typeof AURA];
       if (on) m.scale.set(rad * sc, rad * sc * 0.72, len * sc * 1.15);
     };
     for (const [k, sc] of Object.values(BUFF_AURA)) set(k, !!on[k], sc);

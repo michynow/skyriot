@@ -14,9 +14,17 @@ const BASE_FOV = 60;
 const BOOST_FOV = 6;
 const BOOST_PULLBACK = 0.12;
 const POS_OMEGA = 9; // critically-damped spring angular frequency (1/s): higher = stiffer
-const ROT_RATE = 8;
-/** Share of the Ship's bank the camera follows: the rest shows as the Ship banking on screen. */
-const CAM_BANK = 0.3;
+/** Per-Frame feel: rot = orientation follow rate (higher = twitchier), bank = share of the Ship's roll the camera follows. */
+const FEEL = {
+  wasp: { rot: 9, bank: 0.25 },
+  anvil: { rot: 6, bank: 0.3 },
+  halo: { rot: 7.5, bank: 0.3 },
+  bulwark: { rot: 6, bank: 0.3 },
+} as const;
+/** Look-ahead into turns: extra view yaw/pitch (rad) per rad/s of turn rate, capped, eased in. */
+const LOOK_PER_RATE = 0.1;
+const LOOK_MAX = 0.14;
+const LOOK_RATE = 4;
 /** Screen drift on hard turns: camera shifts against the turn by dist * this per rad/s, capped. */
 const DRIFT_PER_RATE = 0.07;
 const DRIFT_MAX = 0.2;
@@ -76,6 +84,10 @@ export function ChaseCamera() {
       bz: new THREE.Vector3(),
       m: new THREE.Matrix4(),
       drift: new THREE.Vector3(),
+      lookYaw: 0,
+      lookPitch: 0,
+      qla: new THREE.Quaternion(),
+      eul: new THREE.Euler(0, 0, 0, 'YXZ'),
       out: [0, 0] as [number, number],
     }),
     [],
@@ -97,8 +109,10 @@ export function ChaseCamera() {
     // Follow only part of the bank: up = blend of world up and Ship up (all Ship up when near vertical).
     st.bz.set(0, 0, 1).applyQuaternion(st.qs);
     st.by.set(0, 1, 0).applyQuaternion(st.qs);
-    const vert = THREE.MathUtils.smoothstep(Math.abs(st.bz.y), 0.85, 0.98);
-    const bankW = CAM_BANK + (1 - CAM_BANK) * vert;
+    // Roll follow is capped at feel.bank except near vertical (dive/loop apex), where up must come from the Ship; wide smoothstep = no snap.
+    const feel = FEEL[ship.frame];
+    const vert = THREE.MathUtils.smoothstep(Math.abs(st.bz.y), 0.93, 0.995);
+    const bankW = feel.bank + (1 - feel.bank) * vert;
     st.by.multiplyScalar(bankW).add(st.tmp.set(0, 1 - bankW, 0));
     st.bx.crossVectors(st.by, st.bz).normalize();
     st.by.crossVectors(st.bz, st.bx);
@@ -112,7 +126,7 @@ export function ChaseCamera() {
       st.pos.set(ship.pos[0], ship.pos[1], ship.pos[2]);
     }
     // rotation lag: exponential slerp toward ship orientation
-    st.q.slerp(st.qs, 1 - Math.exp(-ROT_RATE * dt));
+    st.q.slerp(st.qs, 1 - Math.exp(-feel.rot * dt));
 
     // zoom + free-look orbit (smoothed)
     st.zoom += (world.cameraZoom - st.zoom) * (1 - Math.exp(-8 * dt));
@@ -132,7 +146,8 @@ export function ChaseCamera() {
     st.boost += ((world.boostLevel.get(ship.id) ?? 0) - st.boost) * (1 - Math.exp(-4 * dt));
     const dist =
       Math.max(def.halfLength, def.radius) * 4.6 * st.zoom * (1 + BOOST_PULLBACK * st.boost);
-    const height = Math.max(dist * 0.2, def.radius * st.zoom);
+    // Camera sits higher: the Ship frames low so targets under the crosshair stay visible.
+    const height = Math.max(dist * 0.3, def.radius * st.zoom);
     st.off.set(0, height, dist).applyQuaternion(st.qs);
     // Pitch so the screen-centre ray meets the Ship's flight line at AIM_DISTANCE: centred cursor = fly straight.
     st.qp.setFromAxisAngle(X_AXIS, -Math.atan2(height, dist + AIM_DISTANCE));
@@ -163,6 +178,12 @@ export function ChaseCamera() {
       .set(ship.angVel[0], ship.angVel[1], ship.angVel[2])
       .applyQuaternion(st.qo.copy(st.qs).invert());
     const dmax = DRIFT_MAX * dist;
+    st.lookYaw +=
+      (THREE.MathUtils.clamp(st.tmp.y * LOOK_PER_RATE, -LOOK_MAX, LOOK_MAX) - st.lookYaw) *
+      (1 - Math.exp(-LOOK_RATE * dt));
+    st.lookPitch +=
+      (THREE.MathUtils.clamp(st.tmp.x * LOOK_PER_RATE, -LOOK_MAX, LOOK_MAX) - st.lookPitch) *
+      (1 - Math.exp(-LOOK_RATE * dt));
     const dx = THREE.MathUtils.clamp(st.tmp.y * DRIFT_PER_RATE * dist, -dmax, dmax);
     const dy = THREE.MathUtils.clamp(-st.tmp.x * DRIFT_PER_RATE * dist, -dmax, dmax);
     const kd = 1 - Math.exp(-DRIFT_RATE * dt);
@@ -181,7 +202,8 @@ export function ChaseCamera() {
     }
 
     camera.position.copy(st.pos);
-    camera.quaternion.copy(st.qs).multiply(st.qp);
+    st.qla.setFromEuler(st.eul.set(st.lookPitch, st.lookYaw, 0));
+    camera.quaternion.copy(st.qs).multiply(st.qla).multiply(st.qp);
 
     // first person from the turret while a Bulwark is sieged (eased over ~0.4 s)
     const fpTarget = ship.sieged && ship.frame === 'bulwark' ? 1 : 0;

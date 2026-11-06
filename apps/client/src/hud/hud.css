@@ -245,11 +245,32 @@
 }
 .dmg i {
   position: absolute;
-  left: -60px;
-  top: -250px;
-  width: 120px;
-  height: 36px;
-  background: radial-gradient(ellipse at 50% 100%, #ff2a2acc, transparent 70%);
+  left: -120px;
+  top: -120px;
+  width: 240px;
+  height: 240px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 6px solid transparent;
+  border-top-color: #ff3030;
+  filter: drop-shadow(0 0 6px #ff2a2a);
+  /* short arc: fade out toward both ends */
+  -webkit-mask-image: conic-gradient(
+    from -35deg,
+    transparent,
+    #000 25deg,
+    #000 45deg,
+    transparent 70deg,
+    transparent
+  );
+  mask-image: conic-gradient(
+    from -35deg,
+    transparent,
+    #000 25deg,
+    #000 45deg,
+    transparent 70deg,
+    transparent
+  );
 }
 .hitmark {
   position: absolute;
