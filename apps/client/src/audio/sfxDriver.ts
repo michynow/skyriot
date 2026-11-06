@@ -35,6 +35,8 @@ let engine: LoopHandle | null = null;
 let burner: LoopHandle | null = null;
 let lockTone: LoopHandle | null = null;
 let wasLockedOn = false;
+let heatWarned = false;
+let wasOverheated = false;
 let sirening = false;
 let nextBeep = 0;
 let nextWarn = 0;
@@ -115,7 +117,11 @@ export function handleAudioEvent(ev: SimEvent): void {
           : 'hit-hull';
       if (ev.attacker === own) {
         lastCombat = now();
-        playSfx('hit-dealt');
+        // Landed round: a tick that climbs with damage; shield hits ring higher, hull hits sit lower.
+        playSfx('hit-dealt', {
+          pitch: (layer === 'hit-shield' ? 1.3 : 0.9) + Math.min(0.5, ev.damage / 300),
+          volume: 0.5 + Math.min(0.5, ev.damage / 200),
+        });
         if (ev.deflected) playSfx('hit-deflect', { pos: ev.pos, volume: 0.6 });
       } else if (ev.victim === own) {
         lastCombat = now();
@@ -175,6 +181,14 @@ export function updateAudio(): void {
     engine.stop();
     engine = null;
   }
+
+  // Primary heat: a quiet warning near the limit, an alarm when the guns lock out.
+  const hot = alive && !!own && own.heat >= 0.85 && !own.overheated;
+  if (hot && !heatWarned) playSfx('overheat', { pitch: 1.4, volume: 0.35 });
+  heatWarned = hot;
+  const over = alive && !!own && own.overheated;
+  if (over && !wasOverheated) playSfx('overheat');
+  wasOverheated = over;
 
   // Afterburner loop + kick on start.
   const boosting = alive && !!own && world.boosting.has(own.id);
