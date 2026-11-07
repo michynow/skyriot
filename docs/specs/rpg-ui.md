@@ -1,10 +1,12 @@
 # RPG UI rework — plan
 
-Status: **proposal, awaiting review.** Nothing here is implemented. Visual reference: [`rpg-ui-mockup.html`](rpg-ui-mockup.html) (open it in a browser).
+Status: **approved 2026-11-07** (user answers in §10). Nothing here is implemented yet. Visual reference: [`rpg-ui-mockup.html`](rpg-ui-mockup.html) (open it in a browser).
 
 Goal: turn the M2 economy (weapons + engines, a text-list Hangar inside the Esc menu, a fixed 3×10 Hotbar) into a proper MMORPG layer: a Pilot owns **Items** with sprites, rarity, Mods and +N Upgrades; each Frame wears them in nine **equipment slots** on a paper-doll; the Hotbar is the Pilot's own layout; every window looks hand-made and reads well at a glance.
 
 Pillars carried over from the PRD and not reopened: no premium currency, no pay-to-win, Upgrades are deterministic (ADR 0004), server is the only writer of inventory (ARCHITECTURE §5).
+
+**Balance freeze.** This rework adds items, slots and windows; it does not retune combat. Implementation sessions must not change existing numbers: Skill cooldowns and durations, weapon, engine and Frame stats, `upgradeCost` / `upgradeMul`. Tier 1 of every new gear line (armor, radar) equals the Frame's current stock values, so an un-geared Ship plays exactly as today. The only new numbers are the new items' T2/T3 steps, prices, Mod values and Charm magnitudes, all in `content/`. Numbers in the mockup (Skill cooldowns, stats) are illustrative; `content/` is the source.
 
 ---
 
@@ -12,28 +14,28 @@ Pillars carried over from the PRD and not reopened: no premium currency, no pay-
 
 Equipped per **Frame** (each Frame keeps its own Loadout), except Charms, which are per **Pilot** because their main effects (XP, Credits) are Pilot-wide.
 
-| Slot                | Fits                                              | Swap where     | What it does in the sim                                                                                                                                                                      |
-| ------------------- | ------------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Armor**           | that Frame's armor line (like engines)            | City or Docked | Sets `maxHp`, `maxShield`, `shieldRegenPerSec` and the new **Defence** stat (damage taken ×(1 − Defence), cap 30%). May add Deflect (still capped 15%).                                      |
-| **Engine**          | that Frame's engine line (exists today)           | City or Docked | Speed envelope and handling (`EngineDef`, unchanged).                                                                                                                                        |
-| **Primary** (STD)   | any gun (`fitsSlot` by projectile kind, as today) | City or Docked | Primary weapon, damage scaled by Upgrade.                                                                                                                                                    |
-| **Secondary** (ADV) | same kind as the Frame's stock Secondary          | City or Docked | Secondary weapon.                                                                                                                                                                            |
-| **Radar**           | any Frame                                         | City or Docked | Multiplies the Frame's stock `radarStdM`, `radarAdvM`, `radarRangeM` (minimap radius and visibility), and may add Valid Angle degrees. Shown to the player as absolute metres for the Frame. |
-| **Cosmetic**        | any Frame                                         | Anywhere       | Visual only: paint scheme + trail colour on the Ship model, seen by everyone. Zero stats, ever.                                                                                              |
-| **Charm I–III**     | any (Pilot-wide)                                  | Anywhere       | Percentage buffs for N hours of **real time**: XP, Credits, Scrap, Glory (server-side rewards) and small combat buffs (Primary/Secondary damage, Defence).                                   |
+| Slot                | Fits                                              | Swap where     | What it does in the sim                                                                                                                                         |
+| ------------------- | ------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Armor**           | that Frame's armor line (like engines)            | City or Docked | Sets `maxHp`, `maxShield`, `shieldRegenPerSec` and the new **Defence** stat (damage taken ×(1 − Defence), cap 30%). May add Deflect (still capped 15%).         |
+| **Engine**          | that Frame's engine line (exists today)           | City or Docked | Speed envelope and handling (`EngineDef`, unchanged).                                                                                                           |
+| **Primary** (STD)   | any gun (`fitsSlot` by projectile kind, as today) | City or Docked | Primary weapon, damage scaled by Upgrade.                                                                                                                       |
+| **Secondary** (ADV) | same kind as the Frame's stock Secondary          | City or Docked | Secondary weapon.                                                                                                                                               |
+| **Radar**           | that Frame's radar line (like engines)            | City or Docked | Sets `radarStdM`, `radarAdvM`, `radarRangeM` (minimap radius and visibility) as absolute metres, and may add Valid Angle degrees.                               |
+| **Cosmetic**        | any Frame                                         | Anywhere       | Visual only: paint scheme + trail colour on the Ship model, seen by everyone. Zero stats, ever.                                                                 |
+| **Charm I–III**     | any (Pilot-wide)                                  | Anywhere       | Percentage buffs for N hours of **logged-in time**: XP, Credits, Scrap, Glory (server-side rewards) and small combat buffs (Primary/Secondary damage, Defence). |
 
-Why radar is universal but armor/engine are per Frame: armor and engines change the Frame's body (its HP class and handling identity, PRD §3), so each Frame gets its own line. A radar is a sensor box; multiplying the Frame's stock ranges keeps the Wasp long-sighted and the Bulwark short-sighted while one item works on all four.
+Armor, engine and radar are per-Frame lines (an item fits one Frame): they define the Frame's body, handling and sensor identity (PRD §3). Each line has T1–T3 now; T1 is today's stock numbers.
 
 **Swap where.** Gear that changes combat numbers (armor, engine, weapons, radar) swaps only in a City or while Docked on a Launch Deck (Docked is new: today it's City only). Charms, Cosmetic and the Hotbar layout change anywhere, including mid-flight; the Ship keeps flying straight while a window is open (§6).
 
 ### Charms
 
 - Up to 3 Charm slots. Slot I from Level 1, slot II at Level 30, slot III at Level 60.
-- Timer starts the first time the Charm is equipped (**activation**) and runs in real time from then on: offline, unequipped, in a City. Unequipping doesn't pause it. When `expiresAt` passes, the item is deleted and the Pilot gets a chat line.
+- Timer starts the first time the Charm is equipped (**activation**) and counts down **only while the Pilot is logged in** (in any Map Instance or City), equipped or not. Unequipping doesn't pause it (no swap-to-save trick); logging out does. The instance stores `msLeft`; at 0 the item is deleted and the Pilot gets a chat line.
 - Same effect doesn't stack: two XP Charms → the higher one counts (the tooltip says so, the second shows "inactive").
 - Durations: 1 h, 5 h, 24 h. Magnitudes: reward Charms +10% / +25% / +50%; combat Charms +3% / +5% (kept small on purpose: fairness pillar).
 - Sources: Mission rewards, Event rewards, a Glory vendor, and a Credits vendor for the 1 h reward Charms. No real money.
-- Server: on join and once a minute per Map Instance, `expireCharms(profile, now)`; when a combat Charm expires it calls `sim.setGear` again. The sim never reads the clock (CODING_STANDARDS).
+- Server: `tickCharms(profile, elapsedMs)` runs once a minute per Map Instance and on leave/travel (elapsed = wall time since the last tick for that Pilot), subtracts from every activated Charm's `msLeft`, deletes spent ones, and saves. When a combat Charm ends it calls `sim.setGear` again. The sim never reads the clock (CODING_STANDARDS). ponytail: one-minute granularity; a Charm can run up to a minute over.
 
 ---
 
@@ -58,7 +60,7 @@ Why radar is universal but armor/engine are per Frame: armor and engines change 
 
 Rarity only decides how many **Mods** an item carries; base stats don't change with rarity. Rarer items drop (missions, Mobs, Events); the shop sells Standard only.
 
-| Rarity    | Colour (§7)     | Mods                                               |
+| Rarity    | Colour (§6)     | Mods                                               |
 | --------- | --------------- | -------------------------------------------------- |
 | Standard  | parchment white | 0                                                  |
 | Tuned     | green           | 1                                                  |
@@ -76,7 +78,7 @@ Mods follow CONTEXT.md: each Mod slot rolls **three options** server-side on dro
 ### Stacks
 
 - Only Consumables stack (Repair Kit, Shield Kit, Fuel Cell; max 20 per stack). Everything else is 1 per bag cell.
-- Consumables become **finite**: one cast uses one from the stack; the server decrements and resends the profile. They keep their cooldown. Buying is cheap (Credits) so the fairness pillar holds; an empty stack greys the Hotbar slot and shows 0.
+- Consumables become **finite**: bought from the Vendor, they take bag cells, and one cast uses one from the stack; the server decrements and resends the profile. Cooldowns stay exactly as in `content/weapons.ts` (Repair Kit and Shield Kit 3 s, Fuel Cell 15 s today). Buying is cheap (Credits) so the fairness pillar holds; an empty stack greys the Hotbar slot and shows 0.
 - New Pilots start with 5 of each.
 
 ### Bag
@@ -86,13 +88,13 @@ Mods follow CONTEXT.md: each Mod slot rolls **three options** server-side on dro
 
 ### Sprite id
 
-`ItemDef.icon` names an entry in the client icon registry; default is the def id. Variants of one line share a glyph and differ by tier trim (§8), so 36 shop items need 12 drawings, not 36.
+`ItemDef.icon` names an entry in the client icon registry; default is the def id. Variants of one line share a glyph and differ by tier trim (§7), so each line needs one drawing, not one per tier.
 
 ---
 
 ## 3. Contract changes (all additive)
 
-`packages/shared/src/types.ts` (orchestrator-owned, so session 0 lands these before anything else):
+`packages/shared/src/types.ts` (orchestrator-owned; session A in §8 lands all of this before anything else):
 
 ```ts
 export type ItemKind =
@@ -110,7 +112,7 @@ export interface ItemDef {
   name: string;
   tier: number;
   levelReq: number;
-  /** Frame it fits (armor, engine); absent = any. Weapons keep using fitsSlot. */
+  /** Frame it fits (armor, engine, radar); absent = any. Weapons keep using fitsSlot. */
   frame?: FrameId;
   /** Icon registry key; defaults to id. */
   icon?: string;
@@ -130,9 +132,9 @@ export interface ArmorDef {
 }
 export interface RadarDef {
   id: RadarId;
-  stdMul: number;
-  advMul: number;
-  rangeMul: number;
+  radarStdM: number;
+  radarAdvM: number;
+  radarRangeM: number;
   validAngleAdd?: number;
 }
 export interface CharmDef {
@@ -190,7 +192,7 @@ export interface ItemInstance {
   /** One entry per Mod slot: chosen Mod id, or the three offered ids until the Pilot picks. */
   mods?: (string | [string, string, string])[];
   count?: number; // stacks; absent = 1
-  expiresAt?: number; // charm, epoch ms, set on activation
+  msLeft?: number; // charm: logged-in time left after activation; absent = not activated yet
   bag?: number | null; // bag cell; null/absent while equipped
 }
 
@@ -248,7 +250,7 @@ export interface ChooseModRequest {
 `packages/shared/src/content/**`:
 
 - `items.ts` (new): `ITEMS: Record<ItemDefId, ItemDef>` for every ownable def. `SHOP` becomes `Object.values(ITEMS).filter(sold)`; `ShopEntry` stays as a derived shape so existing callers keep working.
-- `armors.ts`, `radars.ts`, `charms.ts`, `cosmetics.ts`, `mods.ts` (new). Armor lines: 4 Frames × T1–T3 like engines; T1 = today's stock Frame numbers, so nothing gets weaker. Radar lines: Picket (balanced, ×1.0/1.0 at T1), Spyglass (long ADV, −STD), Brushfire (long STD, +Valid Angle). Charms: Mentor's Coin (XP), Ledger Charm (Credits), Magpie Charm (Scrap), Laurel Charm (Glory), Grudge Charm (damage), Ward Charm (Defence) × 1 h / 5 h / 24 h.
+- `armors.ts`, `radars.ts`, `charms.ts`, `cosmetics.ts`, `mods.ts` (new). Armor lines: 4 Frames × T1–T3 like engines; T1 = today's stock Frame numbers, so nothing gets weaker. Radar lines: 4 Frames × T1–T3 like engines (Wasp Picket/Sentry/Watchtower, Anvil Bombsight/Plotter/Range-Keeper, Halo Choir/Chorus/Cantor, Bulwark Spotter/Surveyor/Overseer — names are suggestions); T1 = today's stock `radarStdM`/`radarAdvM`/`radarRangeM`, T2/T3 step up like the engine variants. A `RADAR_FRAME` / `ARMOR_FRAME` map mirrors `ENGINE_FRAME`. Charms: Mentor's Coin (XP), Ledger Charm (Credits), Magpie Charm (Scrap), Laurel Charm (Glory), Grudge Charm (damage), Ward Charm (Defence) × 1 h / 5 h / 24 h.
 - `economy.ts`: `fitsSlot` widened to the new slots; `gearOf` returns armor/radar/cosmetic too and the Pilot's charms; new `BAG_SIZE = 48`, `CHARM_SLOT_LEVELS = [1, 30, 60]`, `SELL_RATE = 0.25`, `CONSUMABLE_STACK = 20`, `STARTING_CONSUMABLES`.
 - `frames.ts`: `hotbar` stays as the **default** layout only; comment updated.
 - Consumables keep living in `SKILLS` (kind `'consumable'`) and get `ITEMS` entries with `stack: 20`.
@@ -264,11 +266,11 @@ Sim (`packages/shared/src/sim`):
 
 ### DB (`apps/server/src/db/schema.ts`, one migration, additive)
 
-| Table     | Change                                                                                                                                                                       |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `item`    | + `rarity text not null default 'standard'`, + `mods jsonb not null default '[]'`, + `count integer not null default 1`, + `expires_at timestamp null`, + `bag integer null` |
-| `pilot`   | + `charms jsonb not null default '[null,null,null]'`                                                                                                                         |
-| `loadout` | none: `slots` jsonb gains `armor`, `radar`, `cosmetic`, `hotbar` keys                                                                                                        |
+| Table     | Change                                                                                                                                                                  |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `item`    | + `rarity text not null default 'standard'`, + `mods jsonb not null default '[]'`, + `count integer not null default 1`, + `ms_left integer null`, + `bag integer null` |
+| `pilot`   | + `charms jsonb not null default '[null,null,null]'`                                                                                                                    |
+| `loadout` | none: `slots` jsonb gains `armor`, `radar`, `cosmetic`, `hotbar` keys                                                                                                   |
 
 Existing rows load unchanged: missing keys mean stock gear and the default hotbar. Bag positions are assigned on load for items with `bag = null` that aren't equipped.
 
@@ -305,7 +307,7 @@ The Hangar tab inside the Esc menu is removed once these land.
 Top to bottom, fixed order so players learn where to look:
 
 1. Name in rarity colour, `+N` after it.
-2. Kind · slot · Tier · Frame fit, e.g. "Secondary · Missile · Tier 2 · any Frame". Red if it doesn't fit the shown Frame or Level is too low.
+2. Kind · slot · Tier · Frame fit, e.g. "Secondary · Missile · Tier 2", then "fits missile Secondary slots" or the Frame name. Red if it doesn't fit the shown Frame or Level is too low.
 3. Core stats as label / value rows, tabular numerals, right-aligned.
 4. **Comparison column** against the item in the same slot of the shown Frame: green `+42` / red `−8` per row, plus a one-word verdict at the bottom ("Upgrade", "Sidegrade", "Downgrade") from the kind's headline stat. Holding Shift shows the equipped item's tooltip next to it.
 5. Mods, one line each, in the rarity colour; unchosen ones grey with "Choose Mod".
@@ -358,33 +360,87 @@ Icons needed (drawings, not counting tier variants):
 | Secondary lines   | 4 (exist)           | sting missile, seeker pod, brick bomb, mortar battery — same                                                                         |
 | Engine lines      | 4 new               | Kestrel/Falcon/Gyre jet (Wasp), Mule/Ox/Bison turbine (Anvil), Lantern/Beacon/Pharos drive (Halo), Crawler/Tread/Titan rig (Bulwark) |
 | Armor lines       | 4 new               | one plating silhouette per Frame (light scale, riveted slab, halo ring plate, tank hull plate)                                       |
-| Radar lines       | 3 new               | Picket (dish), Spyglass (long horn), Brushfire (wide phased panel)                                                                   |
+| Radar lines       | 4 new               | one sensor silhouette per Frame (Wasp dish, Anvil bombsight horn, Halo ring array, Bulwark mast)                                     |
 | Charms            | 6 new               | coin (XP), ledger (Credits), magpie (Scrap), laurel (Glory), grudge (damage), ward (Defence)                                         |
 | Consumables       | 3 (exist as Skills) | repair kit, shield kit, fuel cell — square-plate variant                                                                             |
 | Cosmetics         | rendered            | paint schemes, trails                                                                                                                |
 | Empty-slot ghosts | 9 new               | armor, engine, STD, ADV, radar, cosmetic, charm (one shape), consumable, generic                                                     |
 | Currency / UI     | 6 new               | Credits, Scrap, Glory coins; padlock; sort; close                                                                                    |
 
-Total new drawings: ~36. Skill icons (41) exist and stay.
+Total new drawings: ~37. Skill icons (41) exist and stay.
 
 ---
 
 ## 8. Implementation sessions
 
-Session 0 lands first (contracts are orchestrator-owned and everybody imports them). Sessions 1–4 then run in parallel with disjoint files.
+Five sessions. **A lands alone first** and is merged to `master`; B, C, D and E then branch from that `master` and run in parallel. B–E write disjoint file sets (A touches some of the same files earlier, then hands them over). A session that needs a file outside its list asks the orchestrator instead of editing it. All of them: Balance freeze (top of doc), `pnpm typecheck` passes, no tests (CLAUDE.md), run the client muted (`VITE_MUTE=1` / `?mute`), domain terms from `CONTEXT.md` and §9.
 
-| #   | Session                      | Owns (writes)                                                                                                                                                                                                                                                               | Depends               | Done when                                                                                                                                                                         |
-| --- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0   | **rpg-contracts**            | `packages/shared/src/types.ts`, `content/{items,armors,radars,charms,cosmetics,mods}.ts` (new), `content/economy.ts`, `content/frames.ts` comment, `apps/client/src/ui/rpg/{tokens.css,Window.tsx,Slot.tsx,dnd.ts}` (UI kit skeleton: chrome, slot well, drag store), fonts | —                     | `pnpm typecheck` passes; old saves load; a blank Window renders.                                                                                                                  |
-| 1   | **rpg-server-sim**           | `apps/server/src/{economy,profiles}.ts`, `db/schema.ts` + migration, `rooms/**` handlers, `packages/shared/src/sim/{gear,skills,damage,createSim,index}.ts`, `net/sanitize.ts`                                                                                              | 0                     | Armor/radar/charm stats felt in play (`/` dev command to grant items and charms); hotbar request moves Skills with cooldowns kept; consumables count down; charm expires on time. |
-| 2   | **rpg-windows**              | `apps/client/src/ui/rpg/{Character,Inventory,Vendor,Tooltip,windows}.tsx`, `rpg.css`, remove `ui/Hangar.tsx` + its Esc tab, window keys P / I / V                                                                                                                           | 0                     | All three windows work against the live profile; tooltip comparison correct; drag in bag works.                                                                                   |
-| 3   | **rpg-hotbar-skillbook**     | `apps/client/src/hud/Hotbar.tsx` (extracted from `Hud.tsx`), `ui/rpg/SkillBook.tsx`, HUD charm/buff strip, `input/input.ts` (read own layout, K key, show-all-bars), pointer release on window open                                                                         | 0 (uses kit `dnd.ts`) | Drag Skill book → bar → bar → off; layout survives reconnect; keys fire the right Skill.                                                                                          |
-| 4   | **rpg-icons**                | `apps/client/src/hud/icons.tsx`, new `apps/client/src/ui/rpg/itemIcons.tsx`, cosmetic thumbnail renderer                                                                                                                                                                    | 0                     | Every `ITEMS` entry and empty-slot ghost has an icon; tier trim visible; reviewed at 44 px and 28 px.                                                                             |
-| —   | Cosmetic paint on Ship model | `apps/client/src/frames/**`                                                                                                                                                                                                                                                 | 0                     | Small; can fold into 4 or run later.                                                                                                                                              |
+### A · rpg-contracts (first, alone)
 
-Hand-off between 2 and 3: both drop into `dnd.ts` (owned by 0, frozen API: `startDrag(payload)`, `useDropTarget(accept, onDrop)`). Session 2 renders `<ItemIcon>` / session 3 renders `<SkillIcon>` from session 4; until 4 lands they use placeholder plates.
+Lands every shared contract, the DB migration and the empty client shells, so the others only fill in.
 
-Every session that runs the client follows the mute rule (`VITE_MUTE=1` / `?mute`).
+Owns:
+
+- `packages/shared/src/types.ts`: everything in §3 (types, widened `ItemInstance` / `Loadout` / `EquipRequest`, `PilotProfile.charms`, `FrameDef.defence`, `ShipState.cosmetic`, `ShipSpawn.cosmetic`, new `MSG` keys `sell`, `discard`, `moveItem`, `hotbar`, `chooseMod`).
+- `packages/shared/src/content/{items,armors,radars,charms,cosmetics,mods}.ts` (new) with the full catalogue and numbers (§2, §3; T1 = stock values), `content/economy.ts` (constants, widened `fitsSlot` / `gearOf`, `SHOP` derived from `ITEMS`, `RADAR_FRAME`, `ARMOR_FRAME`), `content/frames.ts` (hotbar comment only), `packages/shared/src/index.ts` exports.
+- `packages/shared/src/sim/gear.ts`: **signature only** — `resolveGear(frame, gear)` keeps its signature and return type with the widened `ShipGear`; armor/radar/Mods/Charms/hotbar logic is B's. (A adds no behaviour here beyond compiling.)
+- `apps/server/src/db/schema.ts` + one generated migration in `apps/server/drizzle/` (`pnpm --filter @skyriot/server db:generate`), `apps/server/src/profiles.ts` (load/save the new columns, `charms`, bag index assignment on load, `STARTING_CONSUMABLES` for new Pilots).
+- `apps/client/src/net/connection.ts`: thin send methods for every new `MSG` (`sell`, `discard`, `moveItem`, `hotbar`, `chooseMod`).
+- Client UI kit and shells under `apps/client/src/ui/rpg/`: `tokens.css` (palette, rarity colours, type scale, fonts), `Window.tsx` (chrome from §6: frame, title bar, close, drag by title, position in `localStorage`), `Slot.tsx` (inset cell with rarity frame, `+N`, count, ghost), `dnd.ts` (frozen API: `startDrag(payload)`, `useDropTarget(accept, onDrop)`, payload union `{ kind: 'item', item } | { kind: 'skill', skill } | { kind: 'hotbar', slot }`), `windows.ts` (zustand store: open/close/toggle, z-order, `anyOpen`; key listener for **P / I / K / V** and Esc-closes-top), `WindowHost.tsx` (renders open windows), and **placeholder** `Character.tsx`, `Inventory.tsx`, `Vendor.tsx`, `SkillBook.tsx`, `Tooltip.tsx`, `itemIcons.tsx` (each exports its final name and renders an empty `Window` / plate).
+- `apps/client/src/Game.tsx`: mount `<WindowHost/>` (one line).
+- Minimal compile fixes in any caller the widened types break (expected: `apps/client/src/ui/Hangar.tsx`, `apps/server/src/economy.ts` slot list). No behaviour change there.
+
+Done when:
+
+- `pnpm typecheck` passes on `master` after merge.
+- Server boots, migration applies; an existing DB Pilot loads with stock gear and the default hotbar; a new Pilot gets 5 of each Consumable; save → reload round-trips the new fields.
+- P / I / K / V open and close empty framed windows in flight and in a City; Esc closes the top one.
+- Game plays exactly as before (balance freeze).
+
+### B · rpg-server-sim
+
+Owns:
+
+- `apps/server/src/economy.ts` (equip for all slots incl. charms and level gates; City-or-Docked check for combat gear; buy/sell/discard/moveItem with bag rules and stacks; hotbar validation: kit-only, no duplicates; chooseMod), `apps/server/src/charms.ts` (new: `tickCharms`), `apps/server/src/rooms/MapRoom.ts` (handlers, minute timer, leave/travel tick, consumable decrement on `skillUsed`, reward % from Charms on kill rewards/XP), `apps/server/src/rooms/devCommands.ts` (`/give <def> [rarity] [+N] [count]`, `/charm <def>`, `/charmtime <ms>`).
+- `packages/shared/src/sim/{gear,skills,damage,createSim,index,ctx}.ts`: `resolveGear` fills armor, radar, Mods, combat Charms, hotbar into `over`; `skills.ts` reads `rec.fd.hotbar`; cooldown remap by Skill id on hotbar change; `Sim.setCharges` and consumable gate; `defence` in `damage.ts`; `ShipState.cosmetic` set from gear.
+
+Done when (verified in a running game, muted, with dev commands):
+
+- Equipping a T2 armor / radar on the flown Frame changes HP, shield, Defence and the radar/minimap ranges; T1 items give exactly stock values.
+- Combat gear is refused in flight unless Docked; Charms, Cosmetic and hotbar change anywhere.
+- A hotbar request moves a Skill and its running cooldown moves with it; duplicates are dropped; bots unchanged.
+- Repair Kit count goes 5 → 4 on use, 0 blocks the cast; buy/sell/discard/move keep the bag consistent and saved.
+- A Charm counts down only while logged in (log out 2 min, back in: time unchanged), applies its %, and deletes itself at 0 with a chat line.
+
+### C · rpg-windows
+
+Owns: `apps/client/src/ui/rpg/{Character,Inventory,Vendor,Tooltip}.tsx` (replace A's placeholders), new `apps/client/src/ui/rpg/{statSheet.ts,ModPicker.tsx,rpg.css}`, `apps/client/src/ui/EscMenu.tsx` (drop the Hangar tab), delete `apps/client/src/ui/Hangar.tsx`, reuse `ui/FramePreview.tsx` read-only.
+
+- Character: paper-doll, Frame tabs, Charm row with countdowns, stat sheet from `resolveGear(frame, gearOf(profile, frame))`, wallet, XP.
+- Inventory: 8×6 bag, filter tabs, drag to move / equip slot, right-click equip/use, Sort, sell/discard confirm.
+- Vendor: Buy / Sell / Workshop (Upgrade ladder with exact costs), City only.
+- Tooltip: §5 order, comparison column and verdict, Mods incl. "Choose Mod" → `ModPicker`.
+- Until B lands, verify against a DEV-only fixture profile (`ui/rpg/devProfile.ts`, behind `import.meta.env.DEV`); after B, against the live profile.
+
+Done when: every window renders the live profile, tooltip deltas match `statSheet` before/after, drag in the bag and onto paper-doll slots sends the right request, the old Hangar is gone, text meets §6 contrast and sizes.
+
+### D · rpg-hotbar-skillbook
+
+Owns: new `apps/client/src/hud/Hotbar.tsx` (extracted from `Hud.tsx`), `apps/client/src/hud/{Hud.tsx,hudStore.ts,hud.css}` (Hotbar section, Charm/buff strip at 28 px, halt panel replaced by opening Character read-only), `apps/client/src/ui/rpg/SkillBook.tsx` (replace placeholder), `apps/client/src/input/input.ts` (hotbar lookup from the own Loadout layout, show-all-bars keys Shift/Alt + 1–0, pointer-lock release and stick re-centre while `anyOpen`, "FLIGHT HELD" line), `apps/client/src/ui/settings.ts` (Show all bars, UI scale).
+
+Done when: drag Skill book → bar, bar → bar (swap), bar → off (clear), Consumable stack from Inventory → bar; layout sent debounced and survives reconnect and Frame switch; keys fire the Skill shown on the slot; stack counts and greyed 0 show; padlock blocks drags; opening any window in flight frees the mouse and the Ship flies straight.
+
+### E · rpg-icons
+
+Owns: `apps/client/src/hud/icons.tsx` (Skill icons: keep; add currency/UI glyphs), `apps/client/src/ui/rpg/itemIcons.tsx` (replace placeholder: `ItemIcon({ def, tier })`, `SlotGhost({ slot })`), cosmetic paint on the Ship model in `apps/client/src/frames/{palette.ts,FrameModel.tsx}` reading `ShipState.cosmetic`, cosmetic thumbnail render.
+
+Done when: every `ITEMS` entry and every empty-slot ghost has art (§7 list, ~37 drawings), tier trim visible, reviewed at 44 px (bag) and 28 px (HUD strip) on dark plates; a Cosmetic equipped on one client is visible on another.
+
+### Order and merge
+
+1. **A** → merge to `master`.
+2. **B, C, D, E** in parallel from that `master`, merged in any order (each must typecheck against the current `master` before merging).
+3. Orchestrator play-through when all four are in: buy → equip → Upgrade → Mod pick → hotbar drag → fight with Consumables → Charm across a logout.
 
 ---
 
@@ -393,21 +449,22 @@ Every session that runs the client follows the mute rule (`VITE_MUTE=1` / `?mute
 - **Item**: one owned piece of gear, Consumable, Charm or Cosmetic (an instance of an Item def).
 - **Armor**: equipment slot setting a Frame's HP, shield and Defence. _Avoid_: hull (Ship body), plating (item name only).
 - **Defence**: % of incoming damage removed, capped 30%. Separate from Deflect.
-- **Radar** (item): sensor gear scaling the Frame's Primary/Secondary radar ranges.
+- **Radar** (item): per-Frame sensor gear setting the Frame's Primary/Secondary radar ranges and radar range.
 - **Cosmetic**: visual-only slot (paint, trail).
-- **Charm**: timed Pilot-wide buff item that expires in real time after activation. _Avoid_: booster (Booster is the boost engine), potion.
+- **Charm**: timed Pilot-wide buff item; after activation it counts down while the Pilot is logged in, then is gone. _Avoid_: booster (Booster is the boost engine), potion.
 - **Rarity**: Standard / Tuned / Custom / Prototype / Relic; sets the number of Mods.
 - **Bag**: the Pilot's 48-cell inventory grid. _Avoid_: backpack, stash.
 - **Skill book**: the window listing a Frame's Skill Kit.
 
 ---
 
-## 10. Open questions for the user
+## 10. Decisions (user, 2026-11-07)
 
-1. **Consumables finite?** Plan makes Repair/Shield Kit and Fuel Cell finite stacks (bought cheap, 20 per stack). Today they're infinite on a cooldown. Keep infinite instead?
-2. **Gear swap while Docked** on a Launch Deck (not only in a City) — OK? It makes swapping weapons between Battles practical.
-3. **Charm clock**: runs from activation even offline (as proposed), or only while logged in?
-4. **Radar universal** (multiplies each Frame's own ranges) vs. per-Frame radar lines like armor/engine?
-5. **Combat Charms** (+3–5% damage / Defence) at all, or reward Charms only (XP/Credits/Scrap/Glory) to keep PvP clean?
-6. **Character key = P** (C is Land). Fine, or another key?
-7. Rarity names (Standard / Tuned / Custom / Prototype / Relic) and the five colours — keep?
+1. Consumables are finite stacks: bought from the Vendor, they take bag cells; use cooldowns unchanged.
+2. Gear that changes combat numbers swaps in a City or while Docked on a Launch Deck.
+3. Charm clock runs only while the Pilot is logged in (paused offline).
+4. Radars are per-Frame lines, like armor and engines.
+5. Charms: reward Charms (XP, Credits, Scrap, Glory) plus small combat Charms (+3% / +5%).
+6. Character window opens with **P**.
+7. Rarity names and colours as in §2 / §6.
+8. Balance freeze (top of this doc): no retuning of existing combat numbers.
