@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { ENGINES, FRAMES, HOTBAR_BAR_SLOTS, MAPS, SKILLS, WEAPONS } from '@skyriot/shared';
+import { FRAMES, ITEMS, MAPS, SKILLS } from '@skyriot/shared';
 import { useShallow } from 'zustand/react/shallow';
 import { session } from '../net/session';
 import { inputState, setTyping } from '../input/input';
@@ -7,6 +7,7 @@ import { addChatLine, startHudFeed, useHud } from './hudStore';
 import { Floaters } from './Floaters';
 import { useSettings } from '../ui/settings';
 import { IconDefs, SkillIcon } from './icons';
+import { DragGhost, Hotbar, mmss } from './Hotbar';
 import { WeaponPanel } from './Ammo';
 import { Incoming } from './Incoming';
 import { ThreatRing } from './ThreatRing';
@@ -17,6 +18,9 @@ import { FlightTapes } from './FlightTapes';
 import { Launch } from './Launch';
 import { BattleBanner, BattleEnd, Objectives } from './Objectives';
 import { world } from '../state/world';
+import { useProfile } from '../state/profile';
+import { ItemIcon } from '../ui/rpg/itemIcons';
+import { closeWindow, isWindowOpen, openWindow, useWindows } from '../ui/rpg/windows';
 import './hud.css';
 
 const ARC = 0.75; // 270-degree gauges
@@ -187,86 +191,25 @@ function Status() {
   );
 }
 
-const mmss = (sec: number) =>
-  `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
-
-const BAR_NAMES = ['Core', 'Kit', 'Utility'];
-
-function Hotbar() {
-  const { all, bar, frac, sec, toggles, fx } = useHud(
-    useShallow((h) => ({
-      all: h.hotbar,
-      bar: h.hotbarBar,
-      frac: h.cooldownFrac,
-      sec: h.cooldownSec,
-      toggles: h.toggles,
-      fx: h.skillFx,
-    })),
-  );
-  const [tip, setTip] = useState<{ i: number; left: number } | null>(null);
-  // Slots are flattened bars; i below is the absolute slot, i - first the key on this bar.
-  const first = bar * HOTBAR_BAR_SLOTS;
-  const hotbar = all.slice(first, first + HOTBAR_BAR_SLOTS);
-  const tipSkill = tip ? SKILLS[all[tip.i] ?? ''] : undefined;
-  return (
-    <div className="hotbar" data-ui>
-      <div className="hotbar-tabs">
-        {Array.from({ length: Math.ceil(all.length / HOTBAR_BAR_SLOTS) }, (_, b) => (
-          <span key={b} className={b === bar ? 'on' : ''}>
-            F{b + 1} {BAR_NAMES[b]}
-          </span>
-        ))}
-        <kbd>TAB</kbd>
-      </div>
-      {hotbar.map((id, k) => {
-        const i = first + k;
-        const skill = id ? SKILLS[id] : undefined;
-        const cd = frac[i] ?? 0;
-        const on =
-          !!skill &&
-          skill.kind === 'toggle' &&
-          !!skill.toggleGroup &&
-          toggles[skill.toggleGroup] === id;
-        const punched = fx?.slot === i;
-        return (
-          <div
-            key={`${i}-${punched ? fx!.nonce : 0}`}
-            data-slot={i}
-            className={`slot ${skill ? '' : 'empty'} ${skill?.kind ?? ''} ${cd > 0 ? 'cooling' : ''} ${on ? 'on' : ''} ${punched ? 'punch' : ''}`}
-            onMouseEnter={(e) =>
-              skill &&
-              !document.pointerLockElement &&
-              setTip({ i, left: e.currentTarget.offsetLeft + e.currentTarget.offsetWidth / 2 })
-            }
-            onMouseLeave={() => setTip(null)}
-          >
-            {id && <SkillIcon id={id} />}
-            <span className="slot-k">{(k + 1) % 10}</span>
-            {on && <span className="slot-on">ON</span>}
-            <div className="slot-cd" style={{ ['--p' as string]: `${cd * 360}deg` }} />
-            {(sec[i] ?? 0) > 0.05 && <span className="slot-t">{(sec[i] ?? 0).toFixed(1)}</span>}
-          </div>
-        );
-      })}
-      {tip && tipSkill && (
-        <div className="tooltip" style={{ left: tip.left }}>
-          <b>{tipSkill.name}</b>
-          <p>{tipSkill.description}</p>
-          <small>
-            {tipSkill.durationSec > 0 && `Duration ${mmss(tipSkill.durationSec)}  ·  `}Cooldown{' '}
-            {mmss(tipSkill.cooldownSec)}
-          </small>
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** Active buffs under the top-left gauge: icon, timer bar, m:ss, ally marker; pulses under 10 s. */
 function BuffBar() {
   const buffs = useHud((h) => h.buffs);
+  const profile = useProfile((s) => s.profile);
+  // Activated Charms (timer started); `msLeft` only changes when the server resends the profile.
+  const charms = (profile?.charms ?? []).flatMap((id) => {
+    const it = profile?.items.find((i) => i.id === id);
+    return it && it.msLeft !== undefined ? [it] : [];
+  });
   return (
     <div className="buffbar">
+      {charms.map((c) => (
+        <div key={c.id} className="buff charm" title={ITEMS[c.def]?.name}>
+          <ItemIcon def={c.def} tier={ITEMS[c.def]?.tier} />
+          <small>
+            {c.msLeft! >= 3600e3 ? `${Math.floor(c.msLeft! / 3600e3)}h` : mmss(c.msLeft! / 1000)}
+          </small>
+        </div>
+      ))}
       {buffs.map((b, i) => (
         <div
           key={`${b.skill}${i}`}
@@ -445,6 +388,18 @@ function Warnings() {
   );
   // In the hangar / tunnel the Ship is hidden: no lock, bounds or dock warnings apply.
   const flying = h.alive && (h.launchPhase === 'none' || h.launchPhase === 'catapult');
+  const held = useWindows((w) => w.anyOpen);
+  // Halting (B) opens the Character window (read-only in flight) in place of the old loadout panel.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (h.halted && flying && !isWindowOpen('character')) {
+      openWindow('character');
+      opened.current = true;
+    } else if (!h.halted && opened.current) {
+      opened.current = false;
+      closeWindow('character');
+    }
+  }, [h.halted, flying]);
   const fullyStocked = h.resupplied || h.resupply >= 0.999;
   return (
     <>
@@ -454,7 +409,7 @@ function Warnings() {
           HALT IN PLACE? <kbd>B</kbd> / <kbd>Y</kbd> confirm
         </div>
       )}
-      {h.halted && flying && <Loadout />}
+      {held && flying && <div className="flight-held">FLIGHT HELD — windows open</div>}
       {h.rollDenied && flying && <div className="roll-denied">{h.rollDenied}</div>}
       {h.deckHint && flying && <div className="deck-hint">{h.deckHint}</div>}
       {h.outOfBounds && flying && (
@@ -490,58 +445,6 @@ function Warnings() {
         </div>
       )}
     </>
-  );
-}
-
-/** Halted mid-air: read-only Loadout (engine, weapons, hotbar). Swapping parts arrives with inventory (M2). */
-function Loadout() {
-  const frame = useHud((h) => h.frame);
-  if (!frame) return null;
-  const fd = FRAMES[frame];
-  const engine = ENGINES[fd.engine];
-  const weapons = [WEAPONS[fd.primary], WEAPONS[fd.secondary]];
-  return (
-    <div className="loadout" data-ui>
-      <h3>
-        {fd.name.toUpperCase()} <small>LOADOUT · HALTED</small>
-      </h3>
-      <section>
-        <h4>ENGINE — {engine?.name}</h4>
-        <p>
-          Speed {fd.minSpeed}–{fd.maxSpeed} m/s · Boost {fd.boostSpeed} · Accel {fd.accel} · Turn{' '}
-          {fd.turnRate.toFixed(2)} rad/s
-        </p>
-      </section>
-      <section>
-        <h4>WEAPONS</h4>
-        {weapons.map(
-          (w, i) =>
-            w && (
-              <p key={w.id}>
-                <b>{i === 0 ? 'LMB' : 'RMB'}</b> {w.name} · {w.damage} dmg · {w.rangeM} m ·{' '}
-                {i === 0 ? fd.ammo1Max : fd.ammo2Max} rds
-              </p>
-            ),
-        )}
-      </section>
-      <section className="lo-skills">
-        {fd.hotbar.map(
-          (id, i) =>
-            id && (
-              <div key={i} title={SKILLS[id]?.description}>
-                <SkillIcon id={id} />
-                <small>
-                  F{Math.floor(i / HOTBAR_BAR_SLOTS) + 1}·{((i % HOTBAR_BAR_SLOTS) + 1) % 10}{' '}
-                  {SKILLS[id]?.name}
-                </small>
-              </div>
-            ),
-        )}
-      </section>
-      <footer>
-        <kbd>B</kbd> or <kbd>W</kbd> to resume · <kbd>ESC</kbd> › HANGAR to change parts
-      </footer>
-    </div>
   );
 }
 
@@ -669,6 +572,7 @@ export function Hud({ onLeave }: { onLeave(): void }) {
       <SkillFx />
       <Incoming />
       <Hotbar />
+      <DragGhost />
       <Killfeed />
       <KillConfirm />
       <Chat />

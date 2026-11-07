@@ -14,6 +14,27 @@ function load(): Quality {
   return 'med';
 }
 
+const UI_KEY = 'skyriot.ui';
+interface UiPrefs {
+  /** Stack Hotbar bars 2 and 3 above bar 1 (Shift/Alt + 1-0 fire them). */
+  showAllBars: boolean;
+  /** RPG window scale, 0.85-1.3 (CSS variable --rpg-scale). */
+  uiScale: number;
+}
+function loadUi(): UiPrefs {
+  const d: UiPrefs = { showAllBars: false, uiScale: 1 };
+  try {
+    const v = JSON.parse(localStorage.getItem(UI_KEY) ?? '{}');
+    d.showAllBars = v.showAllBars === true;
+    if (typeof v.uiScale === 'number') d.uiScale = Math.min(1.3, Math.max(0.85, v.uiScale));
+  } catch {
+    /* ignore */
+  }
+  return d;
+}
+const applyScale = (s: number) =>
+  document.documentElement.style.setProperty('--rpg-scale', String(s));
+
 interface AudioPrefs {
   master: number;
   sfx: number;
@@ -34,16 +55,19 @@ function loadAudio(): AudioPrefs {
 }
 
 export const useSettings = create<
-  AudioPrefs & {
-    quality: Quality;
-    physicsDebug: boolean;
-    setQuality(q: Quality): void;
-    setPhysicsDebug(on: boolean): void;
-    setAudio(p: Partial<AudioPrefs>): void;
-    toggleMute(): void;
-  }
+  AudioPrefs &
+    UiPrefs & {
+      setUi(p: Partial<UiPrefs>): void;
+      quality: Quality;
+      physicsDebug: boolean;
+      setQuality(q: Quality): void;
+      setPhysicsDebug(on: boolean): void;
+      setAudio(p: Partial<AudioPrefs>): void;
+      toggleMute(): void;
+    }
 >((set, get) => ({
   ...loadAudio(),
+  ...loadUi(),
   quality: load(),
   physicsDebug: false,
   setQuality(quality) {
@@ -64,7 +88,19 @@ export const useSettings = create<
       /* ignore */
     }
   },
+  setUi(p) {
+    set(p);
+    const { showAllBars, uiScale } = get();
+    applyScale(uiScale);
+    try {
+      localStorage.setItem(UI_KEY, JSON.stringify({ showAllBars, uiScale }));
+    } catch {
+      /* ignore */
+    }
+  },
   toggleMute: () => get().setAudio({ muted: !get().muted }),
 }));
+
+applyScale(useSettings.getState().uiScale);
 
 export const QUALITY_DPR: Record<Quality, number> = { low: 0.7, med: 1, high: 2 };
