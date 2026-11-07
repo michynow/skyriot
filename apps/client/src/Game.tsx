@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import {
   FRAMES,
@@ -156,9 +156,12 @@ export function Game({
   const error = useHud((h) => h.error);
   const quality = useSettings((s) => s.quality);
   const [map, setMap] = useState(world.map);
+  const [ready, setReady] = useState(false);
+  const markReady = useCallback(() => setReady(true), []);
 
   useEffect(() => {
     let current = true;
+    setReady(false);
     let conn: Connection | null = null;
     useHud.setState({ status: 'connecting', error: '', chat: [], killfeed: [], consoleLines: [] });
     const interp = createInterpolator();
@@ -263,7 +266,7 @@ export function Game({
             dpr={QUALITY_DPR[quality]}
             camera={{ fov: 70, near: 0.5, far: 8000 }}
           >
-            <MapScene map={map} />
+            <MapScene map={map} onReady={markReady} />
             <Ships />
             <ProjectilesFx />
             <AimPreview />
@@ -285,10 +288,16 @@ export function Game({
           )}
         </>
       )}
-      {status !== 'playing' && (
-        <div className={`status-screen ${status}`}>
-          {status === 'connecting' && <div className="status-ring" />}
-          <h2>{status === 'error' ? 'CONNECTION LOST' : 'CONNECTING'}</h2>
+      {(status !== 'playing' || !ready) && (
+        <div className={`status-screen ${status === 'playing' ? 'connecting' : status}`}>
+          {status !== 'error' && <div className="status-ring" />}
+          <h2>
+            {status === 'error'
+              ? 'CONNECTION LOST'
+              : status === 'playing'
+                ? 'LOADING'
+                : 'CONNECTING'}
+          </h2>
           <p>
             {status === 'error'
               ? error
