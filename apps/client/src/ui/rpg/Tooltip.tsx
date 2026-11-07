@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { create } from 'zustand';
 import {
   FRAMES,
@@ -65,14 +66,22 @@ export function TipLayer({ owner }: { owner: string }) {
   useEffect(() => () => hideTip(), []);
   if (!item || o !== owner || !profile) return null;
   const slot = slotFor(frame, item.def);
-  const equippedId =
-    slot && slot !== 'charm' ? profile.loadouts[frame]?.[slot] : undefined;
-  const equipped = equippedId && equippedId !== item.id ? profile.items.find((i) => i.id === equippedId) : undefined;
+  const equippedId = slot && slot !== 'charm' ? profile.loadouts[frame]?.[slot] : undefined;
+  const equipped =
+    equippedId && equippedId !== item.id
+      ? profile.items.find((i) => i.id === equippedId)
+      : undefined;
   return (
     <>
       <ItemTooltip item={item} at={at} frame={frame} profile={profile} />
       {shift && equipped && (
-        <ItemTooltip item={equipped} at={[at[0] - 300, at[1]]} frame={frame} profile={profile} bare />
+        <ItemTooltip
+          item={equipped}
+          at={[at[0] - 300, at[1]]}
+          frame={frame}
+          profile={profile}
+          bare
+        />
       )}
     </>
   );
@@ -227,7 +236,8 @@ export function ItemTooltip({
   const price = sellPrice(item);
   const charm = charmLines(item.def);
 
-  return (
+  // Portal: a transformed window would make `position: fixed` relative to itself.
+  return createPortal(
     <div
       ref={ref}
       className={`rpg-tooltip rpg-ui rt-frame-${rarity}`}
@@ -303,8 +313,12 @@ export function ItemTooltip({
             'Cannot be sold'
           )}
         </span>
-        <span className="rt-hint">{item.mods?.some((m) => typeof m !== 'string') ? 'Click: choose Mod · ' : ''}Right-click: equip</span>
+        <span className="rt-hint">
+          {item.mods?.some((m) => typeof m !== 'string') ? 'Click: choose Mod · ' : ''}Right-click:
+          equip
+        </span>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

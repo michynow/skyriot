@@ -38,7 +38,10 @@ export function ItemCell({
   const down = useRef<[number, number] | null>(null);
   const tip = tipProps(item, owner);
   const charm = item && CHARMS[item.def];
-  const pct = charm && item.msLeft != null ? Math.max(0, Math.min(1, item.msLeft / (charm.hours * 3600e3))) : null;
+  const pct =
+    charm && item.msLeft != null
+      ? Math.max(0, Math.min(1, item.msLeft / (charm.hours * 3600e3)))
+      : null;
   return (
     <Slot
       rarity={item?.rarity}

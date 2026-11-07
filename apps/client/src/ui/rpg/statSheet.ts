@@ -61,12 +61,14 @@ export function itemLines(item: Pick<ItemInstance, 'def' | 'upgrade'>): Line[] {
     const dmg = w.damage * m;
     const salvo = w.pattern.count * w.pattern.series;
     const rows = [L('dmg', 'Damage', dmg, '', 0)];
-    if (w.pattern.series > 1 || w.pattern.count > 1) rows.push(L('salvo', 'Per trigger', dmg * salvo, '', 0));
+    if (w.pattern.series > 1 || w.pattern.count > 1)
+      rows.push(L('salvo', 'Per trigger', dmg * salvo, '', 0));
     rows.push(
       L('dps', 'Damage / s', (dmg * w.pattern.count) / w.fireIntervalSec, '', 0),
       L('reattack', 'Reattack', w.fireIntervalSec, 's', 1, true),
     );
-    if (w.inductionDegPerSec > 0) rows.push(L('induction', 'Induction rate', w.inductionDegPerSec, '°/s'));
+    if (w.inductionDegPerSec > 0)
+      rows.push(L('induction', 'Induction rate', w.inductionDegPerSec, '°/s'));
     if (w.validAngleDeg > 0) rows.push(L('valid', 'Valid Angle', w.validAngleDeg, '°', 1));
     rows.push(L('pspeed', 'Projectile speed', w.speed, 'm/s'), L('range', 'Range', w.rangeM, 'm'));
     return rows;
