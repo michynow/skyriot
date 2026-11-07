@@ -437,6 +437,14 @@ export interface FrameDef extends Omit<EngineDef, 'id' | 'name'> {
   hotbar: (SkillId | null)[];
 }
 
+/** Secondary visuals only (client fx); no sim effect. `color` is HDR rgb of flame/trail. */
+export interface WeaponLook {
+  trail: 'thin' | 'billow' | 'ion' | 'spiral' | 'arc';
+  warhead: 'dart' | 'fat' | 'bomb' | 'pod' | 'shell';
+  blast: 'flash' | 'fireball' | 'shrapnel' | 'plume';
+  color: [number, number, number];
+}
+
 export interface WeaponDef {
   id: WeaponId;
   name: string;
@@ -463,6 +471,8 @@ export interface WeaponDef {
   validAngleDeg: number;
   /** Secondary: guided turn rate (deg/s); 0 = flies straight. */
   inductionDegPerSec: number;
+  /** Secondary only: how the projectile and its blast look. */
+  look?: WeaponLook;
 }
 
 export interface SkillDef {

@@ -126,7 +126,7 @@ export const ROCKET_FUSE_FRAC = 0.75;
 
 // Barrel Roll: displacement = rollImpulse * factor over ROLL_DURATION_SEC. Velocity curve p(1-p)^2: quick
 // rise (peak at a third of the roll), long smooth settle to zero (no hitch at the end).
-export const ROLL_DURATION_SEC = 0.8;
+export const ROLL_DURATION_SEC = 1.1;
 export const ROLL_DISPLACEMENT_PER_IMPULSE = 0.25;
 
 // Frame core kits

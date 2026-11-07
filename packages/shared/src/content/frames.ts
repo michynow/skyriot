@@ -23,7 +23,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     fuelBurnPerSec: 0.22,
     fuelRegenPerSec: 0.12,
     rollImpulse: 120,
-    rollInvulnSec: 0.9,
+    rollInvulnSec: 1.1, // = ROLL_DURATION_SEC: invulnerable for the whole visible roll
     rollCooldownSec: 3,
     rollFuelCost: 0.12,
     deflectChance: 0.15,
@@ -89,7 +89,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     fuelBurnPerSec: 0.18,
     fuelRegenPerSec: 0.1,
     rollImpulse: 105,
-    rollInvulnSec: 0.9,
+    rollInvulnSec: 1.1, // = ROLL_DURATION_SEC: invulnerable for the whole visible roll
     rollCooldownSec: 3,
     rollFuelCost: 0.14,
     deflectChance: 0.1,
@@ -155,7 +155,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     fuelBurnPerSec: 0.2,
     fuelRegenPerSec: 0.12,
     rollImpulse: 110,
-    rollInvulnSec: 0.9,
+    rollInvulnSec: 1.1, // = ROLL_DURATION_SEC: invulnerable for the whole visible roll
     rollCooldownSec: 3,
     rollFuelCost: 0.14,
     deflectChance: 0.08,
@@ -221,7 +221,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     fuelBurnPerSec: 0.2,
     fuelRegenPerSec: 0.1,
     rollImpulse: 65,
-    rollInvulnSec: 0.9,
+    rollInvulnSec: 1.1, // = ROLL_DURATION_SEC: invulnerable for the whole visible roll
     rollCooldownSec: 3,
     rollFuelCost: 0.2,
     deflectChance: 0.03,
