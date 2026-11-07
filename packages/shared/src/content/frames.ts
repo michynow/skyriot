@@ -15,12 +15,12 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     name: 'Wasp',
     role: 'Agile fighter',
     ...engineStats('kestrel-jet'),
-    maxHp: 2000,
+    maxHp: 1800,
     maxShield: 800,
     shieldRegenPerSec: 35,
     shieldRegenDelaySec: 4,
-    strafeSpeed: 55,
-    verticalSpeed: 50,
+    strafeSpeed: 110,
+    verticalSpeed: 100,
     lateralTauSec: 0.07,
     slipTauSec: 0.05,
     fuelBurnPerSec: 0.22,
@@ -32,9 +32,9 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     deflectChance: 0.15,
     ammo1Max: 3600,
     ammo2Max: 320,
-    radarRangeM: 1600,
-    radarStdM: 1200,
-    radarAdvM: 1300,
+    radarRangeM: 2400,
+    radarStdM: 1800,
+    radarAdvM: 1950,
     radius: 4.4,
     halfLength: 6.0,
     canHover: false,
@@ -85,8 +85,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     maxShield: 900,
     shieldRegenPerSec: 40,
     shieldRegenDelaySec: 5,
-    strafeSpeed: 48,
-    verticalSpeed: 44,
+    strafeSpeed: 96,
+    verticalSpeed: 88,
     lateralTauSec: 0.09,
     slipTauSec: 0.1,
     fuelBurnPerSec: 0.18,
@@ -98,9 +98,9 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     deflectChance: 0.1,
     ammo1Max: 1500,
     ammo2Max: 100,
-    radarRangeM: 1300,
-    radarStdM: 950,
-    radarAdvM: 850,
+    radarRangeM: 1950,
+    radarStdM: 1420,
+    radarAdvM: 1280,
     radius: 7.2,
     halfLength: 10.0,
     canHover: false,
@@ -147,12 +147,12 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     name: 'Halo',
     role: 'Support',
     ...engineStats('lantern-drive'),
-    maxHp: 1400,
+    maxHp: 1700,
     maxShield: 600,
     shieldRegenPerSec: 25,
     shieldRegenDelaySec: 4,
-    strafeSpeed: 48,
-    verticalSpeed: 42,
+    strafeSpeed: 96,
+    verticalSpeed: 84,
     lateralTauSec: 0.12,
     slipTauSec: 0.1,
     fuelBurnPerSec: 0.2,
@@ -164,9 +164,9 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     deflectChance: 0.08,
     ammo1Max: 2400,
     ammo2Max: 320,
-    radarRangeM: 1800,
-    radarStdM: 1050,
-    radarAdvM: 1150,
+    radarRangeM: 2700,
+    radarStdM: 1580,
+    radarAdvM: 1720,
     radius: 5.6,
     halfLength: 7.0,
     canHover: false,
@@ -213,12 +213,12 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     name: 'Bulwark',
     role: 'Armored gunship',
     ...engineStats('crawler-rig'),
-    maxHp: 2750,
+    maxHp: 2950,
     maxShield: 900,
     shieldRegenPerSec: 35,
     shieldRegenDelaySec: 5,
-    strafeSpeed: 36,
-    verticalSpeed: 24,
+    strafeSpeed: 72,
+    verticalSpeed: 48,
     lateralTauSec: 0.08,
     slipTauSec: 0.08,
     fuelBurnPerSec: 0.2,
@@ -230,9 +230,9 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     deflectChance: 0.03,
     ammo1Max: 1800,
     ammo2Max: 192,
-    radarRangeM: 1400,
-    radarStdM: 1150,
-    radarAdvM: 1350,
+    radarRangeM: 2100,
+    radarStdM: 1720,
+    radarAdvM: 2020,
     radius: 6.8,
     halfLength: 8.0,
     canHover: true,
@@ -279,11 +279,13 @@ export const FRAMES: Record<FrameId, FrameDef> = {
 /** Bulwark Siege Mode multipliers. damageTakenMul = the built-in siege armour (takes 25% less damage). */
 export const SIEGE = {
   damageMul: 1.5,
+  /** Primary reattack runs this many times faster (Ground Siege outguns Air Siege). */
+  fireRateMul: 2.5,
   rangeMul: 1.4,
   turnRateMul: 0.6,
   damageTakenMul: 0.75,
   /** Primary rounds can't hit a Target closer than this (m). */
-  minRangeM: 70,
+  minRangeM: 100,
   /** After entering either Siege the Primary holds fire this long (s). */
   armSec: 0.5,
 };
@@ -291,6 +293,7 @@ export const SIEGE = {
 /** Airborne Siege Mode (hover-locked in place): weaker than grounded. */
 export const SIEGE_AIR = {
   damageMul: 1.15,
+  fireRateMul: 1.6,
   rangeMul: 1.15,
   turnRateMul: 0.7,
   lockConeMul: 1.4,
@@ -303,10 +306,10 @@ export const SIEGE_AIR = {
  * Terrain impact above `minSpeed` (m/s into the surface): with shield up the Ship bounces,
  * the shield is emptied and `bounceHpFrac` of max HP is lost; with no shield the Ship is destroyed.
  */
-export const TERRAIN_IMPACT = { minSpeed: 25, bounceHpFrac: 0.15, restitution: 0.6 };
+export const TERRAIN_IMPACT = { minSpeed: 50, bounceHpFrac: 0.15, restitution: 0.6 };
 
 /** Launch Deck behaviour. */
-export const DECK = { dockMaxSpeed: 40, resupplySec: 2, launchSpeed: 60 };
+export const DECK = { dockMaxSpeed: 60, resupplySec: 2, launchSpeed: 150 };
 
 export const RESPAWN_SEC = 5;
 
@@ -343,8 +346,8 @@ export const TARGETING = {
  * - homing missiles get `endgameTurnMul` turn rate inside `endgameDistM` so straight flight is not enough.
  */
 export const MISSILE_EVADE = {
-  rollBreakDistM: 140,
+  rollBreakDistM: 600,
   losBreakSec: 0.4,
-  endgameDistM: 150,
+  endgameDistM: 650,
   endgameTurnMul: 1.25,
 };

@@ -45,16 +45,16 @@ const ACE: BotSkill = {
   combatThrottle: 0.5,
   rollDodgeChance: 0.5,
   panicRollChance: 0,
-  rollWindowMinM: 15,
-  rollWindowMaxM: 130,
+  rollWindowMinM: 70,
+  rollWindowMaxM: 570,
   skillUseChance: 0.02,
   missileFireChance: 0.3,
   disengageChance: 0,
   turnBrake: true,
   pivotFlip: true,
   strafeGround: true,
-  standoffMinM: 60,
-  standoffMaxM: 180,
+  standoffMinM: 250,
+  standoffMaxM: 800,
 };
 const HOLD: BotSkill = { ...ACE, heatCap: 1.01 };
 const NO_KITS: BotSkill = { ...ACE, kits: false };
@@ -206,10 +206,10 @@ function duel(fa: FrameId, fb: FrameId, seed: number, sa: BotSkill, sb: BotSkill
   const sim = createSim(ARENA, { rapier: RAPIER, authoritative: true });
   // Vary the meeting point and angle with the seed; both start facing the centre ~900 m apart.
   const ang = seed * 2.399;
-  const cx = Math.cos(seed * 1.7) * 500,
-    cz = Math.sin(seed * 1.3) * 500;
-  const ox = Math.cos(ang) * 450,
-    oz = Math.sin(ang) * 450;
+  const cx = Math.cos(seed * 1.7) * 750,
+    cz = Math.sin(seed * 1.3) * 750;
+  const ox = Math.cos(ang) * 675,
+    oz = Math.sin(ang) * 675;
   const y = arenaY(cx, cz);
   const a = spawn(sim, arenaHf, ARENA, 'a', 'concord', fa, [cx - ox, y, cz - oz], sa, seed * 2 + 1);
   const b = spawn(sim, arenaHf, ARENA, 'b', 'vex', fb, [cx + ox, y, cz + oz], sb, seed * 2 + 2);
@@ -457,9 +457,9 @@ function siege(attackers: FrameId[], seed: number) {
     const id = `atk${n++}`;
     const a = (seed + n) * 2.399;
     const at: [number, number, number] = [
-      cx + Math.cos(a) * 850,
-      sampleHeight(flatHf, cx + Math.cos(a) * 850, cz + Math.sin(a) * 850) + 180,
-      cz + Math.sin(a) * 850,
+      cx + Math.cos(a) * 1275,
+      sampleHeight(flatHf, cx + Math.cos(a) * 1275, cz + Math.sin(a) * 1275) + 180,
+      cz + Math.sin(a) * 1275,
     ];
     const p = spawn(sim, flatHf, FLAT, id, 'vex', f, at, ACE, seed * 31 + n);
     tally.set(id, new Tally());

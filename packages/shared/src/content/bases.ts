@@ -17,7 +17,7 @@ export const STRUCTURE_ARMOR = { tracerMul: 0.2 };
 export const TURRET = {
   weapon: 'turret-flak',
   /** Barrel slew rate (rad/s): a Ship crossing fast at close range outruns it. */
-  turnRateRad: 1.1,
+  turnRateRad: 2.2,
   /** Fires only when the barrel is this close (rad) to the lead point. */
   fireConeRad: 0.06,
   /** Muzzle distance from the pivot (top of the turret), outside its own collider. */
@@ -53,7 +53,7 @@ export const FORMATION = {
 
 export const SHIELD_DOME = {
   /** Enemy Ship touching the dome is put back outside it with this outward speed. */
-  bounceSpeed: 60,
+  bounceSpeed: 150,
   marginM: 2,
 };
 

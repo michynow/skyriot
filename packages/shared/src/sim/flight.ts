@@ -14,8 +14,6 @@ import {
   CEILING_PITCH_DOWN,
   CEILING_PUSH_SPEED,
   CEILING_SOFT_M,
-  BOMBING_SPEED_MUL,
-  BOMBING_TURN_MUL,
   BOOST_BLEED_SEC,
   BOOST_MIN_FUEL,
   BOOST_MIN_SEC,
@@ -26,6 +24,7 @@ import {
   FLIP_TURN_RATE,
   FLOOR_CLEARANCE,
   GROUND_CLEARANCE_EXTRA,
+  GROUND_DRIVE_MUL,
   GROUND_MAX_SLOPE_RAD,
   GROUND_NORMAL_SAMPLE_M,
   GROUND_NORMAL_TAU_SEC,
@@ -74,6 +73,7 @@ const _move = { x: 0, y: 0, z: 0 };
 /** Siege damage/range/turn multipliers for the Ship's current Siege mode (grounded vs airborne). */
 export function siegeMods(s: ShipState): {
   damageMul: number;
+  fireRateMul: number;
   rangeMul: number;
   turnRateMul: number;
 } {
@@ -377,8 +377,7 @@ export function stepFlight(
         rec.mods.turnRateMul *
         (sieged ? siegeMods(s).turnRateMul : 1) *
         (grounded ? 1 : speedTurnMul(fd, s.speed)) *
-        (1 + (fd.boostTurnMul - 1) * ramp) *
-        (s.toggles.bombing ? BOMBING_TURN_MUL : 1);
+        (1 + (fd.boostTurnMul - 1) * ramp);
   const cosA = clamp(_f0[0]! * ax + _f0[1]! * ay + _f0[2]! * az, -1, 1);
   const angle = Math.acos(cosA);
   let cx = _f0[1]! * az - _f0[2]! * ay;
@@ -559,7 +558,7 @@ export function stepFlight(
         input.throttle >= 0
           ? input.throttle * fd.cruiseSpeed
           : input.throttle * fd.cruiseSpeed * GROUND_REVERSE_MUL;
-      target *= rec.mods.speedMul * rec.mods.groundSpeedMul;
+      target *= GROUND_DRIVE_MUL * rec.mods.speedMul * rec.mods.groundSpeedMul;
     }
     const delta = target - s.speed;
     const rate2 = (Math.abs(target) < Math.abs(s.speed) ? BRAKE_DECEL_MUL : 1) * accel;
@@ -619,7 +618,7 @@ export function stepFlight(
         ? fd.cruiseSpeed + (fd.maxSpeed - fd.cruiseSpeed) * input.throttle
         : fd.cruiseSpeed + (fd.cruiseSpeed - fd.minSpeed) * input.throttle;
     target = s.dashTicks > 0 ? fd.boostSpeed : target + (fd.boostSpeed - target) * ramp;
-    target *= rec.mods.speedMul * (s.toggles.bombing ? BOMBING_SPEED_MUL : 1);
+    target *= rec.mods.speedMul;
   }
   s.fuel = clamp(
     s.fuel + (boosting ? -fd.fuelBurnPerSec : fd.fuelRegenPerSec * rec.mods.fuelRegenMul) * dt,
@@ -732,7 +731,7 @@ export function stepFlight(
   }
 
   // ---- terrain impact: shield bounces, no shield destroys ----
-  const gentle = fd.canHover && speedMag < fd.cruiseSpeed;
+  const gentle = fd.canHover && speedMag < fd.cruiseSpeed * GROUND_DRIVE_MUL;
   if (lost > TERRAIN_IMPACT.minSpeed && !gentle) {
     // Surface normal = opposite of the removed motion.
     const ll = Math.hypot(lostX, lostY, lostZ);

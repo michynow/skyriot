@@ -14,7 +14,6 @@ import {
   BOMB_DROP_SPEED,
   BOMB_GRAVITY,
   BOMB_FORWARD_KICK,
-  BOMBING_REATTACK_MUL,
   AIR_BARRAGE_COUNT,
   OVERHEAT_COOL_MUL,
   TARGETING,
@@ -247,7 +246,7 @@ function siegeLockTest() {
           't',
           mk(seq, {
             aim: [1, Math.sin(seq / 6) * 0.6, Math.cos(seq / 9) * 0.5],
-            boost: seq % 40 < 15,
+            throttle: -1,
           }),
         ],
       ]),
@@ -494,11 +493,11 @@ function buffTests() {
   };
   const hotSlot = FRAMES.wasp.hotbar.indexOf('trim-tabs');
   const hotTicks = Math.ceil(SKILLS['trim-tabs']!.durationSec * TICK_HZ);
-  idle(1, { w: { hotbar: hotSlot } });
+  idle(1, { w: { hotbar: hotSlot, throttle: -1 } });
   const hotOn = w.buffs.some((b) => b.skill === 'trim-tabs');
-  idle(hotTicks - 1, { w: {} });
+  idle(hotTicks - 1, { w: { throttle: -1 } });
   const stillOn = w.buffs.length === 1;
-  idle(3, { w: {} });
+  idle(3, { w: { throttle: -1 } });
   const expired = w.buffs.length === 0;
   const cooldownRunning = w.cooldowns[hotSlot]! > 0;
   sim2.addShip('a', spawn('anvil'), [300, 600, 0]);
@@ -514,13 +513,13 @@ function buffTests() {
   const ev = sim2.step(new Map([['a', mk(1, { aim: [0, 0, -1], fire2: true })]]));
   for (const e of ev) if (e.type === 'projectileSpawned' && e.owner === 'a') spawnedRockets++;
   const barrage = spawnedRockets === AIR_BARRAGE_COUNT && before - a.ammo2 === AIR_BARRAGE_COUNT;
-  idle(Math.ceil(WEAPONS['brick-bomb']!.fireIntervalSec * BOMBING_REATTACK_MUL * 30) + 10, {
+  idle(Math.ceil(WEAPONS['brick-bomb']!.fireIntervalSec * 30) + 10, {
     a: {},
   });
   const gsSlot = FRAMES.anvil.hotbar.indexOf('ground-strike-mode');
   idle(1, { a: { hotbar: gsSlot } });
   const switched = a.toggles.bombing === 'ground-strike-mode' && a.cooldowns[gsSlot]! > 0;
-  idle(Math.ceil(WEAPONS['brick-bomb']!.fireIntervalSec * BOMBING_REATTACK_MUL * 30) + 10, {
+  idle(Math.ceil(WEAPONS['brick-bomb']!.fireIntervalSec * 30) + 10, {
     a: {},
   });
   // Ground Strike throws the bomb forward and down.
@@ -780,7 +779,15 @@ console.log('bulwark salvo lock:', JSON.stringify(salvoRes));
 
 // Anvil bombing modes: share of salvos that damage the Target, with a realistic aim error.
 // Air Barrage: a Wasp head-on from 600 m. Ground Strike: a grounded Bulwark, Anvil 120 m above.
+function biggest(ev: SimEvent[], t: ShipState): number {
+  let m = 0;
+  for (const e of ev)
+    if (e.type === 'hit' && e.victim === t.id) m = Math.max(m, e.damage / (t.maxHp + t.maxShield));
+  return m;
+}
+/** 0 = the salvo missed; else the biggest single round's damage over the Target's full HP + shield. */
 function barrageTrial(k: number): number {
+  let top = 0;
   // Head-on pass; the salvo is aimed at the Target's centre line with up to ~30 m error; the Target jinks.
   const { sim2, t, sh } = duel('anvil', 600, ((k % 7) - 3) * 10);
   t.pos[1] += ((k % 5) - 2) * 10;
@@ -796,13 +803,13 @@ function barrageTrial(k: number): number {
         ['sh', mk(i, { aim: [0, 0, -1], fire2: i === 3, target: null })],
       ]),
     );
-    hit = ev.some((e) => e.type === 'hit' && e.victim === 't' && e.damage > 0);
+    top = Math.max(top, biggest(ev, t));
+    hit = top > 0;
   }
-  // 2 = one salvo killed the Target from full HP + shield.
-  for (let i = 0; i < 60 && hit; i++) sim2.step(new Map([['t', mk(1000 + i, {})]]));
-  const dead = !sim2.getShip('t')!.alive;
+  for (let i = 0; i < 60 && hit; i++)
+    top = Math.max(top, biggest(sim2.step(new Map([['t', mk(1000 + i, {})]])), t));
   sim2.dispose();
-  return hit ? (dead ? 2 : 1) : 0;
+  return top;
 }
 function strikeTrial(k: number): number {
   const sim2 = fresh(true);
@@ -823,6 +830,7 @@ function strikeTrial(k: number): number {
   sh.rot[0] = sh.rot[1] = sh.rot[2] = 0;
   sh.rot[3] = 1;
   sim2.castSkill('sh', 'ground-strike-mode');
+  let top = 0;
   let hit = false,
     dropped = false;
   for (let i = 0; i < 400 && !hit; i++) {
@@ -840,22 +848,21 @@ function strikeTrial(k: number): number {
         ['sh', mk(i, { aim: [0, 0, -1], fire2: fire, target: null })],
       ]),
     );
-    hit = ev.some((e) => e.type === 'hit' && e.victim === 't' && e.damage > 0);
+    top = Math.max(top, biggest(ev, t));
+    hit = top > 0;
   }
-  // 2 = one salvo killed the Target from full HP + shield.
-  for (let i = 0; i < 60 && hit; i++) sim2.step(new Map([['t', mk(1000 + i, {})]]));
-  const dead = !sim2.getShip('t')!.alive;
+  for (let i = 0; i < 60 && hit; i++)
+    top = Math.max(top, biggest(sim2.step(new Map([['t', mk(1000 + i, {})]])), t));
   sim2.dispose();
-  return hit ? (dead ? 2 : 1) : 0;
+  return top;
 }
-const bombRes = { barrage: 0, strike: 0, barrageKills: 0, strikeKills: 0, of: 21 };
+const bombRes = { barrage: 0, strike: 0, biggestRound: 0, of: 21 };
 for (let k = 0; k < bombRes.of; k++) {
   const b = barrageTrial(k),
     st = strikeTrial(k);
   if (b) bombRes.barrage++;
-  if (b === 2) bombRes.barrageKills++;
   if (st) bombRes.strike++;
-  if (st === 2) bombRes.strikeKills++;
+  bombRes.biggestRound = Math.max(bombRes.biggestRound, b, st);
 }
 console.log('anvil bombing hit rate:', bombRes);
 
@@ -988,8 +995,8 @@ const sweep = (i: number): Partial<PilotInput> => ({
   hotbar: i === 3 ? 0 : -1, // afterburn-dash for wasp
 });
 const eq = {
-  flightRollBoostDash: prediction(false, 'wasp', [0, 600, 0], sweep),
-  edgeOverride: prediction(false, 'wasp', [1500, 500, 0], () => ({ aim: [1, 0, 0] })),
+  flightRollBoostDash: prediction(true, 'wasp', [0, 600, 0], sweep),
+  edgeOverride: prediction(true, 'wasp', [1500, 500, 0], () => ({ aim: [1, 0, 0] })),
   buffMovement: prediction(false, 'wasp', [0, 600, 0], (i) => ({
     ...sweep(i),
     hotbar: i === 3 ? 1 : i === 10 ? 2 : sweep(i).hotbar,
@@ -1019,14 +1026,14 @@ const eq = {
       })),
     ]),
   ),
-  bulwarkGround: prediction(false, 'bulwark', [0, sampleHeight(hf, 0, 0) + 30, 0], (i) => ({
+  bulwarkGround: prediction(true, 'bulwark', [0, sampleHeight(hf, 0, 0) + 30, 0], (i) => ({
     aim: [0.3, 0, -1],
     vertical: i < 100 ? -1 : i > 250 ? 1 : 0,
     throttle: i < 100 ? -1 : 1,
     hotbar: i === 150 || i === 200 ? 0 : -1,
     strafe: i % 40 < 10 ? 1 : 0,
   })),
-  gearArmorRadarEngine: prediction(false, 'wasp', [0, 600, 0], sweep, (s2) =>
+  gearArmorRadarEngine: prediction(true, 'wasp', [0, 600, 0], sweep, (s2) =>
     s2.setGear('p', {
       engine: gearItem('falcon-jet', 'engine', 2),
       armor: gearItem('dragonscale-plating', 'armor', 3),
@@ -1171,9 +1178,8 @@ check(travelOk, 'travel token sign/verify/tamper');
 check(
   bombRes.barrage >= bombRes.of * 0.8 &&
     bombRes.strike >= bombRes.of * 0.8 &&
-    bombRes.barrageKills >= bombRes.of * 0.5 &&
-    bombRes.strikeKills >= bombRes.of * 0.5,
-  'Anvil unlocked bombing salvos near the Target should mostly hit and one-hit kill: ' +
+    bombRes.biggestRound < 1,
+  'Anvil unlocked bombing salvos near the Target should mostly hit, no single round a kill: ' +
     JSON.stringify(bombRes),
 );
 check(

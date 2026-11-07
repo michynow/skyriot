@@ -27,7 +27,6 @@ import {
   BOMB_FORWARD_KICK,
   AIR_BARRAGE_RANGE_MUL,
   BOMB_RANGE_MUL,
-  BOMBING_REATTACK_MUL,
   BOMB_ARM_SEC,
   MISSILE_SALVO_SPREAD_RAD,
   GROUND_STRIKE_GROUND_MUL,
@@ -572,7 +571,8 @@ function stepPrimary(ctx: SimCtx, rec: ShipRec, w: WeaponDef, fire: boolean): vo
   }
   if (!fire || s.overheated || rec.fireCd[0] > 0 || s.ammo1 <= 0) return;
   if (s.sieged && rec.siegeArm > 0) return;
-  const interval = w.fireIntervalSec / rec.mods.fireRateMul;
+  const mods = s.sieged ? siegeMods(s) : null;
+  const interval = w.fireIntervalSec / rec.mods.fireRateMul / (mods ? mods.fireRateMul : 1);
   rec.fireCd[0] += interval;
   if (w.overheatSec > 0) {
     s.heat = Math.min(s.heat + interval / w.overheatSec, 1);
@@ -586,7 +586,6 @@ function stepPrimary(ctx: SimCtx, rec: ShipRec, w: WeaponDef, fire: boolean): vo
     dropBuffs(s, (e) => e.primaryShotMul !== undefined);
     rec.mods.primaryShotMul = 1;
   }
-  const mods = s.sieged ? siegeMods(s) : null;
   const range = w.rangeM * (mods ? mods.rangeMul : 1);
   const damage =
     w.damage * rec.mods.damageMul * rec.mods.primaryDamageMul * (mods ? mods.damageMul : 1);
@@ -688,7 +687,7 @@ function stepSecondary(
       if (mode && !armed) {
         // Bay still opening after the mode came on: no salvo yet.
       } else if (mode || w.validAngleDeg <= 0) {
-        rec.fireCd[1] += interval * (mode ? BOMBING_REATTACK_MUL : 1);
+        rec.fireCd[1] += interval;
         dropCloak(rec);
         fireLockless(ctx, rec, w, mode, rewind);
       } else {
@@ -799,12 +798,12 @@ function warn(ctx: SimCtx, attacker: ShipId, target: string, weapon: string, ids
   ctx.events.push({ type: 'missileIncoming', attacker, target, weapon, missiles: ids.slice() });
 }
 
-/** Old per-round share of the Secondary's damage vs Base structures, before the one-hit-kill bombing tune. */
+/** Per-round share of the Secondary's damage vs Base structures (kept from before the bombing-mode tunes). */
 const BOMBING_STRUCTURE_SHARE = 0.4;
 
 /**
- * Bombing-mode round: full damage anywhere inside its proximity-fuse radius (so a near miss still one-hits), and
- * structures take only BOMBING_STRUCTURE_SHARE of the Secondary's damage, as before the tune.
+ * Bombing-mode round: full damage anywhere inside its proximity-fuse radius (a near miss still counts), and
+ * structures take only BOMBING_STRUCTURE_SHARE of the Secondary's damage.
  */
 function bombingRound(p: Projectile, damageMul: number): void {
   p.core = p.splash * ROCKET_FUSE_FRAC;
@@ -1254,7 +1253,8 @@ export function stepProjectiles(ctx: SimCtx): void {
           continue;
         const fd = ctx.frames[os.frame];
         poseAt(ctx, o, testTick);
-        const fuse = p.kind === 'rocket' ? p.splash * ROCKET_FUSE_FRAC : 0;
+        // Shells too: at 560 m/s targets out-accelerate any straight lead, so the Bulwark salvo airbursts.
+        const fuse = p.kind === 'rocket' || p.kind === 'shell' ? p.splash * ROCKET_FUSE_FRAC : 0;
         const reach = fd.halfLength + PROJECTILE_RADIUS + step + fuse;
         if (
           Math.abs(_cx - p.x) > reach ||

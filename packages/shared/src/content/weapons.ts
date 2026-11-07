@@ -6,105 +6,105 @@ import type { SkillDef, WeaponDef, WeaponLook } from '../types';
 // Secondary: missiles fire 1 x 2 (two in series) inside a narrow Valid Angle; the Bulwark salvo is 2 x 2 straight
 // shells; Anvil bombs are lockless.
 export const WEAPONS: Record<string, WeaponDef> = {
-  'needle-cannon': w('needle-cannon', 'Needle Cannon', 'tracer', 24, 0.32, 900, 1100, 0.012, {
+  'needle-cannon': w('needle-cannon', 'Needle Cannon', 'tracer', 22, 0.32, 2250, 1650, 0.012, {
     ...gun(0.85, 4, 6),
   }),
-  'flak-repeater': w('flak-repeater', 'Flak Repeater', 'tracer', 32, 0.54, 650, 800, 0.03, {
+  'flak-repeater': w('flak-repeater', 'Flak Repeater', 'tracer', 32, 0.54, 1620, 1200, 0.03, {
     splashRadius: 4,
     ...gun(0.75, 3, 8),
   }),
-  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 34, 0.44, 800, 950, 0.015, {
+  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 40, 0.44, 2000, 1420, 0.015, {
     ...gun(0.8, 4, 6),
   }),
-  'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 29, 0.24, 750, 1000, 0.02, {
+  'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 32, 0.24, 1880, 1500, 0.02, {
     ...gun(0.85, 2, 8),
   }),
-  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 384, 1.6, 250, 1500, 0, {
+  'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 350, 1.6, 1100, 3000, 0, {
     look: look('thin', 'dart', 'flash', [2.6, 1.3, 0.2]),
     ...missile(6, 135),
     splashRadius: 5,
   }),
-  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 220, 1.6, 240, 1300, 0, {
+  'seeker-pod': w('seeker-pod', 'Seeker Pod', 'missile', 220, 1.6, 1060, 2600, 0, {
     look: look('ion', 'pod', 'shrapnel', [0.2, 1.6, 3]),
     ...missile(8, 145),
     splashRadius: 5,
   }),
-  'brick-bomb': w('brick-bomb', 'Brick Bomb', 'rocket', 520, 3.0, 140, 900, 0.01, {
+  'brick-bomb': w('brick-bomb', 'Brick Bomb', 'rocket', 520, 3.0, 1800, 1350, 0.01, {
     look: look('billow', 'bomb', 'fireball', [3, 0.9, 0.1]),
     splashRadius: 22,
   }),
-  'mortar-battery': w('mortar-battery', 'Mortar Battery', 'shell', 65, 2.6, 600, 1600, 0, {
+  'mortar-battery': w('mortar-battery', 'Mortar Battery', 'shell', 65, 2.6, 2400, 2400, 0, {
     look: look('arc', 'shell', 'plume', [1.8, 1.2, 0.4]),
     ...salvo(10),
-    splashRadius: 12,
+    splashRadius: 20,
   }),
   // ---- Shop variants (tiers 2–3); each sits in the line of the stock weapon above it ----
-  'quill-repeater': w('quill-repeater', 'Quill Repeater', 'tracer', 28, 0.304, 920, 1150, 0.012, {
+  'quill-repeater': w('quill-repeater', 'Quill Repeater', 'tracer', 26, 0.304, 2300, 1720, 0.012, {
     ...gun(0.87, 4, 6),
   }),
-  'lancet-cannon': w('lancet-cannon', 'Lancet Cannon', 'tracer', 30, 0.288, 950, 1200, 0.011, {
+  'lancet-cannon': w('lancet-cannon', 'Lancet Cannon', 'tracer', 28, 0.288, 2380, 1800, 0.011, {
     ...gun(0.9, 4, 6.5),
   }),
-  'burst-flak': w('burst-flak', 'Burst Flak', 'tracer', 36, 0.51, 660, 830, 0.03, {
+  'burst-flak': w('burst-flak', 'Burst Flak', 'tracer', 36, 0.51, 1650, 1240, 0.03, {
     splashRadius: 4.5,
     ...gun(0.77, 3, 8),
   }),
-  'thunder-flak': w('thunder-flak', 'Thunder Flak', 'tracer', 40, 0.48, 680, 860, 0.03, {
+  'thunder-flak': w('thunder-flak', 'Thunder Flak', 'tracer', 40, 0.48, 1700, 1290, 0.03, {
     splashRadius: 5,
     ...gun(0.8, 3, 8.5),
   }),
-  'arc-blaster': w('arc-blaster', 'Arc Blaster', 'tracer', 32, 0.42, 820, 980, 0.015, {
+  'arc-blaster': w('arc-blaster', 'Arc Blaster', 'tracer', 38, 0.42, 2050, 1470, 0.015, {
     ...gun(0.72, 4, 6),
   }),
-  'prism-blaster': w('prism-blaster', 'Prism Blaster', 'tracer', 34, 0.4, 840, 1010, 0.014, {
+  'prism-blaster': w('prism-blaster', 'Prism Blaster', 'tracer', 40, 0.4, 2100, 1520, 0.014, {
     ...gun(0.75, 4, 6.5),
   }),
-  'twin-hammer': w('twin-hammer', 'Twin Hammer', 'tracer', 32, 0.23, 760, 1030, 0.02, {
+  'twin-hammer': w('twin-hammer', 'Twin Hammer', 'tracer', 35, 0.23, 1900, 1540, 0.02, {
     ...gun(0.87, 2, 8),
   }),
-  'quad-autocannon': w('quad-autocannon', 'Quad Autocannon', 'tracer', 35, 0.22, 770, 1060, 0.02, {
+  'quad-autocannon': w('quad-autocannon', 'Quad Autocannon', 'tracer', 38, 0.22, 1920, 1590, 0.02, {
     ...gun(0.9, 2, 8.5),
   }),
-  'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 432, 1.6, 260, 1550, 0, {
+  'hornet-missile': w('hornet-missile', 'Hornet Missile', 'missile', 395, 1.6, 1140, 3100, 0, {
     look: look('thin', 'dart', 'flash', [3, 0.45, 0.15]),
     ...missile(5.5, 150),
     splashRadius: 5,
   }),
-  'talon-missile': w('talon-missile', 'Talon Missile', 'missile', 480, 1.6, 270, 1600, 0, {
+  'talon-missile': w('talon-missile', 'Talon Missile', 'missile', 440, 1.6, 1190, 3200, 0, {
     look: look('thin', 'dart', 'flash', [1.6, 2.6, 0.3]),
     ...missile(5, 160),
     splashRadius: 5.5,
   }),
-  'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 245, 1.6, 250, 1350, 0, {
+  'hound-pod': w('hound-pod', 'Hound Pod', 'missile', 245, 1.6, 1100, 2700, 0, {
     look: look('ion', 'pod', 'shrapnel', [1.6, 0.4, 3]),
     ...missile(7.5, 150),
     splashRadius: 5,
   }),
-  'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 275, 1.6, 260, 1400, 0, {
+  'warden-pod': w('warden-pod', 'Warden Pod', 'missile', 275, 1.6, 1140, 2800, 0, {
     look: look('ion', 'pod', 'shrapnel', [0.3, 3, 0.9]),
     ...missile(7, 155),
     splashRadius: 5.5,
   }),
-  'slab-bomb': w('slab-bomb', 'Slab Bomb', 'rocket', 590, 3.0, 145, 920, 0.01, {
+  'slab-bomb': w('slab-bomb', 'Slab Bomb', 'rocket', 590, 3.0, 1850, 1380, 0.01, {
     look: look('billow', 'bomb', 'fireball', [3, 0.2, 0.2]),
     splashRadius: 23,
   }),
-  'monolith-bomb': w('monolith-bomb', 'Monolith Bomb', 'rocket', 660, 3.0, 150, 950, 0.01, {
+  'monolith-bomb': w('monolith-bomb', 'Monolith Bomb', 'rocket', 660, 3.0, 1900, 1420, 0.01, {
     look: look('billow', 'bomb', 'fireball', [2.4, 0.2, 2.4]),
     splashRadius: 24,
   }),
-  'howler-battery': w('howler-battery', 'Howler Battery', 'shell', 75, 2.5, 615, 1650, 0, {
+  'howler-battery': w('howler-battery', 'Howler Battery', 'shell', 75, 2.5, 2460, 2480, 0, {
     look: look('arc', 'shell', 'plume', [1.2, 1.8, 0.4]),
     ...salvo(10.5),
-    splashRadius: 13,
+    splashRadius: 21,
   }),
-  'quake-battery': w('quake-battery', 'Quake Battery', 'shell', 85, 2.4, 630, 1700, 0, {
+  'quake-battery': w('quake-battery', 'Quake Battery', 'shell', 85, 2.4, 2530, 2550, 0, {
     look: look('arc', 'shell', 'plume', [1.9, 0.8, 0.4]),
     ...salvo(11),
-    splashRadius: 14,
+    splashRadius: 22,
   }),
   // Base Turret gun (not a Frame weapon).
-  'turret-flak': w('turret-flak', 'Turret Flak', 'tracer', 24, 0.2, 700, 950, 0.02, {
+  'turret-flak': w('turret-flak', 'Turret Flak', 'tracer', 24, 0.2, 1750, 1420, 0.02, {
     splashRadius: 5,
   }),
 };
@@ -421,7 +421,7 @@ export const SKILLS: Record<string, SkillDef> = {
   'siege-anchor': s(
     'siege-anchor',
     'Ground Siege',
-    'Landed only: anchor to the ground, first-person gunner view, Target lock. x1.5 damage, x1.4 range, 25% less damage taken.',
+    'Landed only: anchor to the ground, first-person gunner view, Target lock. Guns fire x2.5 as fast, x1.5 damage, x1.4 range, 25% less damage taken.',
     ['bulwark'],
     0.3,
     0,
@@ -429,7 +429,7 @@ export const SKILLS: Record<string, SkillDef> = {
   'air-siege': s(
     'air-siege',
     'Air Siege',
-    'Airborne only: brake and hover-lock in place, gunner view, Target lock. x1.15 damage and range, wider lock cone, 15% less damage taken.',
+    'Airborne only: brake and hover-lock in place, gunner view, Target lock. Guns fire x1.6 as fast, x1.15 damage and range, wider lock cone, 15% less damage taken.',
     ['bulwark'],
     0.3,
     0,

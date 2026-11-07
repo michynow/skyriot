@@ -24,12 +24,12 @@ export const FLOOR_CLEARANCE = 0.5;
 /** Hard clamp (last resort) sits this far inside the map edge. */
 export const BOUNDARY_MARGIN = 20;
 /** Steering override starts this far inside the map edge, blending to full over BOUNDARY_BLEND_M. */
-export const BOUNDARY_SOFT_M = 450;
-export const BOUNDARY_BLEND_M = 120;
+export const BOUNDARY_SOFT_M = 700;
+export const BOUNDARY_BLEND_M = 250;
 /** outOfBounds (HUD warning) is set this far before the override starts. */
-export const BOUNDARY_WARN_M = 200;
-export const CEILING_SOFT_M = 150;
-export const CEILING_PUSH_SPEED = 40;
+export const BOUNDARY_WARN_M = 300;
+export const CEILING_SOFT_M = 250;
+export const CEILING_PUSH_SPEED = 100;
 export const CEILING_PITCH_DOWN = 0.5;
 export const TIMESCALE_MIN = 0.05;
 export const TIMESCALE_MAX = 4;
@@ -57,7 +57,7 @@ export const SHIELD_KIT_FRACTION = 0.2;
 /** Pivot Flip: the steering aim is turned 180 degrees and turn rate is raised to this for the duration. */
 export const FLIP_TURN_RATE = 6.5;
 /** Backdraft: fly backwards at this fraction of boost speed, then resume at min speed. */
-export const REVERSE_SPEED_MUL = 0.7;
+export const REVERSE_SPEED_MUL = 0.4;
 /** Shroud Veil: enemies closer than this still see (and can lock) a veiled Ship. */
 export const CLOAK_REVEAL_M = 180;
 export const SNARE_RANGE = 450;
@@ -97,7 +97,7 @@ export const DECK_RESPAWN_SPREAD = 0.6;
 // Bulwark ground mode
 export const LAND_HEIGHT = 8;
 /** Landing autopilot (C): own Launch Deck must be within this horizontal range (m). */
-export const LAND_DECK_RANGE = 2000;
+export const LAND_DECK_RANGE = 3000;
 /** Approach speed per metre to the Deck (capped at cruise), height above the Deck until over it. */
 export const LAND_APPROACH_GAIN = 0.4;
 export const LAND_APPROACH_HEIGHT = 30;
@@ -107,6 +107,8 @@ export const LAND_DESCENT_GAIN = 1;
 export const LAND_HOLD_HEADING_MUL = 0.5;
 export const GROUND_CLEARANCE_EXTRA = 2;
 export const GROUND_STRAFE_MUL = 0.5;
+/** Grounded Bulwark drives at this fraction of its (air) cruise speed. */
+export const GROUND_DRIVE_MUL = 0.2;
 export const GROUND_REVERSE_MUL = 0.5;
 export const GROUND_MAX_SLOPE_RAD = (40 * Math.PI) / 180;
 export const GROUND_SLIDE_SPEED = 25;
@@ -121,7 +123,7 @@ export const SIEGE_LOCK_CONE_MUL = 2;
 export const SIEGE_GUN_BREAK_CONE_RAD = 0.5;
 /** Overcharge Round: the armed Primary shot flies this much farther. */
 export const CHARGED_SHOT_RANGE_MUL = 2;
-/** Rocket / bomb proximity fuse: bursts when a hull is within this fraction of the blast radius. */
+/** Rocket / bomb / shell proximity fuse: bursts when a hull is within this fraction of the blast radius. */
 export const ROCKET_FUSE_FRAC = 0.75;
 
 // Barrel Roll: displacement = rollImpulse * factor over ROLL_DURATION_SEC. Velocity curve p(1-p)^2: quick
@@ -133,41 +135,35 @@ export const ROLL_DISPLACEMENT_PER_IMPULSE = 0.25;
 export const AIR_BARRAGE_COUNT = 5;
 export const AIR_BARRAGE_SPREAD_RAD = 0.045;
 /** Air Barrage rockets burst wider than the plain bomb. */
-export const AIR_BARRAGE_SPLASH_MUL = 1.4;
+export const AIR_BARRAGE_SPLASH_MUL = 2.2;
 /**
- * Each of the salvo's rockets deals this multiple of the Secondary's damage. Bombing-mode rounds fan wide, so
- * usually one lands on a Target: each carries ~1.1x the sturdiest non-Bulwark Frame's HP + shield (Anvil 3550)
- * at the centre, falling off with splash. A one-hit kill on or near the Target.
+ * Each of the salvo's rockets deals this multiple of the Secondary's damage. No single rocket kills: the whole
+ * salvo landing (5 x ~730 = ~3640) takes most Frames from full HP + shield. Air Barrage outhits Ground Strike.
  */
-export const AIR_BARRAGE_DAMAGE_MUL = 7.5;
+export const AIR_BARRAGE_DAMAGE_MUL = 1.4;
 /** Wide Lock Mode: the Secondary's lock cone widens by this, its lock/fire range scales, and each salvo seeks up to N Ships. */
 export const WIDE_LOCK_CONE_ADD_RAD = 0.384; // ~22 degrees
 export const WIDE_LOCK_RANGE_MUL = 1.45;
 export const WIDE_LOCK_TARGETS = 3;
-export const WIDE_LOCK_HOMING_TURN = 2.4;
-/** Each guided rocket (one per Target) deals this multiple of the Secondary's damage: a one-hit kill. */
-export const WIDE_LOCK_DAMAGE_MUL = 7.5;
+export const WIDE_LOCK_HOMING_TURN = 3.5;
+/** Each guided rocket (one per Target) deals this multiple of the Secondary's damage (a heavy hit, not a kill). */
+export const WIDE_LOCK_DAMAGE_MUL = 1.5;
 export const GROUND_STRIKE_GROUND_MUL = 1.4;
 export const GROUND_STRIKE_SPLASH_MUL = 1.7;
-/** Ground Strike drops this many bombs, fanned sideways at +-this speed (m/s), each dealing this share. */
+/** Ground Strike drops this many bombs, fanned sideways at +-this speed (m/s), each dealing this multiple (3 x ~830). */
 export const GROUND_STRIKE_COUNT = 3;
-export const GROUND_STRIKE_SPREAD_MPS = 12;
-export const GROUND_STRIKE_DAMAGE_MUL = 7.5;
-/** A bombing-mode salvo one-hits, so its reattack is this much longer: a miss leaves the Anvil exposed. */
-export const BOMBING_REATTACK_MUL = 3;
-/** Counterplay: an Anvil with a bombing mode on flies slower and turns worse, so it can be caught and dodged. */
-export const BOMBING_SPEED_MUL = 0.8;
-export const BOMBING_TURN_MUL = 0.75;
+export const GROUND_STRIKE_SPREAD_MPS = 25;
+export const GROUND_STRIKE_DAMAGE_MUL = 1.6;
 /** Seconds after a bombing mode comes on before its first salvo can fire (the bay opening is the telegraph). */
 export const BOMB_ARM_SEC = 0.6;
-export const BOMB_DROP_SPEED = 20;
+export const BOMB_DROP_SPEED = 60;
 /** Ground strike: bombs leave with this extra horizontal forward speed, so they arc out ahead of the Ship. */
 export const BOMB_FORWARD_KICK = 100;
 /** Air barrage rockets reach this much further than the plain Secondary. */
 export const AIR_BARRAGE_RANGE_MUL = 1.3;
 /** Ground strike bombs fly this much further than the Secondary's range, so high drops still reach the ground. */
 export const BOMB_RANGE_MUL = 2.5;
-export const BOMB_GRAVITY = 30;
+export const BOMB_GRAVITY = 120;
 /** Side-by-side Secondary rounds of one volley are fanned this far apart. */
 export const MISSILE_SALVO_SPREAD_RAD = 0.05;
 export const PURGE_RADIUS = 120;
@@ -188,9 +184,9 @@ export const SEEKER_CONE_RAD = 0.6;
 /** Guidance only while the motor burns; afterwards the missile flies on dumb until its range runs out. */
 export const MISSILE_MOTOR_SEC = 5;
 /** Proximity fuse: a guided missile still tracking detonates this close to its target's hull (direct hit). */
-export const MISSILE_FUSE_M = 8;
+export const MISSILE_FUSE_M = 20;
 /**
  * A target pulling at least this lateral acceleration (speed * turn rate, m/s^2) while the missile is in its
  * endgame out-turns it. Wasp manages it at cruise, Halo needs throttle, Anvil/Bulwark only while boosting.
  */
-export const BREAK_TURN_ACCEL = 230;
+export const BREAK_TURN_ACCEL = 1030;

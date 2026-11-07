@@ -1,5 +1,6 @@
 import {
   BOMB_DROP_SPEED,
+  BOMB_FORWARD_KICK,
   BOMB_GRAVITY,
   CLOAK_REVEAL_M,
   EMPTY_INPUT,
@@ -48,8 +49,8 @@ export const BOT_SKILL = {
   /** Chance of a (wasted) Barrel Roll when an evasive jink starts after taking damage. */
   panicRollChance: 0.08,
   /** Missile distance window (m) a Bot tries to Barrel Roll in. */
-  rollWindowMinM: 30,
-  rollWindowMaxM: 80,
+  rollWindowMinM: 130,
+  rollWindowMaxM: 350,
   skillUseChance: 0.004,
   missileFireChance: 0.015,
   disengageChance: 0.5,
@@ -71,10 +72,10 @@ export type BotSkill = typeof BOT_SKILL;
 /** Anvil target pick: each point of the target's HP + shield costs this many metres of distance. */
 const ANVIL_TARGET_HEALTH_COST = 0.3;
 /** Anvil vs an air target: Air Barrage inside this range, Wide Lock (guided salvo) beyond it. */
-const BARRAGE_RANGE_M = 450;
+const BARRAGE_RANGE_M = 600;
 /** Anvil Secondary: rocket salvo cone, the guided salvo's minimum range, and its per-tick fire chance once locked. */
 const ROCKET_FIRE_CONE_RAD = 0.12;
-const WIDE_LOCK_MIN_M = 200;
+const WIDE_LOCK_MIN_M = 300;
 const WIDE_LOCK_FIRE_CHANCE = 0.06;
 /** Overcharge Round: armed only with the target this tight in the nose and inside Primary range. */
 const OVERCHARGE_CONE_RAD = 0.06;
@@ -83,32 +84,32 @@ const SIM_TURN_GAIN = 7;
 /** turnBrake: enemy this far off the nose (rad) = slow right down; pivotFlip: this far off and this close. */
 const TURN_BRAKE_RAD = 0.3;
 const FLIP_OFF_RAD = 2.2;
-const FLIP_MAX_M = 700;
+const FLIP_MAX_M = 1000;
 /** Hurt below this HP fraction, a Bot may break off and run for a while. */
 const DISENGAGE_HP_FRACTION = 0.35;
 const DISENGAGE_TICKS = 6 * TICK_HZ;
 /** Extra distance (m) a target costs per other Bot already on it: spreads Bots over targets. */
-const DOGPILE_PENALTY_M = 1000;
+const DOGPILE_PENALTY_M = 1500;
 
 // Bot tuning (module constants; no content/ equivalent yet).
 const AVOID_LOOKAHEAD_SEC = 2.2;
-const AVOID_MARGIN = 90;
+const AVOID_MARGIN = 120;
 const SINK_LOOKAHEAD_SEC = 0.8;
 const CRUISE_THROTTLE = 0.6;
 /** Below the engine's min speed times this, Bots go full throttle. */
 const SLOW_SPEED_MUL = 1.3;
 const CRUISE_ALTITUDE = 160;
-const FAR_BOOST_DISTANCE = 1200;
+const FAR_BOOST_DISTANCE = 1800;
 const DODGE_CHANCE = 0.3;
 const HEAL_HP_FRACTION = 0.4;
 /** Repair/Shield Kits (4 s cooldown): only when low, never back to back, so a Bot can still be finished. */
 const KIT_SHIELD_FRACTION = 0.2;
 const RESUPPLY_AMMO_FRACTION = 0.05;
 const DECK_APPROACH_HEIGHT = 20;
-const DECK_BRAKE_DISTANCE = 250;
-const BOT_EDGE_MARGIN = 600;
+const DECK_BRAKE_DISTANCE = 600;
+const BOT_EDGE_MARGIN = 1000;
 const SIEGE_SLOT = 0; // siege-anchor is hotbar slot 0 on the Bulwark
-const BUFF_ENGAGE_DIST = 900;
+const BUFF_ENGAGE_DIST = 1350;
 const BOMB_DROP_RADIUS = 60;
 /** Distance to the enemy under which a Bot fires each offensive Skill (roughly its effect reach). */
 const OFFENSIVE_REACH_M: Record<string, number> = {
@@ -131,19 +132,19 @@ const BREACH_HP_FRACTION = 0.2;
 const BREACH_REACH_M = 120;
 const BOMB_RUN_ALTITUDE = 120;
 const SIEGE_BOT_CHANCE = 0.5;
-const SIEGE_BOT_ENGAGE_DISTANCE = 700;
-const SIEGE_BOT_LEAVE_DISTANCE = 1100;
+const SIEGE_BOT_ENGAGE_DISTANCE = 1050;
+const SIEGE_BOT_LEAVE_DISTANCE = 1650;
 /** Enemy Ships closer than this are fought; otherwise the bot attacks the enemy Base. Raiders mostly ignore Ships. */
-const SHIP_ENGAGE_DISTANCE = 600;
-const RAIDER_ENGAGE_DISTANCE = 200;
+const SHIP_ENGAGE_DISTANCE = 900;
+const RAIDER_ENGAGE_DISTANCE = 300;
 const RAIDER_CHANCE = 0.5;
 const STRUCTURE_FIRE_CONE_RAD = 0.12;
 /** Steepest dive (as aim y) on a strafing run, the height above ground that ends it, and the climb-out. */
 const STRUCTURE_MAX_DIVE_DY = 0.35;
-const STRUCTURE_PULL_UP_M = 80;
+const STRUCTURE_PULL_UP_M = 120;
 const STRUCTURE_CLIMB_DY = 0.3;
-const STRUCTURE_BREAK_M = 250;
-const STRUCTURE_RUN_IN_M = 900;
+const STRUCTURE_BREAK_M = 400;
+const STRUCTURE_RUN_IN_M = 1350;
 const STRUCTURE_RUN_ALTITUDE = 150;
 
 export interface BotMemory {
@@ -318,9 +319,9 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   else if (dist < mem.skill.standoffMinM * standoff) mem.separating = true;
   if (enemy && mem.separating && !retreating) {
     const away = norm3(me.pos[0] - enemy.pos[0], 0, me.pos[2] - enemy.pos[2]);
-    tx = me.pos[0] + away[0] * 500;
+    tx = me.pos[0] + away[0] * 800;
     ty = Math.max(me.pos[1], enemy.pos[1]);
-    tz = me.pos[2] + away[2] * 500;
+    tz = me.pos[2] + away[2] * 800;
   }
   if (enemy && groundRun) {
     const hx = me.pos[0] - enemy.pos[0],
@@ -500,7 +501,13 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     const f = noseOf(me);
     const air = !enemy.grounded && !enemy.docked;
     if (mode === 'air-barrage-mode') {
-      const a = norm3(tx - me.pos[0], ty - me.pos[1], tz - me.pos[2]);
+      // At the enemy's lead point (the steering point may be a standoff run away from it).
+      const lead = Math.min(dist / secondary.speed, 2);
+      const a = norm3(
+        enemy.pos[0] + enemy.vel[0] * lead - me.pos[0],
+        enemy.pos[1] + enemy.vel[1] * lead - me.pos[1],
+        enemy.pos[2] + enemy.vel[2] * lead - me.pos[2],
+      );
       const cos = f[0] * a[0] + f[1] * a[1] + f[2] * a[2];
       input.fire2 = air && cos > Math.cos(ROCKET_FIRE_CONE_RAD) && dist < BARRAGE_RANGE_M + 100;
     } else if (mode === 'wide-lock-mode') {
@@ -704,9 +711,12 @@ function bombOnTarget(me: ShipState, gx: number, gy: number, gz: number): boolea
   if (h <= 0) return false;
   const vy = me.vel[1] - BOMB_DROP_SPEED;
   const t = (vy + Math.sqrt(vy * vy + 2 * BOMB_GRAVITY * h)) / BOMB_GRAVITY;
-  return (
-    Math.hypot(me.pos[0] + me.vel[0] * t - gx, me.pos[2] + me.vel[2] * t - gz) < BOMB_DROP_RADIUS
-  );
+  // The bomb also gets a level forward kick along the nose.
+  const f = noseOf(me);
+  const fl = Math.hypot(f[0], f[2]) || 1;
+  const vx = me.vel[0] + (f[0] / fl) * BOMB_FORWARD_KICK,
+    vz = me.vel[2] + (f[2] / fl) * BOMB_FORWARD_KICK;
+  return Math.hypot(me.pos[0] + vx * t - gx, me.pos[2] + vz * t - gz) < BOMB_DROP_RADIUS;
 }
 
 function pickObjective(sim: Sim, me: ShipState): StructureState | null {
@@ -788,7 +798,7 @@ function botMayCast(id: string, me: ShipState, dist: number): boolean {
       return me.hp < me.maxHp * HEAL_HP_FRACTION;
     case 'shroud-veil':
       // Stealth is for closing in, not mid-dogfight (firing ends it).
-      return dist > 400;
+      return dist > 600;
     default:
       return true;
   }
