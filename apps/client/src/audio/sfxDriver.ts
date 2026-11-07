@@ -129,6 +129,11 @@ export function handleAudioEvent(ev: SimEvent): void {
       break;
     case 'skillUsed':
       if (ev.id === own) playSfx(skillSfx(ev.skill), { pitch: 0.85 + (hash(ev.skill) % 7) / 20 });
+      else if (SKILLS[ev.skill]?.toggleGroup === 'bombing') {
+        // Telegraph: an Anvil opening its bomb bay is heard nearby.
+        const s = world.ships.get(ev.id);
+        if (s) playSfx('skill-toggle', { pos: s.pos as Vec3, volume: 0.9, pitch: 0.7 });
+      }
       break;
     case 'barrelRoll': {
       const s = world.ships.get(ev.id);

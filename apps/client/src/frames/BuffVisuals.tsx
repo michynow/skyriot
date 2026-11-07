@@ -159,6 +159,18 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
   const ghosts = useRef<(THREE.Group | null)[]>([]);
   const calib = useRef<THREE.Group>(null);
   const doors = useRef<(THREE.Group | null)[]>([]);
+  const bayGlow = useRef<THREE.Mesh>(null);
+  const bayGlowMat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: '#ff7a1a',
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+        toneMapped: false,
+      }),
+    [],
+  );
   const rings = useRef<(THREE.Mesh | null)[]>([]);
   const st = useRef({
     plate: 0,
@@ -238,9 +250,13 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       plate.current.position.y = (1 - s.plate) * 0.5;
     }
 
-    // Anvil bay doors: open for Ground Strike
-    const ground = ship.toggles?.bombing === 'ground-strike-mode';
-    s.bay += ((ground ? 1 : 0) - s.bay) * (1 - Math.exp(-5 * dt));
+    // Anvil bay doors: open in any bombing mode, with a pulsing hot glow inside (the telegraph enemies watch for)
+    const bombing = !!ship.toggles?.bombing;
+    s.bay += ((bombing ? 1 : 0) - s.bay) * (1 - Math.exp(-5 * dt));
+    if (bayGlow.current) {
+      bayGlow.current.visible = s.bay > 0.02;
+      bayGlowMat.opacity = s.bay * (0.55 + 0.35 * Math.sin(s.t * 9));
+    }
     for (let i = 0; i < 2; i++) {
       const g = doors.current[i];
       if (!g) continue;
@@ -367,6 +383,11 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
             </mesh>
           </group>
         ))}
+      {frame === 'anvil' && (
+        <mesh ref={bayGlow} material={bayGlowMat} position={[0, -1.05, 0.9]} visible={false}>
+          <boxGeometry args={[1.5, 0.04, 3.2]} />
+        </mesh>
+      )}
     </>
   );
 }
