@@ -27,6 +27,7 @@ import {
   BOMB_FORWARD_KICK,
   AIR_BARRAGE_RANGE_MUL,
   BOMB_RANGE_MUL,
+  BOMBING_REATTACK_MUL,
   MISSILE_SALVO_SPREAD_RAD,
   GROUND_STRIKE_GROUND_MUL,
   GROUND_STRIKE_SPLASH_MUL,
@@ -669,7 +670,7 @@ function stepSecondary(
     if (fire && rec.fireCd[1] <= 0 && s.ammo2 > 0) {
       const mode = s.toggles.bombing;
       if (mode || w.validAngleDeg <= 0) {
-        rec.fireCd[1] += interval;
+        rec.fireCd[1] += interval * (mode ? BOMBING_REATTACK_MUL : 1);
         dropCloak(rec);
         fireLockless(ctx, rec, w, mode, rewind);
       } else {

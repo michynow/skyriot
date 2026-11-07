@@ -153,6 +153,8 @@ export const GROUND_STRIKE_SPLASH_MUL = 1.7;
 export const GROUND_STRIKE_COUNT = 3;
 export const GROUND_STRIKE_SPREAD_MPS = 12;
 export const GROUND_STRIKE_DAMAGE_MUL = 7.5;
+/** A bombing-mode salvo one-hits, so its reattack is this much longer: a miss leaves the Anvil exposed. */
+export const BOMBING_REATTACK_MUL = 3;
 export const BOMB_DROP_SPEED = 20;
 /** Ground strike: bombs leave with this extra horizontal forward speed, so they arc out ahead of the Ship. */
 export const BOMB_FORWARD_KICK = 100;
