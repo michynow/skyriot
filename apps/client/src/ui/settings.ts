@@ -42,11 +42,13 @@ interface AudioPrefs {
   muted: boolean;
 }
 function loadAudio(): AudioPrefs {
-  const d: AudioPrefs = { master: 0.8, sfx: 0.9, music: 0.6, muted: false };
+  const d: AudioPrefs = { master: 0.8, sfx: 0.5, music: 0.7, muted: false };
   try {
     const v = JSON.parse(localStorage.getItem(AUDIO_KEY) ?? '{}');
     for (const k of ['master', 'sfx', 'music'] as const)
       if (typeof v[k] === 'number') d[k] = Math.min(1, Math.max(0, v[k]));
+    // Untouched old defaults (0.8/0.9/0.6) move to the new mix; anything the player set stays.
+    if (v.master === 0.8 && v.sfx === 0.9 && v.music === 0.6) ((d.sfx = 0.5), (d.music = 0.7));
     d.muted = v.muted === true;
   } catch {
     /* ignore */

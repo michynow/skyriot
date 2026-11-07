@@ -1,6 +1,6 @@
 import type { Vec3, Quat } from '@skyriot/shared';
 import { useSettings } from '../ui/settings';
-import { AGENT_MUTE } from './music';
+import { AGENT_MUTE, MUSIC_GAIN, music } from './music';
 
 export { music } from './music';
 
@@ -56,6 +56,7 @@ export interface LoopHandle {
 const VOICE_CAP = 32;
 const LOOP_CAP = 14;
 const MAX_DISTANCE = 2000;
+const DUCKS = new Set<SfxName>(['explosion', 'boom', 'destroyed']);
 
 let ac: AudioContext | null = null;
 let master: GainNode;
@@ -317,6 +318,10 @@ function applyVolumes() {
   const t = ac.currentTime;
   master.gain.setTargetAtTime(s.muted ? 0 : s.master, t, 0.05);
   sfxBus.gain.setTargetAtTime(s.sfx, t, 0.05);
+  if (import.meta.env.DEV)
+    console.debug(
+      `[mix] master ${s.muted ? 0 : s.master} sfxBus ${s.sfx} musicEl ${(s.muted ? 0 : s.master * s.music * MUSIC_GAIN).toFixed(3)}`,
+    );
 }
 
 /** Create/resume the AudioContext. Must be called from a user gesture (LAUNCH click / first lobby press). */
@@ -332,14 +337,14 @@ export function initAudio(): void {
     }
     master = ac.createGain();
     const comp = ac.createDynamicsCompressor();
-    comp.threshold.value = -16;
-    comp.knee.value = 12;
-    comp.ratio.value = 10;
+    comp.threshold.value = -18;
+    comp.knee.value = 10;
+    comp.ratio.value = 8;
     comp.attack.value = 0.003;
     comp.release.value = 0.2;
-    master.connect(comp).connect(ac.destination);
+    master.connect(ac.destination);
     sfxBus = ac.createGain();
-    sfxBus.connect(master);
+    sfxBus.connect(comp).connect(master); // SFX-only bus compressor; music (HTMLAudio) bypasses it
     const conv = ac.createConvolver();
     conv.buffer = makeReverbIr(ac);
     reverb = ac.createGain();
@@ -419,6 +424,7 @@ export function playSfx(name: SfxName, opts: SfxOpts = {}): void {
   const recipe = RECIPES[name];
   if (!recipe) return;
   if (opts.pos && distToListener(opts.pos) > MAX_DISTANCE) return;
+  if (DUCKS.has(name)) music.duck();
   if (!allowed(name, name.startsWith('fire-') ? 5 : name.startsWith('hit-') ? 4 : 3, now)) return;
   voices = voices.filter((v) => v.end > now);
   if (voices.length >= VOICE_CAP) {
@@ -498,17 +504,17 @@ export function startLoop(name: LoopName, pos?: Vec3): LoopHandle | null {
   };
   let base = 1;
   if (name === 'engine') {
-    mkOsc('sawtooth', 55, 0.28, 500);
-    mkOsc('square', 82.5, 0.12, 400);
-    mkNoise('lowpass', 300, 0.7, 0.25);
+    mkOsc('sawtooth', 55, 0.18, 500);
+    mkOsc('square', 82.5, 0.07, 400);
+    mkNoise('lowpass', 300, 0.7, 0.15);
   } else if (name === 'afterburner') {
-    mkNoise('bandpass', 500, 0.6, 0.9);
-    mkNoise('highpass', 2500, 0.5, 0.25);
-    mkOsc('sawtooth', 70, 0.35, 600);
+    mkNoise('bandpass', 500, 0.6, 0.5);
+    mkNoise('highpass', 2500, 0.5, 0.12);
+    mkOsc('sawtooth', 70, 0.2, 600);
     base = 1;
   } else if (name === 'missile-hiss') {
-    mkNoise('bandpass', 3000, 1.2, 0.7);
-    mkNoise('lowpass', 500, 0.7, 0.4);
+    mkNoise('bandpass', 3000, 1.2, 0.45);
+    mkNoise('lowpass', 500, 0.7, 0.25);
   } else {
     mkOsc('sine', 1400, 0.4, 5000);
   }
@@ -518,7 +524,7 @@ export function startLoop(name: LoopName, pos?: Vec3): LoopHandle | null {
     update(o) {
       if (stopped) return;
       const t = c.currentTime;
-      if (o.gain !== undefined) g.gain.setTargetAtTime(o.gain * base, t, 0.08);
+      if (o.gain !== undefined) g.gain.setTargetAtTime(o.gain * base, t, 0.25);
       if (o.rate !== undefined)
         for (const f of freqTargets) f.p.setTargetAtTime(f.base * o.rate, t, 0.1);
       if (o.pos && panner) {
