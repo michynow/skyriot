@@ -1,4 +1,5 @@
 import type {
+  FrameDef,
   MapDef,
   MatchState,
   NationId,
@@ -33,6 +34,13 @@ export interface Sim {
    * addShip; removeShip clears it. Server and client prediction must pass the same gear.
    */
   setGear(id: ShipId, gear: ShipGear): void;
+  /**
+   * Consumable charges the Pilot holds (`chargesOf(profile)`); a Consumable with 0 can't be cast. Kept by id like
+   * gear. Never set = unlimited (Bots). The authoritative sim spends one per cast; the server then resends.
+   */
+  setCharges(id: ShipId, charges: Record<SkillId, number>): void;
+  /** A Ship's effective FrameDef (tuned Frame + gear): radar ranges, max HP, hotbar layout. */
+  frameDef(id: ShipId): FrameDef | undefined;
   /**
    * Advance exactly one tick. Missing input for a Ship = EMPTY_INPUT. Ships in `frozen` skip their own
    * logic this tick (a human whose input is late: stays in lockstep with client prediction).
@@ -84,6 +92,7 @@ export interface SimOptions {
 }
 
 export { createSim } from './createSim';
+export { chargesOf, sanitizeHotbar, DEFENCE_CAP } from './gear';
 export { isCloaked } from './buffs';
 // Skill area sizes the client draws.
 export {

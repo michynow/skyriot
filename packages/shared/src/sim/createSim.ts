@@ -12,6 +12,7 @@ import {
   type ShipSpawn,
   type ShipState,
   type SimEvent,
+  type SkillId,
   type StructureKind,
   type Vec3,
 } from '../types';
@@ -128,6 +129,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
   const discard: SimEvent[] = [];
   /** Equipped gear per Ship id; kept across addShip so it can be set before the Ship exists (client). */
   const gears = new Map<ShipId, ShipGear>();
+  /** Consumable charges per Ship id, kept like `gears`. */
+  const chargeMap = new Map<ShipId, Record<SkillId, number>>();
 
   /** Lay the Ship's gear over its tuned Frame; gearless Ships share the Frame record. */
   function applyGear(rec: ShipRec): void {
@@ -145,10 +148,51 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     const rec = ctx.ships.get(id);
     if (!rec) return;
     const resolved = resolveGear(rec.state.frame, gear);
+    const oldBar = rec.fd.hotbar;
     rec.gear = resolved;
-    rec.state.tier = resolved.tier;
-    rec.state.upgrade = resolved.upgrade;
+    const s = rec.state;
+    s.tier = resolved.tier;
+    s.upgrade = resolved.upgrade;
+    s.cosmetic = resolved.cosmetic;
     applyGear(rec);
+    if (rec.fd.hotbar !== oldBar) remapCooldowns(rec, oldBar);
+    // Max HP / shield change at once, keeping the fraction (resolveMods keeps max HP in line each tick after).
+    const maxHp = rec.fd.maxHp * rec.mods.maxHpMul;
+    if (s.alive && s.maxHp !== maxHp) {
+      s.hp = Math.max((s.hp * maxHp) / s.maxHp, 1);
+      s.maxHp = maxHp;
+    }
+    if (s.alive && s.maxShield !== rec.fd.maxShield) {
+      s.shield = s.maxShield > 0 ? (s.shield * rec.fd.maxShield) / s.maxShield : rec.fd.maxShield;
+      s.maxShield = rec.fd.maxShield;
+    }
+  }
+
+  /** Cooldowns follow the Skill, not the slot: a moved Skill keeps its running cooldown, a removed one is parked. */
+  function remapCooldowns(rec: ShipRec, oldBar: readonly (SkillId | null)[]): void {
+    const s = rec.state;
+    const bar = rec.fd.hotbar;
+    const left = new Map<SkillId, number>();
+    oldBar.forEach((id, i) => {
+      if (id && s.cooldowns[i]! > 0) left.set(id, s.cooldowns[i]!);
+    });
+    for (const [id, cd] of left) if (!bar.includes(id)) rec.parked.set(id, ctx.tick + cd);
+    s.cooldowns.length = bar.length;
+    bar.forEach((id, i) => {
+      let cd = id ? (left.get(id) ?? 0) : 0;
+      const ready = id ? rec.parked.get(id) : undefined;
+      if (ready !== undefined) {
+        cd = Math.max(cd, ready - ctx.tick);
+        rec.parked.delete(id!);
+      }
+      s.cooldowns[i] = cd;
+    });
+  }
+
+  function setCharges(id: ShipId, charges: Record<SkillId, number>): void {
+    chargeMap.set(id, charges);
+    const rec = ctx.ships.get(id);
+    if (rec) rec.charges = { ...charges };
   }
 
   function refreshFrames(): void {
@@ -319,6 +363,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       state,
       fd,
       gear: null,
+      charges: chargeMap.has(id) ? { ...chargeMap.get(id)! } : null,
+      parked: new Map(),
       body,
       collider,
       lat: [0, 0, 0],
@@ -366,6 +412,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     ctx.recList.splice(ctx.recList.indexOf(rec), 1);
     tuning.god.delete(id);
     gears.delete(id);
+    chargeMap.delete(id);
   }
 
   /** Full vitals, then into the Launch Queue (or, for Bots at a Battle start, straight into formation). */
@@ -422,6 +469,8 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     addShip,
     removeShip,
     setGear,
+    setCharges,
+    frameDef: (id) => ctx.ships.get(id)?.fd,
 
     step(inputs, frozen) {
       const events: SimEvent[] = pending;

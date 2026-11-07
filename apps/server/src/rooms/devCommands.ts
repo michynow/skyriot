@@ -1,4 +1,15 @@
-import { SKILLS, type NationId, type Sim, type ShipId, type StructureKind } from '@skyriot/shared';
+import {
+  CHARMS,
+  ITEMS,
+  SKILLS,
+  type NationId,
+  type Rarity,
+  type Sim,
+  type ShipId,
+  type StructureKind,
+} from '@skyriot/shared';
+
+const RARITIES: Rarity[] = ['standard', 'tuned', 'custom', 'prototype', 'relic'];
 
 const NATION_IDS: NationId[] = ['concord', 'vex'];
 const STRUCTURE_KINDS: Record<string, StructureKind> = {
@@ -12,6 +23,12 @@ export interface DevHost {
   setBotsPerNation(n: number): number;
   /** Add to the caller's wallet (negative takes away). False if they have no profile. */
   grant(credits: number, scrap: number): boolean;
+  /** New item into the caller's Bag. False if the Bag is full. */
+  give(def: string, opts: { rarity?: Rarity; upgrade?: number; count?: number }): boolean;
+  /** Give a Charm and equip it in the first free Charm slot (activates it). Error line or null. */
+  equipCharm(def: string): string | null;
+  /** Set every activated Charm's time left; returns how many. 0 expires them now. */
+  charmTime(ms: number): number;
 }
 
 const STUB_M2 = 'stored (M2 persistence)';
@@ -67,7 +84,7 @@ export function runDevCommand(host: DevHost, shipId: ShipId, line: string): stri
       if (!me || !SKILLS[skill]) return 'usage: /cast <skill-id> (any Skill of your Frame kit)';
       return sim.castSkill(shipId, skill)
         ? `cast ${SKILLS[skill]!.name}`
-        : `can't cast ${skill} (not in the ${me.frame} kit, or dead)`;
+        : `can't cast ${skill} (not in the ${me.frame} kit, none left, or dead)`;
     }
     case 'credits': {
       const credits = Number(args[0]);
@@ -76,6 +93,29 @@ export function runDevCommand(host: DevHost, shipId: ShipId, line: string): stri
         return 'usage: /credits <n> [scrap]';
       return host.grant(credits, scrap) ? `+${credits} credits, +${scrap} scrap` : 'no profile';
     }
+    case 'give': {
+      // /give <def> [rarity] [+N] [count], extra args in any order
+      const def = args[0] ?? '';
+      if (!ITEMS[def]) return 'usage: /give <item-def> [rarity] [+N] [count]';
+      const opts: { rarity?: Rarity; upgrade?: number; count?: number } = {};
+      for (const a of args.slice(1)) {
+        if (RARITIES.includes(a as Rarity)) opts.rarity = a as Rarity;
+        else if (/^\+\d+$/.test(a)) opts.upgrade = Number(a.slice(1));
+        else if (/^\d+$/.test(a)) opts.count = Number(a);
+        else return `bad /give arg: ${a}`;
+      }
+      return host.give(def, opts) ? `gave ${ITEMS[def]!.name}` : 'bag full';
+    }
+    case 'charm': {
+      const def = args[0] ?? '';
+      if (!CHARMS[def]) return 'usage: /charm <charm-def> (e.g. ledger-charm-1h)';
+      return host.equipCharm(def) ?? `equipped ${ITEMS[def]?.name ?? def}`;
+    }
+    case 'charmtime': {
+      const ms = Number(args[0]);
+      if (!Number.isFinite(ms) || ms < 0) return 'usage: /charmtime <ms>';
+      return `${host.charmTime(Math.round(ms))} Charm(s) set to ${Math.round(ms)} ms`;
+    }
     case 'level':
     case 'glory':
     case 'spawn':
@@ -83,7 +123,7 @@ export function runDevCommand(host: DevHost, shipId: ShipId, line: string): stri
     case 'event':
       return 'events: not yet implemented';
     case 'help':
-      return '/god, /bots <n>, /credits <n> [scrap], /timescale <x>, /cast <skill>, /tp <x> <y> <z>, /base <nation> <stations|core|turrets>, /battle end <winner>, /level <n>, /glory <n>, /spawn <item> [+n], /event start <type>, /help';
+      return '/god, /bots <n>, /credits <n> [scrap], /timescale <x>, /cast <skill>, /tp <x> <y> <z>, /base <nation> <stations|core|turrets>, /battle end <winner>, /give <item> [rarity] [+N] [count], /charm <charm>, /charmtime <ms>, /level <n>, /glory <n>, /event start <type>, /help';
     default:
       return `unknown command: /${cmd} (try /help)`;
   }

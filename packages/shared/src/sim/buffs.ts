@@ -92,7 +92,7 @@ export function resolveMods(ctx: SimCtx, rec: ShipRec): void {
     m.missileBlind ||= e.missileBlind === true;
   }
   if (!s.alive) return;
-  const target = ctx.frames[s.frame].maxHp * m.maxHpMul;
+  const target = rec.fd.maxHp * m.maxHpMul;
   if (Math.abs(target - s.maxHp) > 1e-6) {
     // Keep the HP fraction when max HP rises or reverts.
     s.hp = Math.max((s.hp * target) / s.maxHp, 1);

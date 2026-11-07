@@ -8,8 +8,10 @@ import {
   MAX_SHIPS_PER_INSTANCE,
   MSG,
   RUSTWATER_CANYONS,
+  SKILLS,
   SNAPSHOT_HZ,
   TICK_HZ,
+  chargesOf,
   createSim,
   gearOf,
   generateHeightfield,
@@ -32,7 +34,21 @@ import {
   type Welcome,
 } from '@skyriot/shared';
 import { botBrain, createBotMemory, type BotMemory } from '../bots/botBrain';
-import { awardKill, buy, canTrade, equip, upgrade } from '../economy';
+import {
+  awardKill,
+  buy,
+  canTrade,
+  chooseMod,
+  discard,
+  equip,
+  giveItem,
+  moveItem,
+  sell,
+  setHotbar,
+  spendConsumable,
+  upgrade,
+} from '../economy';
+import { tickCharms } from '../charms';
 import { loadProfile, saveProfile } from '../profiles';
 import { runDevCommand } from './devCommands';
 import { packShared, snapshotFrame } from './snapshotFrame';
@@ -51,6 +67,7 @@ const SLOW_TICK_MS = 8;
 const SLOW_LOG_INTERVAL_MS = 5000;
 const MAX_NAME_LENGTH = 16;
 const PROFILE_FLUSH_MS = 60_000;
+const CHARM_TICK_MS = 60_000;
 const NATIONS: NationId[] = ['concord', 'vex'];
 const FRAME_IDS = Object.keys(FRAMES) as FrameId[];
 /** Arrivals appear this far past the Gate's rim, toward the map centre, so they don't fly straight back. */
@@ -92,6 +109,8 @@ export class MapRoom extends Room {
   private stepInputs = new Map<ShipId, PilotInput>();
   /** Live Pilot profile per human Ship. Mutate in place, then send MSG.profile; saved on leave + every 60 s. */
   private profiles = new Map<ShipId, PilotProfile>();
+  /** Wall time each Pilot's Charms were last ticked (logged-in time only). */
+  private charmTick = new Map<ShipId, number>();
 
   onCreate(options: { mapId?: string }) {
     this.map = MAPS[options.mapId ?? ''] ?? RUSTWATER_CANYONS;
@@ -129,6 +148,38 @@ export class MapRoom extends Room {
             this.sendProfile(client.sessionId);
             return true;
           },
+          give: (def, opts) => {
+            const p = this.profiles.get(client.sessionId);
+            if (!p || !giveItem(p, def, opts)) return false;
+            this.sendProfile(client.sessionId);
+            return true;
+          },
+          equipCharm: (def) => {
+            const p = this.profiles.get(client.sessionId);
+            if (!p || !giveItem(p, def)) return 'bag full or unknown Charm';
+            const item = p.items.filter((i) => i.def === def).pop()!;
+            const slot = p.charms.findIndex((c) => c === null);
+            const err = equip(
+              p,
+              { frame: 'wasp', slot: `charm${slot < 0 ? 0 : slot}`, item: item.id },
+              { city: true, docked: true },
+            );
+            this.sendProfile(client.sessionId);
+            return err;
+          },
+          charmTime: (ms) => {
+            const p = this.profiles.get(client.sessionId);
+            if (!p) return 0;
+            let n = 0;
+            for (const i of p.items)
+              if (i.kind === 'charm' && i.msLeft !== undefined) {
+                i.msLeft = ms;
+                n++;
+              }
+            this.tickCharmsOf(client.sessionId, 0);
+            this.sendProfile(client.sessionId);
+            return n;
+          },
         },
         client.sessionId,
         text,
@@ -136,16 +187,33 @@ export class MapRoom extends Room {
       client.send(MSG.console, { text: reply });
     });
 
-    for (const [type, handler] of [
-      [MSG.buy, buy],
-      [MSG.upgrade, upgrade],
-      [MSG.equip, equip],
-    ] as const) {
+    type Handler = (p: PilotProfile, raw: unknown, id: ShipId) => string | null;
+    const vendor =
+      (fn: (p: PilotProfile, raw: unknown) => string | null): Handler =>
+      (p, raw) =>
+        canTrade(this.map) ? fn(p, raw) : 'Vendor only in a City';
+    const handlers: [string, Handler][] = [
+      [MSG.buy, vendor(buy)],
+      [MSG.upgrade, vendor(upgrade)],
+      [MSG.sell, vendor(sell)],
+      [MSG.discard, discard],
+      [MSG.moveItem, moveItem],
+      [MSG.hotbar, setHotbar],
+      [MSG.chooseMod, chooseMod],
+      [
+        MSG.equip,
+        (p, raw, id) =>
+          equip(p, raw, {
+            city: this.map.city !== undefined,
+            docked: this.sim.getShip(id)?.docked === true,
+          }),
+      ],
+    ];
+    for (const [type, handler] of handlers) {
       this.onMessage(type, (client, raw: unknown) => {
         const profile = this.profiles.get(client.sessionId);
         if (!profile) return;
-        if (!canTrade(this.map)) return client.send(MSG.console, { text: 'trade only in a city' });
-        const error = handler(profile, raw);
+        const error = handler(profile, raw, client.sessionId);
         if (error) return client.send(MSG.console, { text: error });
         this.sendProfile(client.sessionId);
       });
@@ -153,6 +221,9 @@ export class MapRoom extends Room {
 
     this.setSimulationInterval((deltaMs) => this.loop(deltaMs), LOOP_INTERVAL_MS);
     this.clock.setInterval(() => this.profiles.forEach(saveProfile), PROFILE_FLUSH_MS);
+    this.clock.setInterval(() => {
+      for (const id of this.profiles.keys()) if (this.tickCharmsOf(id)) this.sendProfile(id);
+    }, CHARM_TICK_MS);
     console.log(`[MapRoom] created map=${this.map.id}`);
   }
 
@@ -173,6 +244,7 @@ export class MapRoom extends Room {
     this.makeSlot(profile.nation);
     const id = client.sessionId;
     this.profiles.set(id, profile);
+    this.charmTick.set(id, Date.now());
     const gate = claim && this.map.gates?.find((g) => g.to === claim.from);
     this.sim.addShip(
       id,
@@ -202,7 +274,9 @@ export class MapRoom extends Room {
     this.humans.delete(id);
     this.byId.delete(id);
     const profile = this.profiles.get(id);
+    this.tickCharmsOf(id);
     this.profiles.delete(id);
+    this.charmTick.delete(id);
     if (profile) void saveProfile(profile);
     this.fillBots();
   }
@@ -213,7 +287,23 @@ export class MapRoom extends Room {
     const ship = this.sim.getShip(id);
     if (!profile || !ship) return;
     this.sim.setGear(id, gearOf(profile, ship.frame));
+    this.sim.setCharges(id, chargesOf(profile));
     this.byId.get(id)?.send(MSG.profile, profile);
+  }
+
+  /**
+   * Charm time since the last tick (or `elapsedMs`); spent Charms go with a chat line. True if any went.
+   * ponytail: a Charm counts the time since the last minute tick, so it can run up to a minute over.
+   */
+  private tickCharmsOf(id: ShipId, elapsedMs?: number): boolean {
+    const profile = this.profiles.get(id);
+    if (!profile) return false;
+    const now = Date.now();
+    const gone = tickCharms(profile, elapsedMs ?? now - (this.charmTick.get(id) ?? now));
+    if (elapsedMs === undefined) this.charmTick.set(id, now);
+    for (const name of gone) this.byId.get(id)?.send(MSG.console, { text: `${name} has run out.` });
+    if (gone.length) void saveProfile(profile);
+    return gone.length > 0;
   }
 
   onDispose() {
@@ -334,6 +424,10 @@ export class MapRoom extends Room {
             this.sendProfile(e.killer);
           }
         }
+        if (e.type === 'skillUsed' && SKILLS[e.skill]?.kind === 'consumable') {
+          const p = this.profiles.get(e.id);
+          if (p && spendConsumable(p, e.skill)) this.sendProfile(e.id);
+        }
         if (e.type === 'shipDestroyed' && this.humans.has(e.victim))
           console.log(`[MapRoom] ${e.victim} destroyed by ${e.killer ?? 'terrain'}`);
         else if (e.type === 'shipRespawned' && this.humans.has(e.id))
@@ -390,6 +484,11 @@ export class MapRoom extends Room {
     }
   }
 
+  /** Squared radar range of a Ship: its radar gear, else the Frame's. */
+  private radarRange2(id: ShipId, frame: FrameId): number {
+    return (this.sim.frameDef(id)?.radarRangeM ?? FRAMES[frame].radarRangeM) ** 2;
+  }
+
   private sendSnapshots(): void {
     const all = [...this.sim.ships()];
     const shared = packShared(all, this.sim.structures(), this.sim.match());
@@ -401,7 +500,7 @@ export class MapRoom extends Room {
       let ships = packed;
       if (me) {
         // Radar: allies always, enemies only within this Frame's radar range (a veiled one: reveal range).
-        const range2 = FRAMES[me.frame].radarRangeM ** 2;
+        const range2 = this.radarRange2(id, me.frame);
         const reveal2 = CLOAK_REVEAL_M ** 2;
         // Ships in the enemy hangar are hidden.
         ships = packed.filter((_, i) => {
@@ -417,7 +516,7 @@ export class MapRoom extends Room {
           );
         });
       }
-      const range2 = me ? FRAMES[me.frame].radarRangeM ** 2 : Infinity;
+      const range2 = me ? this.radarRange2(id, me.frame) : Infinity;
       const visible = missiles
         .filter(
           (k) =>

@@ -16,6 +16,7 @@ import type {
   ShipId,
   ShipState,
   SimEvent,
+  SkillId,
   StructureState,
 } from '../types';
 import type { SimTuning } from './index';
@@ -75,6 +76,10 @@ export interface ShipRec {
   siegeArm: number;
   wasSieged: boolean;
   spawnCounter: number;
+  /** Consumable charges held (server-sent from the profile); null = unlimited (Bots, dev sims). */
+  charges: Record<SkillId, number> | null;
+  /** Skills taken off the hotbar while cooling down: tick they are ready again (cooldowns follow the Skill). */
+  parked: Map<SkillId, number>;
   /** Hits left on the absorbHits buff (Chaff Screen); set on cast, server-side. */
   absorbLeft: number;
   /** Lag-comp ring: x,y,z,fx,fy,fz per slot, tagged by tick. */

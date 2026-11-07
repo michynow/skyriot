@@ -61,7 +61,7 @@ export function tickTimers(rec: ShipRec): void {
 export function useHotbar(ctx: SimCtx, rec: ShipRec, slot: number, predictOnly: boolean): void {
   const s = rec.state;
   if (slot < 0 || slot >= s.cooldowns.length || s.cooldowns[slot]! > 0 || !s.alive) return;
-  const id = ctx.frames[s.frame].hotbar[slot];
+  const id = rec.fd.hotbar[slot];
   if (id) castSkill(ctx, rec, id, slot, predictOnly);
 }
 
@@ -84,6 +84,9 @@ export function castSkill(
   const movesShip = def.kind === 'buff' && affectsFlight(def.buff);
   if (predictOnly && !PREDICTED.has(id) && !movesShip) return false;
   if (GROUND_ONLY.has(id) && !s.grounded) return false;
+  // Finite Consumables: 0 left blocks the cast. Only the server spends one (the profile resend syncs the client).
+  const charges = def.kind === 'consumable' ? rec.charges : null;
+  if (charges && !((charges[id] ?? 0) > 0)) return false;
   const ticks = Math.ceil(def.durationSec * TICK_HZ);
   forwardOf(s.rot, _f);
 
@@ -279,6 +282,7 @@ export function castSkill(
       return true;
   }
   if (slot >= 0) s.cooldowns[slot] = Math.ceil(def.cooldownSec * TICK_HZ);
+  if (charges && ctx.authoritative) charges[id]!--;
   ctx.events.push(
     targets && targets.length > 0
       ? { type: 'skillUsed', id: s.id as ShipId, skill: id, slot, targets }

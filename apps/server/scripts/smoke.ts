@@ -18,7 +18,14 @@ import {
   AIR_BARRAGE_COUNT,
   OVERHEAT_COOL_MUL,
   TARGETING,
+  ARMORS,
+  RADARS,
+  STOCK_ARMOR,
+  STOCK_RADAR,
+  resolveGear,
   type FrameId,
+  type ItemInstance,
+  type Sim,
   type PilotInput,
   type ShipId,
   type ShipState,
@@ -852,12 +859,84 @@ for (let k = 0; k < bombRes.of; k++) {
 }
 console.log('anvil bombing hit rate:', bombRes);
 
+// RPG gear: T1 armor/radar = stock, T2 steps up, hotbar remap, consumable charges.
+function gearItem(def: string, kind: ItemInstance['kind'], upgrade = 0): ItemInstance {
+  return { id: def, def, kind, upgrade };
+}
+const waspSlot = (id: string) => FRAMES.wasp.hotbar.indexOf(id);
+function gearTest() {
+  const res: Record<string, boolean> = { t1Stock: true, t2Better: true };
+  for (const f of frames) {
+    const fd = FRAMES[f];
+    const t1 = resolveGear(f, {
+      armor: gearItem(STOCK_ARMOR[f], 'armor'),
+      radar: gearItem(STOCK_RADAR[f], 'radar'),
+    }).over;
+    for (const k of [
+      'maxHp',
+      'maxShield',
+      'shieldRegenPerSec',
+      'radarStdM',
+      'radarAdvM',
+      'radarRangeM',
+    ] as const)
+      if (t1[k] !== fd[k]) res.t1Stock = false;
+    if ((t1.defence ?? 0) !== (fd.defence ?? 0)) res.t1Stock = false;
+  }
+  const s2 = fresh(true);
+  s2.addShip('g', spawn('wasp'), [0, 600, 0]);
+  s2.addShip('bot', { ...spawn('anvil'), isBot: true }, [100, 600, 0]);
+  s2.setGear('g', {
+    armor: gearItem('lamellar-plating', 'armor'),
+    radar: gearItem('sentry-radar', 'radar'),
+  });
+  s2.step(new Map());
+  const g = s2.getShip('g')!;
+  const fd = s2.frameDef('g')!;
+  res.t2Better =
+    g.maxHp === ARMORS['lamellar-plating']!.maxHp &&
+    g.maxHp > FRAMES.wasp.maxHp &&
+    g.maxShield === ARMORS['lamellar-plating']!.maxShield &&
+    (fd.defence ?? 0) > 0 &&
+    fd.radarRangeM === RADARS['sentry-radar']!.radarRangeM &&
+    fd.radarRangeM > FRAMES.wasp.radarRangeM;
+  // Cooldown follows the Skill: cast slot 0, move it to slot 5 (with a duplicate that must drop).
+  const dash = FRAMES.wasp.hotbar[0]!;
+  s2.step(new Map([['g', mk(1, { hotbar: 0 })]]));
+  const cd = g.cooldowns[0]!;
+  const bar = [...FRAMES.wasp.hotbar];
+  bar[0] = null;
+  bar[5] = dash;
+  bar[6] = dash;
+  s2.setGear('g', { hotbar: bar });
+  const bar2 = s2.frameDef('g')!.hotbar;
+  res.cooldownMoved = cd > 0 && g.cooldowns[5] === cd && g.cooldowns[0] === 0;
+  res.duplicateDropped = bar2[5] === dash && bar2[6] === null;
+  // Off the bar and back: the cooldown kept running (parked), not reset.
+  s2.setGear('g', { hotbar: FRAMES.wasp.hotbar.map((x) => (x === dash ? null : x)) });
+  s2.step(new Map());
+  s2.setGear('g', {});
+  res.parkedKept = g.cooldowns[0] === cd - 1; // one tick passed while parked
+  res.botDefaultBar = s2.frameDef('bot')!.hotbar === FRAMES.anvil.hotbar;
+  // Consumable charges: 1 → one cast, then 0 blocks; Bots (never set) are unlimited.
+  s2.setCharges('g', { 'repair-kit': 1 });
+  const c1 = s2.castSkill('g', 'repair-kit');
+  const c2 = s2.castSkill('g', 'repair-kit');
+  res.chargesGate =
+    c1 && !c2 && s2.castSkill('bot', 'repair-kit') && s2.castSkill('bot', 'repair-kit');
+  s2.dispose();
+  return res;
+}
+const gearRes = gearTest();
+console.log('rpg gear:', gearRes);
+
 // 3. Prediction equality: stepLocal (with reconcile + replay) vs server step, bit-compare.
 function prediction(
   god: boolean,
   frame: FrameId,
   at: [number, number, number] | 'deck',
   script: (i: number) => Partial<PilotInput>,
+  setup?: (sim2: Sim) => void,
 ) {
   const a = fresh(true);
   const b = fresh(false);
@@ -868,6 +947,7 @@ function prediction(
   for (const sim2 of [a, b]) {
     if (at === 'deck') atDeck(sim2, 'p', frame);
     else sim2.addShip('p', spawn(frame), at);
+    setup?.(sim2);
   }
   let worst = 0;
   const N = 400;
@@ -946,6 +1026,26 @@ const eq = {
     hotbar: i === 150 || i === 200 ? 0 : -1,
     strafe: i % 40 < 10 ? 1 : 0,
   })),
+  gearArmorRadarEngine: prediction(false, 'wasp', [0, 600, 0], sweep, (s2) =>
+    s2.setGear('p', {
+      engine: gearItem('falcon-jet', 'engine', 2),
+      armor: gearItem('dragonscale-plating', 'armor', 3),
+      radar: gearItem('watchtower-radar', 'radar', 1),
+      hotbar: [null, 'afterburn-dash', 'fuel-cell', ...FRAMES.wasp.hotbar.slice(3)],
+    }),
+  ),
+  ...Object.fromEntries(
+    [0, 1].map((n) => [
+      `consumableCharges${n}`,
+      prediction(
+        false,
+        'wasp',
+        [0, 600, 0],
+        (i) => ({ ...sweep(i), hotbar: i === 60 ? waspSlot('fuel-cell') : -1 }),
+        (s2) => s2.setCharges('p', { 'fuel-cell': n }),
+      ),
+    ]),
+  ),
 };
 console.log('prediction max |server-local| diff:', eq);
 
@@ -1056,6 +1156,7 @@ check(rollRes.hit <= TRIALS * 0.25, 'rolling target should mostly evade');
 check(straightRes.hit >= TRIALS * 0.7, 'straight-flying target should mostly get hit');
 // Reconcile rebuilds hidden lateral velocity from vel, which leaves float rounding (~1e-14).
 for (const [k, v] of Object.entries(eq)) check(v < 1e-6, `prediction mismatch ${k}: ${v}`);
+check(Object.values(gearRes).every(Boolean), 'rpg gear: ' + JSON.stringify(gearRes));
 check(
   lagComp.hitWindow > 0 && lagComp.lagged === lagComp.hitWindow,
   'lag comp: shots that hit unlagged must hit at the same view time',

@@ -5,8 +5,12 @@ import { SKILLS } from '../content/weapons';
 import type { Projectile, SimCtx, ShipRec } from './ctx';
 import { dropBuffs } from './buffs';
 import { DEFLECT_CAP, DEFLECT_DAMAGE_MUL } from './constants';
+import { DEFENCE_CAP } from './gear';
 
-/** Shield first, then HP. Handles god, roll invulnerability and death. Returns damage actually dealt. */
+/**
+ * Shield first, then HP. Handles god, roll invulnerability and death. Returns damage actually dealt.
+ * Damage from someone (`killer` set) is cut by the victim's Defence; terrain, collisions and self-destruct aren't.
+ */
 export function damageShip(
   ctx: SimCtx,
   rec: ShipRec,
@@ -19,6 +23,8 @@ export function damageShip(
   if (ctx.map.city) return 0; // City = safe zone
   if (s.launchPhase !== 'none') return 0;
   rec.shieldDelay = ctx.frames[s.frame].shieldRegenDelaySec;
+  const defence = rec.fd.defence;
+  if (defence && killer !== null) amount *= 1 - Math.min(defence, DEFENCE_CAP);
   // Shield damage buffs scale only the part the shield soaks (in shield units).
   const sm = rec.mods.shieldDamageTakenMul;
   const absorbed = Math.min(s.shield, amount * sm);
@@ -75,7 +81,7 @@ export function hitShip(
     });
     return;
   }
-  const chance = Math.min(ctx.frames[s.frame].deflectChance, DEFLECT_CAP) + rec.mods.deflectAdd;
+  const chance = Math.min(rec.fd.deflectChance, DEFLECT_CAP) + rec.mods.deflectAdd;
   const deflected = ctx.rng() < chance;
   let dmg = base;
   if (deflected) dmg *= DEFLECT_DAMAGE_MUL;
