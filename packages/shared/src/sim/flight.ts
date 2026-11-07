@@ -14,6 +14,8 @@ import {
   CEILING_PITCH_DOWN,
   CEILING_PUSH_SPEED,
   CEILING_SOFT_M,
+  BOMBING_SPEED_MUL,
+  BOMBING_TURN_MUL,
   BOOST_BLEED_SEC,
   BOOST_MIN_FUEL,
   BOOST_MIN_SEC,
@@ -375,7 +377,8 @@ export function stepFlight(
         rec.mods.turnRateMul *
         (sieged ? siegeMods(s).turnRateMul : 1) *
         (grounded ? 1 : speedTurnMul(fd, s.speed)) *
-        (1 + (fd.boostTurnMul - 1) * ramp);
+        (1 + (fd.boostTurnMul - 1) * ramp) *
+        (s.toggles.bombing ? BOMBING_TURN_MUL : 1);
   const cosA = clamp(_f0[0]! * ax + _f0[1]! * ay + _f0[2]! * az, -1, 1);
   const angle = Math.acos(cosA);
   let cx = _f0[1]! * az - _f0[2]! * ay;
@@ -616,7 +619,7 @@ export function stepFlight(
         ? fd.cruiseSpeed + (fd.maxSpeed - fd.cruiseSpeed) * input.throttle
         : fd.cruiseSpeed + (fd.cruiseSpeed - fd.minSpeed) * input.throttle;
     target = s.dashTicks > 0 ? fd.boostSpeed : target + (fd.boostSpeed - target) * ramp;
-    target *= rec.mods.speedMul;
+    target *= rec.mods.speedMul * (s.toggles.bombing ? BOMBING_SPEED_MUL : 1);
   }
   s.fuel = clamp(
     s.fuel + (boosting ? -fd.fuelBurnPerSec : fd.fuelRegenPerSec * rec.mods.fuelRegenMul) * dt,

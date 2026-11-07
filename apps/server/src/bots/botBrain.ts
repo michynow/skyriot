@@ -306,7 +306,10 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   }
   const groundRun =
     mem.skill.strafeGround && enemy?.grounded === true && me.frame !== 'anvil' && !retreating;
-  if (!enemy || enemy.grounded || dist > mem.skill.standoffMaxM) mem.separating = false;
+  // An enemy Anvil with a bombing mode on is slow and one-hits at range: close in instead of holding standoff.
+  const bomberThreat = enemy?.frame === 'anvil' && !!enemy.toggles.bombing && me.frame !== 'anvil';
+  if (!enemy || enemy.grounded || dist > mem.skill.standoffMaxM || bomberThreat)
+    mem.separating = false;
   else if (dist < mem.skill.standoffMinM) mem.separating = true;
   if (enemy && mem.separating && !retreating) {
     const away = norm3(me.pos[0] - enemy.pos[0], 0, me.pos[2] - enemy.pos[2]);
@@ -542,6 +545,11 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
     }
   }
   mem.lastHealth = health;
+  // Jink sideways against a bombing Anvil so its salvos lead into empty air.
+  if (bomberThreat && !me.sieged && !me.grounded && mem.dodgeTicks <= 0) {
+    mem.dodgeTicks = 15 + Math.floor(mem.rng() * 20);
+    mem.dodgeDir = mem.rng() < 0.5 ? -1 : 1;
+  }
   if (mem.dodgeTicks > 0) {
     mem.dodgeTicks--;
     input.strafe = mem.dodgeDir;
