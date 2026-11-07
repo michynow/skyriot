@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { NationId } from '@skyriot/shared';
+import { COSMETICS, type NationId } from '@skyriot/shared';
 import type { Slot } from './bricks';
 
 interface Palette {
@@ -64,14 +64,24 @@ export function upgradeTint(nation: NationId, upgrade: number): THREE.Color {
   return c;
 }
 
+/** Accent colour, or the equipped Cosmetic's trail colour. */
+const trailTint = (nation: NationId, u: number, cosmetic: string) => {
+  const cos = COSMETICS[cosmetic];
+  return cos ? new THREE.Color(cos.trail) : upgradeTint(nation, u);
+};
+
 const trails = new Map<string, [number, number, number]>();
 /** HDR engine-trail colour for an upgrade level (same ramp as the accent). */
-export function trailRgb(nation: NationId, upgrade: number): [number, number, number] {
+export function trailRgb(
+  nation: NationId,
+  upgrade: number,
+  cosmetic = '',
+): [number, number, number] {
   const u = clampU(upgrade);
-  const key = `${nation}|${u}`;
+  const key = `${nation}|${u}|${cosmetic}`;
   let t = trails.get(key);
   if (!t) {
-    const c = upgradeTint(nation, u)
+    const c = trailTint(nation, u, cosmetic)
       .clone()
       .multiplyScalar(1.8 + u * 0.12);
     t = [c.r, c.g, c.b];
@@ -84,12 +94,13 @@ export function trailRgb(nation: NationId, upgrade: number): [number, number, nu
  * Shared per (nation, upgrade): accent/trim shift along the upgrade ramp and glow harder, paint gets
  * glossier and picks up a faint accent sheen from +7.
  */
-export function getMaterials(nation: NationId, upgrade: number) {
+export function getMaterials(nation: NationId, upgrade: number, cosmetic = '') {
   const u = clampU(upgrade);
-  const key = `${nation}|${u}`;
+  const key = `${nation}|${u}|${cosmetic}`;
   let m = mats.get(key);
   if (m) return m;
-  const p = PALETTES[nation];
+  const cos = COSMETICS[cosmetic];
+  const p = cos ? { ...PALETTES[nation], primary: cos.paint } : PALETTES[nation];
   const tint = upgradeTint(nation, u);
   const sheen = Math.max(0, u - 6) * 0.02;
   const std = (color: string, rough: number, metal: number, glow = 0) =>
@@ -160,9 +171,9 @@ const flames = new Map<
   { outer: THREE.MeshBasicMaterial; inner: THREE.MeshBasicMaterial }
 >();
 /** Engine flame materials; the outer cone follows the upgrade ramp. */
-export function getFlameMaterials(nation: NationId, upgrade: number) {
+export function getFlameMaterials(nation: NationId, upgrade: number, cosmetic = '') {
   const u = clampU(upgrade);
-  const key = `${nation}|${u}`;
+  const key = `${nation}|${u}|${cosmetic}`;
   let f = flames.get(key);
   if (!f) {
     const mk = (c: THREE.Color, k: number, o: number) => {
@@ -178,7 +189,7 @@ export function getFlameMaterials(nation: NationId, upgrade: number) {
       return mat;
     };
     f = {
-      outer: mk(upgradeTint(nation, u), 2.2 + u * 0.15, 0.55 + u * 0.02),
+      outer: mk(trailTint(nation, u, cosmetic), 2.2 + u * 0.15, 0.55 + u * 0.02),
       inner: mk(new THREE.Color('#ffffff'), 2.5, 0.9),
     };
     flames.set(key, f);

@@ -1067,3 +1067,95 @@ export function WeaponIcon({ id }: { id: string }) {
     </svg>
   );
 }
+
+/** Raw 48-grid art of a Weapon line or Skill/Consumable id (for item tiles). */
+export const iconArt = (id: string): ReactNode => WEAPON[id] ?? SKILL[id]?.art;
+
+/** Currency coins and window glyphs (48 grid, original). */
+export function UiGlyph({
+  name,
+}: {
+  name: 'credits' | 'scrap' | 'glory' | 'lock' | 'sort' | 'close';
+}) {
+  const art: Record<string, ReactNode> = {
+    credits: (
+      <>
+        <circle cx="24" cy="24" r="19" fill="url(#g-gold)" stroke="#5a3a08" strokeWidth="2" />
+        <circle cx="24" cy="24" r="13" fill="none" stroke="#8a5608" strokeWidth="2" />
+        <path
+          d="M24 13v22M29 18h-7a4 4 0 000 8h4a4 4 0 010 8h-8"
+          fill="none"
+          stroke="#5a3a08"
+          strokeWidth="3"
+          strokeLinecap="round"
+        />
+      </>
+    ),
+    scrap: (
+      <>
+        <path
+          d="M24 3l17 10v22L24 45 7 35V13z"
+          fill="url(#g-steel)"
+          stroke="#222a36"
+          strokeWidth="2"
+        />
+        <path
+          d="M24 3v20L7 13M24 23l17-10M24 23v22"
+          stroke="#222a36"
+          strokeWidth="1.5"
+          fill="none"
+        />
+        <circle cx="24" cy="23" r="4" fill="url(#g-dark)" stroke="#222a36" strokeWidth="1.5" />
+      </>
+    ),
+    glory: (
+      <>
+        <circle cx="24" cy="24" r="19" fill="url(#g-red)" stroke="#4a0a10" strokeWidth="2" />
+        <polygon
+          points={star(24, 24.5, 13, 5.5, 5)}
+          fill="url(#g-gold)"
+          stroke="#5a3a08"
+          strokeWidth="1.5"
+        />
+      </>
+    ),
+    lock: (
+      <>
+        <path d="M15 22v-6a9 9 0 0118 0v6" fill="none" stroke="url(#g-steel)" strokeWidth="4" />
+        <rect
+          x="9"
+          y="22"
+          width="30"
+          height="21"
+          rx="3"
+          fill="url(#g-gold)"
+          stroke="#5a3a08"
+          strokeWidth="2"
+        />
+        <circle cx="24" cy="31" r="3.5" fill="#3a2406" />
+        <path d="M24 33v5" stroke="#3a2406" strokeWidth="3" />
+      </>
+    ),
+    sort: (
+      <path
+        d="M8 12h32M8 24h22M8 36h12"
+        stroke="url(#g-steel)"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+    ),
+    close: (
+      <path
+        d="M12 12l24 24M36 12L12 36"
+        stroke="url(#g-steel)"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
+    ),
+  };
+  return (
+    <svg viewBox="0 0 48 48" aria-hidden>
+      {art[name]}
+    </svg>
+  );
+}
