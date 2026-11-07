@@ -24,6 +24,8 @@ export const pilot = pgTable('pilot', {
   credits: integer('credits').notNull().default(0),
   scrap: integer('scrap').notNull().default(0),
   glory: integer('glory').notNull().default(0),
+  /** Charm slots I–III: item ids or null. */
+  charms: jsonb('charms').notNull().default([null, null, null]),
 });
 
 export const item = pgTable('item', {
@@ -34,9 +36,17 @@ export const item = pgTable('item', {
   def: text('def').notNull(),
   kind: text('kind').notNull(),
   upgrade: integer('upgrade').notNull().default(0),
+  rarity: text('rarity').notNull().default('standard'),
+  /** Per Mod slot: chosen Mod id, or the three offered ids. */
+  mods: jsonb('mods').notNull().default([]),
+  count: integer('count').notNull().default(1),
+  /** Charm: logged-in ms left after activation; null = not activated. */
+  msLeft: integer('ms_left'),
+  /** Bag cell; null while equipped. */
+  bag: integer('bag'),
 });
 
-/** Per Frame: `slots` is a `Loadout` ({ primary?, secondary?, engine? } of item ids). */
+/** Per Frame: `slots` is a `Loadout` (item ids per gear slot, plus the optional `hotbar` layout). */
 export const loadout = pgTable(
   'loadout',
   {

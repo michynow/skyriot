@@ -18,7 +18,7 @@ import { session } from '../net/session';
 import { world } from '../state/world';
 import { useProfile } from '../state/profile';
 
-const SLOTS: (keyof Loadout)[] = ['primary', 'secondary', 'engine'];
+const SLOTS = ['primary', 'secondary', 'engine'] as const;
 
 const nameOf = (def: ItemDefId) => WEAPONS[def]?.name ?? ENGINES[def]?.name ?? def;
 
@@ -78,7 +78,9 @@ export function Hangar() {
   if (!profile || !frame) return <p className="hangar-note">No Pilot profile yet.</p>;
   const loadout = profile.loadouts[frame] ?? {};
   const fd = FRAMES[frame];
-  const equippedName = (slot: keyof Loadout) => {
+  // Weapons and engines only: the RPG windows take over everything else.
+  const gear = profile.items.filter((i) => i.kind === 'weapon' || i.kind === 'engine');
+  const equippedName = (slot: (typeof SLOTS)[number]) => {
     const item = profile.items.find((i) => i.id === loadout[slot]);
     if (item) return `${nameOf(item.def)} +${item.upgrade}`;
     return `${nameOf(slot === 'engine' ? fd.engine : fd[slot])} (stock)`;
@@ -105,8 +107,8 @@ export function Hangar() {
       ))}
 
       <h3>Inventory</h3>
-      {profile.items.length === 0 && <p className="hangar-note">Nothing owned yet.</p>}
-      {profile.items.map((item) => (
+      {gear.length === 0 && <p className="hangar-note">Nothing owned yet.</p>}
+      {gear.map((item) => (
         <Item key={item.id} item={item} frame={frame} loadout={loadout} />
       ))}
 

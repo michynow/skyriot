@@ -29,6 +29,7 @@ import { matchOwnShot, predictOwnShot } from './net/ownShots';
 import { createPredictor } from './net/predictor';
 import { session } from './net/session';
 import { QUALITY_DPR, useSettings } from './ui/settings';
+import { WindowHost } from './ui/rpg/WindowHost';
 import { structureEvent } from './scene/Structures';
 import { useProfile } from './state/profile';
 import { music, setListener } from './audio/engine';
@@ -273,6 +274,7 @@ export function Game({
             )}
           </Canvas>
           <Hud onLeave={onExit} />
+          <WindowHost />
           {DevPanel && (
             <Suspense fallback={null}>
               <DevPanel />

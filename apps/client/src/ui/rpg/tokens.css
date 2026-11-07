@@ -1,0 +1,319 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Saira+Condensed:wght@600;700&display=swap');
+
+/* RPG windows: palette, rarity colours, type scale and the shared chrome (Window, Slot). docs/specs/rpg-ui.md §6.
+   Tokens are scoped to .rpg-ui (WindowHost's root; put it on anything rendered outside) so they don't clash with lobby.css. */
+:root {
+  /* UI scale setting, 0.85–1.3 */
+  --rpg-scale: 1;
+}
+.rpg-ui {
+  --plate: #1c1f24;
+  --plate-2: #15171b;
+  --well: #0b0c0f;
+  --brass: #9a7a45;
+  --brass-hi: #d9b675;
+  --brass-lo: #5a4322;
+  --ink: #efe8d8;
+  --ink-2: #bfb7a6;
+  --ink-3: #a39b8a;
+  --nation: #e8b84a;
+  --good: #7fd46b;
+  --bad: #ff6b5a;
+  --r-standard: #e6dcc6;
+  --r-tuned: #7fd46b;
+  --r-custom: #5aa8ff;
+  --r-prototype: #b98cff;
+  --r-relic: #ffa640;
+  --display: 'Saira Condensed', 'Arial Narrow', sans-serif;
+  --body: 'Barlow', 'Segoe UI', sans-serif;
+  /* type scale (px): caption 11 (never smaller) · body 13 · item name 15 · window title 18 · headline 24 */
+  --fs-caption: 11px;
+  --fs-body: 13px;
+  --fs-name: 15px;
+  --fs-title: 18px;
+  --fs-headline: 24px;
+  --ch: 12px;
+}
+.rpg-ui.vex {
+  --nation: #e0503a;
+}
+
+.rpg-host {
+  position: fixed;
+  inset: 0;
+  z-index: 15; /* above the HUD, below the Esc menu (20) */
+  pointer-events: none;
+}
+
+/* ---------- window chrome ---------- */
+.rpg-win {
+  position: absolute;
+  pointer-events: auto;
+  color: var(--ink);
+  font: 500 var(--fs-body) / 1.35 var(--body);
+  font-variant-numeric: tabular-nums;
+  filter: drop-shadow(0 18px 28px #000a) drop-shadow(0 2px 2px #0008);
+  transform: scale(var(--rpg-scale));
+  transform-origin: 0 0;
+  user-select: none;
+}
+.rpg-win *,
+.rpg-tooltip * {
+  box-sizing: border-box;
+}
+.rpg-frame,
+.rpg-body {
+  clip-path: polygon(
+    var(--c) 0,
+    calc(100% - var(--c)) 0,
+    100% var(--c),
+    100% calc(100% - var(--c)),
+    calc(100% - var(--c)) 100%,
+    var(--c) 100%,
+    0 calc(100% - var(--c)),
+    0 var(--c)
+  );
+}
+.rpg-frame {
+  --c: var(--ch);
+  padding: 2px;
+  background: linear-gradient(160deg, #e0be7c 0%, #9a7a45 22%, #5a4322 55%, #8a6a38 100%);
+}
+.rpg-body {
+  --c: calc(var(--ch) - 1px);
+  position: relative;
+  background: linear-gradient(180deg, var(--plate), var(--plate-2));
+  box-shadow: inset 0 1px 0 #ffffff14;
+}
+.rpg-rivet {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #f3dca6, #8a6a38 55%, #3a2a12);
+  box-shadow: 0 1px 1px #000;
+  pointer-events: none;
+}
+.rpg-rivet.tl {
+  top: 7px;
+  left: 7px;
+}
+.rpg-rivet.tr {
+  top: 7px;
+  right: 7px;
+}
+.rpg-rivet.bl {
+  bottom: 7px;
+  left: 7px;
+}
+.rpg-rivet.br {
+  bottom: 7px;
+  right: 7px;
+}
+.rpg-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 40px;
+  padding: 0 12px 0 20px;
+  background: linear-gradient(#262a31, #1a1c21);
+  border-bottom: 1px solid #000;
+  box-shadow: 0 1px 0 #ffffff0d;
+  cursor: grab;
+}
+.rpg-titlebar h2 {
+  margin: 0;
+  font: 700 var(--fs-title) / 1.1 var(--display);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #f4e7c4;
+  text-shadow: 0 1px 0 #000;
+  white-space: nowrap;
+}
+.rpg-rule {
+  flex: 1;
+  height: 5px;
+  border-top: 1px solid #9a7a4566;
+  border-bottom: 1px solid #9a7a4533;
+}
+.rpg-keyhint {
+  font: 600 12px/1 var(--display);
+  letter-spacing: 0.08em;
+  color: var(--ink-3);
+  border: 1px solid #ffffff1f;
+  padding: 3px 6px 2px;
+}
+.rpg-x {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: linear-gradient(#2c3037, #1b1d22);
+  border: 1px solid #000;
+  box-shadow:
+    inset 0 1px 0 #ffffff17,
+    0 0 0 1px #9a7a4555;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.rpg-x:hover {
+  color: var(--ink);
+}
+.rpg-x svg {
+  width: 10px;
+  height: 10px;
+}
+.rpg-win :focus-visible {
+  outline: 2px solid var(--brass-hi);
+  outline-offset: 2px;
+}
+.rpg-content {
+  padding: 14px 16px;
+}
+/* Placeholder body for windows not built yet. */
+.rpg-empty {
+  display: grid;
+  place-items: center;
+  min-height: 220px;
+  background: var(--well);
+  box-shadow:
+    inset 0 2px 5px #000,
+    0 0 0 1px #000;
+  color: var(--ink-3);
+  font: 600 var(--fs-caption) / 1 var(--display);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* ---------- item cells (Slot) ---------- */
+.rpg-cell {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  padding: 3px;
+  flex: none;
+  background: var(--well);
+  box-shadow:
+    inset 0 2px 5px #000,
+    0 0 0 1px #000,
+    0 1px 0 1px #ffffff0a;
+}
+.rpg-cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid transparent;
+  pointer-events: none;
+}
+.rpg-cell.empty {
+  background: #0e1013;
+}
+.rpg-cell.r-standard::after {
+  border-color: #e6dcc62e;
+}
+.rpg-cell.r-tuned::after {
+  border-color: #7fd46bb3;
+}
+.rpg-cell.r-custom::after {
+  border-color: #5aa8ffb3;
+}
+.rpg-cell.r-prototype::after {
+  border-color: #b98cffb3;
+}
+.rpg-cell.r-relic::after {
+  border-color: #ffa640cc;
+  animation: rpg-glint 4s ease-in-out infinite;
+}
+.rpg-cell.r-relic {
+  box-shadow:
+    inset 0 2px 5px #000,
+    0 0 0 1px #000,
+    0 0 10px #ffa64033;
+}
+@keyframes rpg-glint {
+  50% {
+    border-color: #ffd9a0;
+  }
+}
+.rpg-cell > svg,
+.rpg-cell > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.rpg-cell.off > svg,
+.rpg-cell.off > img {
+  filter: grayscale(1) brightness(0.5);
+}
+.rpg-cell.drop {
+  box-shadow:
+    inset 0 2px 5px #000,
+    0 0 0 1px #000,
+    0 0 0 3px var(--brass-hi),
+    0 0 14px #d9b67566;
+  z-index: 2;
+}
+.rpg-ghost {
+  color: #3b3e45;
+}
+.rpg-up,
+.rpg-cnt {
+  position: absolute;
+  right: 4px;
+  font: 700 12px/1 var(--body);
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+  text-shadow:
+    0 0 2px #000,
+    0 1px 1px #000,
+    0 0 4px #000;
+  pointer-events: none;
+}
+.rpg-up {
+  top: 3px;
+}
+.rpg-cnt {
+  bottom: 3px;
+  font-size: 13px;
+}
+
+/* rarity text */
+.rt-standard {
+  color: var(--r-standard);
+}
+.rt-tuned {
+  color: var(--r-tuned);
+}
+.rt-custom {
+  color: var(--r-custom);
+}
+.rt-prototype {
+  color: var(--r-prototype);
+}
+.rt-relic {
+  color: var(--r-relic);
+}
+
+/* ---------- tooltip plate ---------- */
+.rpg-tooltip {
+  position: fixed;
+  z-index: 16;
+  min-width: 240px;
+  padding: 10px 12px;
+  pointer-events: none;
+  color: var(--ink);
+  font: 500 var(--fs-body) / 1.35 var(--body);
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, #1f2227, #15171b);
+  box-shadow:
+    0 0 0 1px #000,
+    0 0 0 2px var(--brass),
+    0 12px 24px #000a;
+}
+
+body.rpg-dragging,
+body.rpg-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}

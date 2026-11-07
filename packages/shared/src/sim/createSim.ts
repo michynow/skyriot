@@ -252,6 +252,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       isBot: spawn.isBot,
       tier: spawn.tier,
       upgrade: spawn.upgrade,
+      cosmetic: spawn.cosmetic ?? '',
       pos: [at[0], at[1], at[2]],
       rot: [0, 0, 0, 1],
       vel: [0, 0, 0],

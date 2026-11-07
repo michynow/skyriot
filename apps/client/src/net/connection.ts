@@ -2,10 +2,14 @@ import { Client, type Room } from '@colyseus/sdk';
 import {
   MSG,
   type BuyRequest,
+  type ChooseModRequest,
   type EquipRequest,
+  type HotbarRequest,
   type JoinOptions,
+  type MoveItemRequest,
   type PilotInput,
   type PilotProfile,
+  type SellRequest,
   type ShipState,
   type SimEvent,
   type Snapshot,
@@ -33,6 +37,11 @@ export interface Connection {
   buy(req: BuyRequest): void;
   upgrade(req: UpgradeRequest): void;
   equip(req: EquipRequest): void;
+  sell(req: SellRequest): void;
+  discard(req: SellRequest): void;
+  moveItem(req: MoveItemRequest): void;
+  hotbar(req: HotbarRequest): void;
+  chooseMod(req: ChooseModRequest): void;
   close(): void;
   /** Smoothed round-trip estimate in ms (input send -> snapshot ack). */
   readonly rtt: number;
@@ -230,6 +239,11 @@ export async function connect(options: JoinOptions, h: ConnectionHandlers): Prom
     buy: (req) => !closed && room.send(MSG.buy, req),
     upgrade: (req) => !closed && room.send(MSG.upgrade, req),
     equip: (req) => !closed && room.send(MSG.equip, req),
+    sell: (req) => !closed && room.send(MSG.sell, req),
+    discard: (req) => !closed && room.send(MSG.discard, req),
+    moveItem: (req) => !closed && room.send(MSG.moveItem, req),
+    hotbar: (req) => !closed && room.send(MSG.hotbar, req),
+    chooseMod: (req) => !closed && room.send(MSG.chooseMod, req),
     close() {
       closed = true;
       clearTimeout(timeout);

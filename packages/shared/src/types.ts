@@ -80,6 +80,8 @@ export interface ShipSpawn {
   /** Visual only for M1. */
   tier: number;
   upgrade: number;
+  /** Equipped Cosmetic (paint + trail), visual only. */
+  cosmetic?: CosmeticId;
 }
 
 export interface ShipState {
@@ -90,6 +92,8 @@ export interface ShipState {
   isBot: boolean;
   tier: number;
   upgrade: number;
+  /** Equipped Cosmetic, '' = stock paint. Seen by all clients; zero stats. */
+  cosmetic: CosmeticId | '';
   pos: Vec3;
   rot: Quat;
   vel: Vec3;
@@ -428,11 +432,13 @@ export interface FrameDef extends Omit<EngineDef, 'id' | 'name'> {
   radius: number;
   halfLength: number;
   canHover: boolean;
+  /** Defence: fraction of incoming damage removed (cap 0.3); 0 when absent. Set by Armor. */
+  defence?: number;
   primary: WeaponId;
   secondary: WeaponId;
   /**
-   * Default hotbar: HOTBAR_BARS bars of HOTBAR_BAR_SLOTS slots, flattened; null = empty. The Frame's full kit is every SKILLS entry listing it
-   * (or 'all'); kit Skills off the hotbar wait for Loadout editing.
+   * Default hotbar layout only: HOTBAR_BARS bars of HOTBAR_BAR_SLOTS slots, flattened; null = empty. A Pilot's own
+   * layout lives in `Loadout.hotbar`; Bots always fly this one. The Frame's full kit is every SKILLS entry listing it (or 'all').
    */
   hotbar: (SkillId | null)[];
 }
@@ -570,7 +576,12 @@ export const MSG = {
   profile: 'profile', // S→C PilotProfile (on join and after every economy change)
   buy: 'buy', // C→S BuyRequest (city only)
   upgrade: 'upgrade', // C→S UpgradeRequest (city only)
-  equip: 'equip', // C→S EquipRequest (city only)
+  equip: 'equip', // C→S EquipRequest (combat gear: city or Docked; charms/cosmetic: anywhere)
+  sell: 'sell', // C→S SellRequest (city only): SELL_RATE of the Credits price
+  discard: 'discard', // C→S SellRequest: destroy the item (count from a stack), no refund
+  moveItem: 'moveItem', // C→S MoveItemRequest: move within the Bag (swap if occupied)
+  hotbar: 'hotbar', // C→S HotbarRequest: the Pilot's own hotbar layout for a Frame
+  chooseMod: 'chooseMod', // C→S ChooseModRequest: pick one of the three offered Mods, once
   travel: 'travel', // S→C TravelOrder: leave this room, join `mapId`
 } as const;
 
@@ -587,15 +598,130 @@ export interface JoinOptions {
 
 // ---- Economy (M2) ----
 
-export type ItemDefId = WeaponId | EngineId;
+export type ItemKind =
+  'weapon' | 'engine' | 'armor' | 'radar' | 'cosmetic' | 'charm' | 'consumable';
+/** Sets how many Mods an item carries (0 / 1 / 2 / 3 / 3 + Relic Mod); base stats don't change. */
+export type Rarity = 'standard' | 'tuned' | 'custom' | 'prototype' | 'relic';
+export type ArmorId = string;
+export type RadarId = string;
+export type CharmId = string;
+export type CosmeticId = string;
+/** Any ownable def; Consumables are SkillIds (they live in SKILLS too). */
+export type ItemDefId = WeaponId | EngineId | ArmorId | RadarId | CharmId | CosmeticId | SkillId;
 export type ItemId = string;
 
-/** One owned piece of gear. Upgrade +0..+10 never fails (ADR 0004). */
+/** What an item is (content, static). The kind's stats live in WEAPONS / ENGINES / ARMORS / RADARS / CHARMS / COSMETICS / SKILLS. */
+export interface ItemDef {
+  id: ItemDefId;
+  kind: ItemKind;
+  name: string;
+  tier: number;
+  levelReq: number;
+  /** Frame it fits (armor, engine, radar); absent = any. Weapons keep using fitsSlot. */
+  frame?: FrameId;
+  /** Icon registry key; defaults to id. */
+  icon?: string;
+  flavor?: string;
+  /** Shop price; 0 = not sold for Credits (drops, rewards). */
+  credits: number;
+  /** Max per bag cell; 1 = doesn't stack. */
+  stack: number;
+}
+
+/** Armor: sets a Frame's hull numbers. Tier 1 of each line = the Frame's stock values. */
+export interface ArmorDef {
+  id: ArmorId;
+  maxHp: number;
+  maxShield: number;
+  shieldRegenPerSec: number;
+  /** Fraction of incoming damage removed (cap 0.3). */
+  defence: number;
+  /** Added to the Frame's Deflect chance (still capped 0.15). */
+  deflectAdd?: number;
+}
+
+/** Radar: sets a Frame's sensor ranges (absolute metres). Tier 1 of each line = the Frame's stock values. */
+export interface RadarDef {
+  id: RadarId;
+  radarStdM: number;
+  radarAdvM: number;
+  radarRangeM: number;
+  /** Degrees added to the Secondary's Valid Angle. */
+  validAngleAdd?: number;
+}
+
+export interface CharmDef {
+  id: CharmId;
+  /** Logged-in hours after activation. */
+  hours: number;
+  effect: CharmEffect;
+}
+
+/** `*Pct` are whole percent (10 = +10%); `defenceAdd` is a fraction like `ArmorDef.defence`. Same field doesn't stack: the higher wins. */
+export interface CharmEffect {
+  xpPct?: number;
+  creditsPct?: number;
+  scrapPct?: number;
+  gloryPct?: number;
+  primaryDamagePct?: number;
+  secondaryDamagePct?: number;
+  defenceAdd?: number;
+}
+
+/** Visual only: paint scheme and trail colour on the Ship model. Zero stats, ever. */
+export interface CosmeticDef {
+  id: CosmeticId;
+  /** CSS hex colour. */
+  paint: string;
+  trail: string;
+}
+
+/** One Mod line. Value at tier t = base + perTier * (t - 1) (`modValue`). `*Pct` whole percent; `*Add` in the stat's own unit. */
+export interface ModDef {
+  id: string;
+  kind: ItemKind;
+  label: string;
+  /** Value at tier 1. */
+  base: number;
+  perTier: number;
+  stat: ModStat;
+}
+
+export type ModStat =
+  | 'damagePct'
+  | 'fireRatePct'
+  | 'projectileSpeedPct'
+  | 'accuracyAdd'
+  | 'validAngleAdd'
+  | 'ammoPct'
+  | 'maxSpeedPct'
+  | 'boostSpeedPct'
+  | 'turnRatePct'
+  | 'fuelBurnPct'
+  | 'hpPct'
+  | 'shieldPct'
+  | 'shieldRegenPct'
+  | 'defenceAdd'
+  | 'deflectAdd'
+  | 'stdRangePct'
+  | 'advRangePct';
+
+/** One owned thing. Upgrade +0..+10 never fails (ADR 0004). */
 export interface ItemInstance {
   id: ItemId;
   def: ItemDefId;
-  kind: 'weapon' | 'engine';
+  kind: ItemKind;
   upgrade: number;
+  /** Absent = 'standard'. */
+  rarity?: Rarity;
+  /** One entry per Mod slot: the chosen Mod id, or the three offered ids until the Pilot picks. */
+  mods?: (string | [string, string, string])[];
+  /** Stack size (Consumables); absent = 1. */
+  count?: number;
+  /** Charm: logged-in ms left after activation; absent = not activated yet. */
+  msLeft?: number;
+  /** Bag cell 0..BAG_SIZE-1; null/absent while equipped. */
+  bag?: number | null;
 }
 
 export interface Wallet {
@@ -609,7 +735,17 @@ export interface Loadout {
   primary?: ItemId;
   secondary?: ItemId;
   engine?: ItemId;
+  armor?: ItemId;
+  radar?: ItemId;
+  cosmetic?: ItemId;
+  /** HOTBAR_BARS × HOTBAR_BAR_SLOTS Skill / Consumable ids; absent = the Frame's default FrameDef.hotbar. */
+  hotbar?: (SkillId | null)[];
 }
+
+/** Per-Frame equipment slots. */
+export type GearSlot = Exclude<keyof Loadout, 'hotbar'>;
+/** Every slot an EquipRequest can target: the Frame's gear plus the Pilot-wide Charm slots I–III. */
+export type EquipSlot = GearSlot | 'charm0' | 'charm1' | 'charm2';
 
 /** What the server tells a Pilot about themselves. Server is the only writer. */
 export interface PilotProfile {
@@ -621,6 +757,8 @@ export interface PilotProfile {
   items: ItemInstance[];
   /** Per Frame. */
   loadouts: Partial<Record<FrameId, Loadout>>;
+  /** Pilot-wide Charm slots I–III (length 3); null = empty. Slots unlock at CHARM_SLOT_LEVELS. */
+  charms: (ItemId | null)[];
   guest: boolean;
 }
 
@@ -631,10 +769,32 @@ export interface UpgradeRequest {
   item: ItemId;
 }
 export interface EquipRequest {
+  /** Ignored for charm slots. */
   frame: FrameId;
-  slot: keyof Loadout;
-  /** null = back to stock. */
+  slot: EquipSlot;
+  /** null = back to stock / empty. */
   item: ItemId | null;
+}
+/** Sell (MSG.sell) or discard (MSG.discard) an item; `count` from a stack, absent = all of it. */
+export interface SellRequest {
+  item: ItemId;
+  count?: number;
+}
+/** Move an item to a Bag cell; swaps with the occupant. (Split stacks later.) */
+export interface MoveItemRequest {
+  item: ItemId;
+  bag: number;
+}
+/** The Pilot's hotbar layout for `frame`, HOTBAR_BARS × HOTBAR_BAR_SLOTS long. */
+export interface HotbarRequest {
+  frame: FrameId;
+  slots: (SkillId | null)[];
+}
+/** Pick `mod` (one of the three offered) for Mod slot `slot` of `item`. */
+export interface ChooseModRequest {
+  item: ItemId;
+  slot: number;
+  mod: string;
 }
 export interface TravelOrder {
   mapId: MapId;
@@ -644,7 +804,7 @@ export interface TravelOrder {
 /** A shop listing; cities sell every unlocked tier. */
 export interface ShopEntry {
   def: ItemDefId;
-  kind: ItemInstance['kind'];
+  kind: ItemKind;
   tier: number;
   credits: number;
 }

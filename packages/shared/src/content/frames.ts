@@ -2,7 +2,10 @@ import type { FrameDef, FrameId } from '../types';
 import { engineStats } from './engines';
 
 // Starting tuning. Live-tweakable via the dev Leva panel; export new values back here.
-/** Hotbar = HOTBAR_BARS bars of HOTBAR_BAR_SLOTS slots, flattened; slot index = bar * HOTBAR_BAR_SLOTS + key. */
+/**
+ * Hotbar = HOTBAR_BARS bars of HOTBAR_BAR_SLOTS slots, flattened; slot index = bar * HOTBAR_BAR_SLOTS + key.
+ * `FrameDef.hotbar` below is only the default layout (new Pilots, Bots); a Pilot's own layout is `Loadout.hotbar`.
+ */
 export const HOTBAR_BAR_SLOTS = 10;
 export const HOTBAR_BARS = 3;
 

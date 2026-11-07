@@ -6,6 +6,7 @@ import { inputSettings, inputState, saveInputSettings, setTyping } from '../inpu
 import { Controls } from './Controls';
 import { Hangar } from './Hangar';
 import { useSettings, type Quality } from './settings';
+import { useWindows } from './rpg/windows';
 import './escMenu.css';
 
 export const useEscMenu = create<{ open: boolean }>(() => ({ open: false }));
@@ -118,7 +119,8 @@ export function EscMenu({ onLeave }: { onLeave(): void }) {
     };
     // Browsers release pointer lock on Esc before the page sees the key; chat typing releases it too.
     const onLockChange = () => {
-      if (!document.pointerLockElement) openEscMenu();
+      // An RPG window freed the mouse on purpose (Esc with a window open closes it instead).
+      if (!document.pointerLockElement && !useWindows.getState().anyOpen) openEscMenu();
     };
     window.addEventListener('keydown', onKey);
     document.addEventListener('pointerlockchange', onLockChange);

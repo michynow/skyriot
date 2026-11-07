@@ -9,7 +9,6 @@ import {
   itemTier,
   upgradeCost,
   type FrameId,
-  type Loadout,
   type MapDef,
   type NationId,
   type PilotProfile,
@@ -18,7 +17,7 @@ import {
 // Server-side economy: every handler validates the raw client message and mutates the profile in place.
 // Each returns an error line for the Pilot, or null when the profile changed (caller resends it).
 
-const SLOTS: (keyof Loadout)[] = ['primary', 'secondary', 'engine'];
+const SLOTS = ['primary', 'secondary', 'engine'] as const;
 
 /** Shop, upgrades and equip only work in a city (any map while developing, until cities exist). */
 export function canTrade(map: MapDef): boolean {
@@ -53,7 +52,7 @@ export function upgrade(profile: PilotProfile, raw: unknown): string | null {
 
 export function equip(profile: PilotProfile, raw: unknown): string | null {
   const frame = field(raw, 'frame') as FrameId;
-  const slot = field(raw, 'slot') as keyof Loadout;
+  const slot = field(raw, 'slot') as (typeof SLOTS)[number];
   const itemId = field(raw, 'item');
   if (!(frame in FRAMES) || !SLOTS.includes(slot)) return 'bad equip request';
   const loadout = (profile.loadouts[frame] ??= {});
