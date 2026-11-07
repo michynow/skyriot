@@ -132,10 +132,10 @@ const BREACH_HP_FRACTION = 0.2;
 const BREACH_REACH_M = 120;
 const BOMB_RUN_ALTITUDE = 120;
 const SIEGE_BOT_CHANCE = 0.5;
-const SIEGE_BOT_ENGAGE_DISTANCE = 1050;
-const SIEGE_BOT_LEAVE_DISTANCE = 1650;
+const SIEGE_BOT_ENGAGE_DISTANCE = 2000;
+const SIEGE_BOT_LEAVE_DISTANCE = 2600;
 /** Enemy Ships closer than this are fought; otherwise the bot attacks the enemy Base. Raiders mostly ignore Ships. */
-const SHIP_ENGAGE_DISTANCE = 900;
+const SHIP_ENGAGE_DISTANCE = 1500;
 const RAIDER_ENGAGE_DISTANCE = 300;
 const RAIDER_CHANCE = 0.5;
 const STRUCTURE_FIRE_CONE_RAD = 0.12;
