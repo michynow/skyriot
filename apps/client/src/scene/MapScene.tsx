@@ -18,6 +18,18 @@ const LIGHT = {
   'space-nebula': { sun: '#ffe2c0', sunI: 3.0, sky: '#3a2a5a', ground: '#0a0a14', hemiI: 0.35 },
 } as const;
 
+/** Mounts once the Suspense siblings (terrain textures) are in; compiles all shaders, then reports ready. */
+function Ready({ onReady }: { onReady(): void }) {
+  const { gl, scene, camera } = useThree();
+  useEffect(() => {
+    let live = true;
+    const done = () => requestAnimationFrame(() => live && onReady());
+    gl.compileAsync(scene, camera).then(done, done);
+    return () => void (live = false);
+  }, [gl, scene, camera, onReady]);
+  return null;
+}
+
 const SHADOW_R = 260;
 
 function Lights({ map }: { map: MapDef }) {
@@ -66,7 +78,7 @@ function Lights({ map }: { map: MapDef }) {
  * Terrain + sky + fog + lights + props for a MapDef. Data-driven by `map.env.sky`
  * ('desert-dusk' | 'storm' | 'space-nebula'). Sets world.map / world.heightfield if unset.
  */
-export function MapScene({ map }: { map: MapDef }) {
+export function MapScene({ map, onReady }: { map: MapDef; onReady?: () => void }) {
   const hf = useMemo(() => generateHeightfield(map), [map]);
   const scene = useThree((s) => s.scene);
   useEffect(() => {
@@ -98,12 +110,11 @@ export function MapScene({ map }: { map: MapDef }) {
       <LaunchDecks map={map} />
       <Gates map={map} />
       {map.bases && <Structures />}
-      {atmos && (
-        <Suspense fallback={null}>
-          <Terrain map={map} hf={hf} />
-          <Scatter map={map} hf={hf} />
-        </Suspense>
-      )}
+      <Suspense fallback={null}>
+        {atmos && <Terrain map={map} hf={hf} />}
+        {atmos && <Scatter map={map} hf={hf} />}
+        {onReady && <Ready onReady={onReady} />}
+      </Suspense>
     </>
   );
 }
