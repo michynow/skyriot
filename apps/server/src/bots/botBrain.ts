@@ -79,7 +79,7 @@ const WIDE_LOCK_FIRE_CHANCE = 0.06;
 /** Overcharge Round: armed only with the target this tight in the nose and inside Primary range. */
 const OVERCHARGE_CONE_RAD = 0.06;
 /** Mirrors the sim's TURN_GAIN (turn rate = aim angle * gain), used to cap the Bot's aim offset. */
-const SIM_TURN_GAIN = 9;
+const SIM_TURN_GAIN = 7;
 /** turnBrake: enemy this far off the nose (rad) = slow right down; pivotFlip: this far off and this close. */
 const TURN_BRAKE_RAD = 0.3;
 const FLIP_OFF_RAD = 2.2;

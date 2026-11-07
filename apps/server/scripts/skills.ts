@@ -183,7 +183,7 @@ ship('halo').shield = ship('halo').maxShield;
 sim.castSkill('halo', 'charge-beam');
 check(
   'charge-beam recharges the lowest-shield ally',
-  ship('wasp').shield === Math.min(ship('wasp').maxShield, 10 + ship('wasp').maxShield * 0.3),
+  ship('wasp').shield === Math.min(ship('wasp').maxShield, 10 + ship('wasp').maxShield * 0.2),
 );
 ship('wasp').shield = 0;
 sim.castSkill('halo', 'recharge-pulse');

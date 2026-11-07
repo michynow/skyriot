@@ -6,17 +6,17 @@ import type { SkillDef, WeaponDef, WeaponLook } from '../types';
 // Secondary: missiles fire 1 x 2 (two in series) inside a narrow Valid Angle; the Bulwark salvo is 2 x 2 straight
 // shells; Anvil bombs are lockless.
 export const WEAPONS: Record<string, WeaponDef> = {
-  'needle-cannon': w('needle-cannon', 'Needle Cannon', 'tracer', 26, 0.32, 900, 1100, 0.012, {
+  'needle-cannon': w('needle-cannon', 'Needle Cannon', 'tracer', 24, 0.32, 900, 1100, 0.012, {
     ...gun(0.85, 4, 6),
   }),
   'flak-repeater': w('flak-repeater', 'Flak Repeater', 'tracer', 32, 0.54, 650, 800, 0.03, {
     splashRadius: 4,
     ...gun(0.75, 3, 8),
   }),
-  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 30, 0.44, 800, 950, 0.015, {
-    ...gun(0.7, 4, 6),
+  'pulse-blaster': w('pulse-blaster', 'Pulse Blaster', 'tracer', 34, 0.44, 800, 950, 0.015, {
+    ...gun(0.8, 4, 6),
   }),
-  'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 28, 0.24, 750, 1000, 0.02, {
+  'twin-autocannon': w('twin-autocannon', 'Twin Autocannon', 'tracer', 29, 0.24, 750, 1000, 0.02, {
     ...gun(0.85, 2, 8),
   }),
   'sting-missile': w('sting-missile', 'Sting Missile', 'missile', 384, 1.6, 250, 1500, 0, {
@@ -346,7 +346,7 @@ export const SKILLS: Record<string, SkillDef> = {
   'renewal-pulse': s(
     'renewal-pulse',
     'Renewal Pulse',
-    'Allies within 200 m (you too) instantly regain 15% max HP.',
+    'Allies within 200 m (you too) instantly regain 10% max HP.',
     ['halo'],
     40,
     0,
@@ -362,7 +362,7 @@ export const SKILLS: Record<string, SkillDef> = {
   'mend-beam': s(
     'mend-beam',
     'Mend Beam',
-    'Heal the most hurt ally within 400 m (or yourself) for 20% max HP.',
+    'Heal the most hurt ally within 400 m (or yourself) for 15% max HP.',
     ['halo'],
     30,
     0,
@@ -370,7 +370,7 @@ export const SKILLS: Record<string, SkillDef> = {
   'charge-beam': s(
     'charge-beam',
     'Charge Beam',
-    'Recharge the ally within 400 m with the lowest shield (or yourself) for 30% max shield.',
+    'Recharge the ally within 400 m with the lowest shield (or yourself) for 20% max shield.',
     ['halo'],
     30,
     0,
@@ -506,8 +506,8 @@ export const SKILLS: Record<string, SkillDef> = {
     0,
   ),
 
-  'repair-kit': c('repair-kit', 'Repair Kit', 'Restore 20% HP.', 3),
-  'shield-kit': c('shield-kit', 'Shield Kit', 'Restore half the shield.', 3),
+  'repair-kit': c('repair-kit', 'Repair Kit', 'Restore 8% HP.', 3),
+  'shield-kit': c('shield-kit', 'Shield Kit', 'Restore 20% of the shield.', 3),
   'fuel-cell': c('fuel-cell', 'Fuel Cell', 'Refill booster fuel.', 15),
 };
 
