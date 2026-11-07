@@ -11,7 +11,8 @@ import {
   type ShipId,
   type ShipState,
 } from '@skyriot/shared';
-import { showBanner } from '../hud/hudStore';
+import { hotbarOf, showBanner } from '../hud/hudStore';
+import { useWindows } from '../ui/rpg/windows';
 import { project } from '../hud/view';
 import { world } from '../state/world';
 import { useSettings } from '../ui/settings';
@@ -108,6 +109,9 @@ const STICK_CURVE = 1.7;
 const STICK_PER_PX = 0.0018;
 const STICK_DEAD = 0.05;
 const FLIP_MS = 700;
+
+/** An RPG window is open: the mouse is free, the stick is centred and weapons stay quiet (the Ship flies straight). */
+export const flightHeld = () => useWindows.getState().anyOpen;
 
 const isUi = (t: EventTarget | null) => t instanceof Element && t.closest('[data-ui]') !== null;
 const isLocked = () => document.pointerLockElement !== null;
@@ -270,10 +274,19 @@ export function attachInput(canvas: HTMLElement): () => void {
       inputState.hotbarBar = Number(e.code.slice(1)) - 1;
     } else if (e.code.startsWith('Digit')) {
       const n = Number(e.code.slice(5));
-      hotbar = inputState.hotbarBar * HOTBAR_BAR_SLOTS + (n === 0 ? 9 : n - 1);
+      // "Show all bars": Shift fires bar 2, Alt bar 3; otherwise the visible bar.
+      const bar = useSettings.getState().showAllBars
+        ? e.shiftKey
+          ? 1
+          : e.altKey
+            ? 2
+            : 0
+        : inputState.hotbarBar;
+      hotbar = bar * HOTBAR_BAR_SLOTS + (n === 0 ? 9 : n - 1);
       const own = world.ownId ? world.ships.get(world.ownId) : undefined;
-      // The sim refuses a Siege Skill in the wrong mode; say why.
-      const sk = own ? FRAMES[own.frame].hotbar[hotbar] : null;
+      // The slot shows the Pilot's own layout; the sim refuses a Siege Skill in the wrong mode, say why.
+      const layout = own ? hotbarOf(own.frame) : [];
+      const sk = layout[hotbar] ?? null;
       if (
         own &&
         (sk === 'siege-anchor' || sk === 'air-siege') &&
@@ -289,7 +302,7 @@ export function attachInput(canvas: HTMLElement): () => void {
           'bad',
         );
       // Pivot Flip turns the steering aim around; the sim only lifts the turn-rate cap.
-      if (own && FRAMES[own.frame].hotbar[hotbar] === 'pivot-flip' && !own.cooldowns[hotbar]) {
+      if (own && sk === 'pivot-flip' && !own.cooldowns[hotbar]) {
         const [x, y, z, w] = own.rot;
         flipYaw = Math.atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y)) + Math.PI;
         flipUntil = performance.now() + FLIP_MS;
@@ -325,7 +338,7 @@ export function attachInput(canvas: HTMLElement): () => void {
     }
   };
   const onMouseDown = (e: MouseEvent) => {
-    if (isUi(e.target) || inputState.typing) return;
+    if (isUi(e.target) || inputState.typing || flightHeld()) return;
     if (!isLocked() && !lockFailed) {
       void Promise.resolve(canvas.requestPointerLock()).catch(() => (lockFailed = true));
       // the first click also fires
@@ -377,7 +390,9 @@ export function trackAim(_camera: Camera, own: ShipState | undefined): void {
   if (!own || world.freeLook) return;
   let sx = stickX,
     sy = stickY;
-  if (!isLocked()) {
+  if (flightHeld()) {
+    stickX = stickY = sx = sy = 0;
+  } else if (!isLocked()) {
     // No pointer lock (refused, not yet granted, or dropped without an error): the absolute mouse position is the stick.
     sx = pointerX;
     sy = pointerY;
@@ -469,8 +484,8 @@ export function sampleInput(seq: number, viewTick: number, own: ShipState | unde
     boost: !!k('Space'),
     // S is the brake: down to a stop (hover in place), or onto the Launch Deck when over it.
     brake: !!k('KeyS'),
-    fire1: !typing && (fire1 || tap1),
-    fire2: !typing && (fire2 || tap2),
+    fire1: !typing && !flightHeld() && (fire1 || tap1),
+    fire2: !typing && !flightHeld() && (fire2 || tap2),
     hotbar: typing ? -1 : hotbar,
     rollLeft: !typing && rollArm === -1,
     rollRight: !typing && rollArm === 1,

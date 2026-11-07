@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { Vector3 } from 'three';
 import {
   FRAMES,
+  HOTBAR_BARS,
+  HOTBAR_BAR_SLOTS,
   KILL_REWARD,
   RESPAWN_SEC,
   SKILLS,
@@ -13,6 +15,7 @@ import {
   type FrameId,
   type LaunchPhase,
   type NationId,
+  type PilotProfile,
   type ShipState,
   type SimEvent,
   type SkillId,
@@ -24,6 +27,90 @@ import { session } from '../net/session';
 import { view } from './view';
 import { inputState } from '../input/input';
 import { pushFloater } from './Floaters';
+
+// ---------------------------------------------------------------- Hotbar layout (rpg-ui.md §4)
+/**
+ * The Pilot's own Hotbar layout per Frame (HOTBAR_BARS x HOTBAR_BAR_SLOTS, flattened; null = empty). Edited
+ * here, sent debounced, and replaced by the server's copy whenever a profile arrives. Absent = the Frame's default.
+ */
+export const useLayouts = create<{ layouts: Partial<Record<FrameId, (SkillId | null)[]>> }>(() => ({
+  layouts: {},
+}));
+export const hotbarOf = (frame: FrameId): (SkillId | null)[] =>
+  useLayouts.getState().layouts[frame] ?? FRAMES[frame].hotbar;
+
+const SEND_DEBOUNCE_MS = 500;
+const sendTimers: Partial<Record<FrameId, ReturnType<typeof setTimeout>>> = {};
+const sendLayout = (frame: FrameId) => {
+  delete sendTimers[frame];
+  session.conn?.hotbar({ frame, slots: hotbarOf(frame) });
+};
+
+export function setHotbar(frame: FrameId, slots: (SkillId | null)[]): void {
+  useLayouts.setState((s) => ({ layouts: { ...s.layouts, [frame]: slots } }));
+  clearTimeout(sendTimers[frame]);
+  sendTimers[frame] = setTimeout(() => sendLayout(frame), SEND_DEBOUNCE_MS);
+}
+
+/** Is `skill` in `frame`'s Skill Kit (what may sit on its Hotbar)? */
+export function inKit(frame: FrameId, skill: SkillId): boolean {
+  const d = SKILLS[skill];
+  return !!d && (d.frames === 'all' || d.frames.includes(frame));
+}
+
+/** Put `skill` on `slot` (replacing what is there); a Skill sits on at most one slot, so it leaves its old one. */
+export function placeSkill(frame: FrameId, slot: number, skill: SkillId): void {
+  const l = [...hotbarOf(frame)];
+  const old = l.indexOf(skill);
+  if (old >= 0) l[old] = null;
+  l[slot] = skill;
+  setHotbar(frame, l);
+}
+
+/** Swap two slots (dragging a Hotbar slot onto another). */
+export function swapSlots(frame: FrameId, a: number, b: number): void {
+  const l = [...hotbarOf(frame)];
+  [l[a], l[b]] = [l[b] ?? null, l[a] ?? null];
+  setHotbar(frame, l);
+}
+
+export function clearSlot(frame: FrameId, slot: number): void {
+  const l = [...hotbarOf(frame)];
+  l[slot] = null;
+  setHotbar(frame, l);
+}
+
+/** Right-click in the Skill book: first empty slot, bar 1 first. False when the Hotbar is full or it's already there. */
+export function placeFirstEmpty(frame: FrameId, skill: SkillId): boolean {
+  const l = hotbarOf(frame);
+  const slot = l.indexOf(null);
+  if (slot < 0 || l.includes(skill)) return false;
+  placeSkill(frame, slot, skill);
+  return true;
+}
+
+/** Stack count of a Consumable across the Bag; undefined without a profile (Guest). */
+export function consumableCount(profile: PilotProfile | null, skill: SkillId): number | undefined {
+  if (!profile) return undefined;
+  return profile.items.reduce((n, i) => (i.def === skill ? n + (i.count ?? 1) : n), 0);
+}
+
+/**
+ * A profile arrived (join, reconnect, server echo after a change): the server's layout wins, except while one of
+ * ours is still waiting to be sent. A layout the server doesn't have yet (older server, or Frame switch race) is re-sent.
+ */
+useProfile.subscribe((st) => {
+  const p = st.profile;
+  if (!p) return;
+  const next = { ...useLayouts.getState().layouts };
+  for (const f of Object.keys(p.loadouts) as FrameId[]) {
+    if (sendTimers[f]) continue;
+    const srv = p.loadouts[f]?.hotbar;
+    if (srv?.length === HOTBAR_BARS * HOTBAR_BAR_SLOTS) next[f] = srv;
+    else if (next[f]) sendTimers[f] = setTimeout(() => sendLayout(f), SEND_DEBOUNCE_MS);
+  }
+  useLayouts.setState({ layouts: next });
+});
 
 export interface KillEntry {
   id: number;
@@ -574,7 +661,7 @@ export function startHudFeed(): () => void {
       patch.killfeed = feed.filter((k) => now - k.at <= KILLFEED_MS);
     if (own) {
       const def = FRAMES[own.frame];
-      const hotbar = def.hotbar;
+      const hotbar = hotbarOf(own.frame);
       const total = hotbar.map((id) =>
         id ? Math.max(1, (SKILLS[id]?.cooldownSec ?? 1) * TICK_HZ) : 1,
       );
