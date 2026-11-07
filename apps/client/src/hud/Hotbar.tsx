@@ -19,7 +19,6 @@ import { SkillIcon } from './icons';
 export const mmss = (sec: number) =>
   `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 
-const BAR_NAMES = ['Core', 'Kit', 'Utility'];
 /** Key prefix per bar when all bars are shown: Shift fires bar 2, Alt bar 3. */
 const BAR_PREFIX = ['', '⇧', '⌥'];
 
@@ -126,7 +125,7 @@ export function Hotbar() {
         <div className="hotbar-tabs">
           {Array.from({ length: HOTBAR_BARS }, (_, b) => (
             <span key={b} className={b === bar ? 'on' : ''}>
-              F{b + 1} {BAR_NAMES[b]}
+              F{b + 1}
             </span>
           ))}
           <kbd>TAB</kbd>

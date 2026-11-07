@@ -499,13 +499,14 @@ function FlightTips() {
         <kbd>D</kbd> strafe, double-tap to Barrel Roll
       </p>
       <p>
-        <kbd>ESC</kbd> menu, controls and Hangar
+        <kbd>P</kbd> <kbd>I</kbd> <kbd>K</kbd> <kbd>V</kbd> character, inventory, Skills, vendor ·{' '}
+        <kbd>ESC</kbd> menu
       </p>
     </div>
   );
 }
 
-/** Cities have no Battle panel: say where we are and where the shop is instead. */
+/** Cities have no Battle panel: say where we are and which windows serve the City. */
 function CityBanner() {
   const city = world.map?.city ? world.map : null;
   if (!city) return null;
@@ -514,7 +515,7 @@ function CityBanner() {
     <div className="city-banner">
       <b>{city.name.toUpperCase()} · SAFE ZONE</b>
       <span>
-        Shop and Loadout: <kbd>ESC</kbd> › HANGAR
+        Vendor <kbd>V</kbd> · Character <kbd>P</kbd> · Inventory <kbd>I</kbd>
         {gate && ` · fly through the Gate to return to ${MAPS[gate.to]?.name ?? gate.to}`}
       </span>
     </div>

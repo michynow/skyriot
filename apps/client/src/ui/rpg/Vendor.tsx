@@ -41,6 +41,29 @@ const SLOT_NAME: Record<string, string> = {
 };
 
 /** Vendor window (V, Cities): Buy · Sell · Workshop. The Inventory opens beside it. */
+/** Defined at module level: an inline component remounts each render and swallows clicks. */
+const Row = ({
+  item,
+  children,
+  sub,
+}: {
+  item: ItemInstance;
+  sub: string;
+  children: React.ReactNode;
+}) => (
+  <li className="v-row">
+    <ItemCell item={item} ghost="generic" owner="vendor" />
+    <div className="txt">
+      <b className={`rt-${item.rarity ?? 'standard'}`}>
+        {ITEMS[item.def]?.name}
+        {item.upgrade > 0 && ` +${item.upgrade}`}
+      </b>
+      <span>{sub}</span>
+    </div>
+    {children}
+  </li>
+);
+
 export function Vendor() {
   const profile = useRpgProfile();
   const frame = useShownFrame();
@@ -59,27 +82,6 @@ export function Vendor() {
   const workList = (profile?.items ?? []).filter((i) => UPGRADABLE.includes(i.kind));
   const chosen = workList.find((i) => i.id === pick) ?? workList[0];
 
-  const Row = ({
-    item,
-    children,
-    sub,
-  }: {
-    item: ItemInstance;
-    sub: string;
-    children: React.ReactNode;
-  }) => (
-    <li className="v-row">
-      <ItemCell item={item} ghost="generic" owner="vendor" />
-      <div className="txt">
-        <b className={`rt-${item.rarity ?? 'standard'}`}>
-          {ITEMS[item.def]?.name}
-          {item.upgrade > 0 && ` +${item.upgrade}`}
-        </b>
-        <span>{sub}</span>
-      </div>
-      {children}
-    </li>
-  );
   const headline = (item: ItemInstance) => {
     const l = itemLines(item).find((r) => ['dps', 'dmg', 'max', 'hp', 'range'].includes(r.key));
     return l ? `${l.label} ${withUnit(l)}` : '';
