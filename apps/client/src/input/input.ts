@@ -337,13 +337,6 @@ export function attachInput(canvas: HTMLElement): () => void {
     if (e.button === 0) fire1 = false;
     if (e.button === 2) fire2 = false;
   };
-  const onWheel = (e: WheelEvent) => {
-    if (isUi(e.target)) return;
-    world.cameraZoom = Math.min(
-      2,
-      Math.max(0.6, world.cameraZoom * (1 + Math.sign(e.deltaY) * 0.08)),
-    );
-  };
   const onLockChange = () => {
     if (!isLocked()) fire1 = fire2 = false;
     // Start each lock from a centred stick, so a stale offset doesn't keep the Ship circling.
@@ -358,7 +351,6 @@ export function attachInput(canvas: HTMLElement): () => void {
   window.addEventListener('mousemove', onMouseMove);
   window.addEventListener('mousedown', onMouseDown);
   window.addEventListener('mouseup', onMouseUp);
-  window.addEventListener('wheel', onWheel, { passive: true });
   window.addEventListener('contextmenu', onContext);
   document.addEventListener('pointerlockchange', onLockChange);
   document.addEventListener('pointerlockerror', onLockError);
@@ -369,7 +361,6 @@ export function attachInput(canvas: HTMLElement): () => void {
     window.removeEventListener('mousemove', onMouseMove);
     window.removeEventListener('mousedown', onMouseDown);
     window.removeEventListener('mouseup', onMouseUp);
-    window.removeEventListener('wheel', onWheel);
     window.removeEventListener('contextmenu', onContext);
     document.removeEventListener('pointerlockchange', onLockChange);
     document.removeEventListener('pointerlockerror', onLockError);

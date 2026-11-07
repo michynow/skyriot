@@ -24,6 +24,10 @@ import {
   GROUND_STRIKE_SPREAD_MPS,
   BOMB_DROP_SPEED,
   BOMB_GRAVITY,
+  BOMB_FORWARD_KICK,
+  AIR_BARRAGE_RANGE_MUL,
+  BOMB_RANGE_MUL,
+  BOMBING_REATTACK_MUL,
   MISSILE_SALVO_SPREAD_RAD,
   GROUND_STRIKE_GROUND_MUL,
   GROUND_STRIKE_SPLASH_MUL,
@@ -211,6 +215,8 @@ export function spawnProjectile(
   p.losTime = 0;
   p.gravity = 0;
   p.groundMul = 1;
+  p.core = 0;
+  p.structMul = 1;
   p.weaveAmp = 0;
   p.visual = false;
   p.strike = null;
@@ -266,7 +272,7 @@ function structureById(ctx: SimCtx, id: string): StructureRec | undefined {
 
 /** Structures shrug off gunfire (see STRUCTURE_ARMOR). */
 function structureDamage(p: Projectile): number {
-  return p.kind === 'tracer' ? p.damage * STRUCTURE_ARMOR.tracerMul : p.damage;
+  return (p.kind === 'tracer' ? p.damage * STRUCTURE_ARMOR.tracerMul : p.damage) * p.structMul;
 }
 
 /**
@@ -664,7 +670,7 @@ function stepSecondary(
     if (fire && rec.fireCd[1] <= 0 && s.ammo2 > 0) {
       const mode = s.toggles.bombing;
       if (mode || w.validAngleDeg <= 0) {
-        rec.fireCd[1] += interval;
+        rec.fireCd[1] += interval * (mode ? BOMBING_REATTACK_MUL : 1);
         dropCloak(rec);
         fireLockless(ctx, rec, w, mode, rewind);
       } else {
@@ -775,6 +781,18 @@ function warn(ctx: SimCtx, attacker: ShipId, target: string, weapon: string, ids
   ctx.events.push({ type: 'missileIncoming', attacker, target, weapon, missiles: ids.slice() });
 }
 
+/** Old per-round share of the Secondary's damage vs Base structures, before the one-hit-kill bombing tune. */
+const BOMBING_STRUCTURE_SHARE = 0.4;
+
+/**
+ * Bombing-mode round: full damage anywhere inside its proximity-fuse radius (so a near miss still one-hits), and
+ * structures take only BOMBING_STRUCTURE_SHARE of the Secondary's damage, as before the tune.
+ */
+function bombingRound(p: Projectile, damageMul: number): void {
+  p.core = p.splash * ROCKET_FUSE_FRAC;
+  p.structMul = BOMBING_STRUCTURE_SHARE / damageMul;
+}
+
 /** Anvil Secondary: bombs and bombing modes, no lock needed (Wide Lock guides at whatever it has). */
 function fireLockless(
   ctx: SimCtx,
@@ -803,7 +821,7 @@ function fireLockless(
         ady = _f[1]! + _r[1]! * off,
         adz = _f[2]! + _r[2]! * off;
       const al = Math.hypot(adx, ady, adz);
-      spawnProjectile(
+      const p = spawnProjectile(
         ctx,
         rec,
         w.kind,
@@ -815,7 +833,7 @@ function fireLockless(
           (mods ? mods.damageMul : 1),
         w.splashRadius * AIR_BARRAGE_SPLASH_MUL * rec.mods.splashMul,
         w.speed,
-        w.rangeM * (mods ? mods.rangeMul : 1),
+        w.rangeM * AIR_BARRAGE_RANGE_MUL * (mods ? mods.rangeMul : 1),
         0,
         null,
         ox,
@@ -826,6 +844,7 @@ function fireLockless(
         adz / al,
         rewind,
       );
+      bombingRound(p, AIR_BARRAGE_DAMAGE_MUL);
     }
     return;
   }
@@ -865,6 +884,7 @@ function fireLockless(
         adz / al,
         rewind,
       );
+      bombingRound(p, WIDE_LOCK_DAMAGE_MUL);
       if (target) {
         _ids.length = 0;
         _ids.push(p.id);
@@ -874,15 +894,16 @@ function fireLockless(
     return;
   }
   if (mode === 'ground-strike-mode') {
-    // A stick of heavy bombs dropped straight down, inheriting the Ship's velocity, fanned sideways, then
-    // falling under gravity. The first bomb's ammo is already paid; each extra one costs 1.
+    // A stick of heavy bombs thrown forward (the Ship's velocity plus a level forward kick), fanned sideways,
+    // then falling under gravity. The first bomb's ammo is already paid; each extra one costs 1.
     const extra = Math.min(GROUND_STRIKE_COUNT - 1, s.ammo2);
     s.ammo2 -= extra;
+    const kick = BOMB_FORWARD_KICK / (Math.hypot(_f[0]!, _f[2]!) || 1);
     for (let k = 0; k <= extra; k++) {
       const side = extra > 0 ? ((2 * k) / extra - 1) * GROUND_STRIKE_SPREAD_MPS : 0;
-      const bvx = s.vel[0] + _r[0]! * side,
+      const bvx = s.vel[0] + _f[0]! * kick + _r[0]! * side,
         bvy = s.vel[1] - BOMB_DROP_SPEED,
-        bvz = s.vel[2] + _r[2]! * side;
+        bvz = s.vel[2] + _f[2]! * kick + _r[2]! * side;
       const bs = Math.hypot(bvx, bvy, bvz) || 1;
       const bomb = spawnProjectile(
         ctx,
@@ -896,7 +917,7 @@ function fireLockless(
           (mods ? mods.damageMul : 1),
         w.splashRadius * GROUND_STRIKE_SPLASH_MUL * rec.mods.splashMul,
         bs,
-        w.rangeM,
+        w.rangeM * BOMB_RANGE_MUL,
         0,
         null,
         s.pos[0],
@@ -909,6 +930,7 @@ function fireLockless(
       );
       bomb.gravity = BOMB_GRAVITY;
       bomb.groundMul = GROUND_STRIKE_GROUND_MUL;
+      bombingRound(bomb, GROUND_STRIKE_DAMAGE_MUL);
     }
     return;
   }
@@ -1022,7 +1044,8 @@ function explode(
     poseAt(ctx, o, testTick);
     const d = Math.hypot(_cx - x, _cy - y, _cz - z) - ctx.frames[os.frame].radius;
     if (d >= p.splash) continue;
-    const fall = Math.max(1 - Math.max(d, 0) / p.splash, SPLASH_MIN_FRACTION);
+    const fall =
+      d <= p.core ? 1 : Math.max(1 - (d - p.core) / (p.splash - p.core), SPLASH_MIN_FRACTION);
     hitShip(ctx, o, p.damage * fall * victimMul(p, o), p.owner, p, x, y, z);
   }
 }

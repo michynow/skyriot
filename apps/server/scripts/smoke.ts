@@ -13,6 +13,8 @@ import {
   WEAPONS,
   BOMB_DROP_SPEED,
   BOMB_GRAVITY,
+  BOMB_FORWARD_KICK,
+  BOMBING_REATTACK_MUL,
   AIR_BARRAGE_COUNT,
   OVERHEAT_COOL_MUL,
   TARGETING,
@@ -505,14 +507,25 @@ function buffTests() {
   const ev = sim2.step(new Map([['a', mk(1, { aim: [0, 0, -1], fire2: true })]]));
   for (const e of ev) if (e.type === 'projectileSpawned' && e.owner === 'a') spawnedRockets++;
   const barrage = spawnedRockets === AIR_BARRAGE_COUNT && before - a.ammo2 === AIR_BARRAGE_COUNT;
-  idle(120, { a: {} });
+  idle(Math.ceil(WEAPONS['brick-bomb']!.fireIntervalSec * BOMBING_REATTACK_MUL * 30) + 10, {
+    a: {},
+  });
   const gsSlot = FRAMES.anvil.hotbar.indexOf('ground-strike-mode');
   idle(1, { a: { hotbar: gsSlot } });
   const switched = a.toggles.bombing === 'ground-strike-mode' && a.cooldowns[gsSlot]! > 0;
-  idle(70, { a: {} });
+  idle(Math.ceil(WEAPONS['brick-bomb']!.fireIntervalSec * BOMBING_REATTACK_MUL * 30) + 10, {
+    a: {},
+  });
+  // Ground Strike throws the bomb forward and down.
   let bombDown = false;
   for (const e of sim2.step(new Map([['a', mk(2, { aim: [0, 0, -1], fire2: true })]]))) {
-    if (e.type === 'projectileSpawned' && e.owner === 'a' && e.dir[1] < -0.1) bombDown = true;
+    if (
+      e.type === 'projectileSpawned' &&
+      e.owner === 'a' &&
+      e.dir[1] < 0 &&
+      Math.hypot(e.dir[0], e.dir[2]) > 0.5
+    )
+      bombDown = true;
   }
   // Pressing the active mode turns bombing off again.
   idle(70, { a: {} });
@@ -760,7 +773,7 @@ console.log('bulwark salvo lock:', JSON.stringify(salvoRes));
 
 // Anvil bombing modes: share of salvos that damage the Target, with a realistic aim error.
 // Air Barrage: a Wasp head-on from 600 m. Ground Strike: a grounded Bulwark, Anvil 120 m above.
-function barrageTrial(k: number): boolean {
+function barrageTrial(k: number): number {
   // Head-on pass; the salvo is aimed at the Target's centre line with up to ~30 m error; the Target jinks.
   const { sim2, t, sh } = duel('anvil', 600, ((k % 7) - 3) * 10);
   t.pos[1] += ((k % 5) - 2) * 10;
@@ -772,15 +785,19 @@ function barrageTrial(k: number): boolean {
     const ev = sim2.step(
       new Map([
         ['t', mk(i, { aim: [Math.sin(i / 9 + k) * 0.15, Math.cos(i / 7 + k) * 0.1, 1] })],
-        ['sh', mk(i, { aim: [0, 0, -1], fire2: i === 3 })],
+        // No Target, no lock: bombing modes hit whatever their blast catches.
+        ['sh', mk(i, { aim: [0, 0, -1], fire2: i === 3, target: null })],
       ]),
     );
     hit = ev.some((e) => e.type === 'hit' && e.victim === 't' && e.damage > 0);
   }
+  // 2 = one salvo killed the Target from full HP + shield.
+  for (let i = 0; i < 60 && hit; i++) sim2.step(new Map([['t', mk(1000 + i, {})]]));
+  const dead = !sim2.getShip('t')!.alive;
   sim2.dispose();
-  return hit;
+  return hit ? (dead ? 2 : 1) : 0;
 }
-function strikeTrial(k: number): boolean {
+function strikeTrial(k: number): number {
   const sim2 = fresh(true);
   let ox = 0;
   const slope = (x: number) =>
@@ -802,27 +819,36 @@ function strikeTrial(k: number): boolean {
   let hit = false,
     dropped = false;
   for (let i = 0; i < 400 && !hit; i++) {
-    // Drop when the falling bomb lands on the Target's line (vel z only, ballistic fall).
+    // Drop when the thrown bomb lands on the Target's line (vel z only, ballistic fall).
     const h = sh.pos[1] - t.pos[1];
     const vy = sh.vel[1] - BOMB_DROP_SPEED;
     const tf = (vy + Math.sqrt(vy * vy + 2 * BOMB_GRAVITY * h)) / BOMB_GRAVITY;
-    const fire: boolean = !dropped && sh.pos[2] + sh.vel[2] * tf <= t.pos[2] + ((k % 3) - 1) * 20;
+    // Facing -z: the forward throw adds BOMB_FORWARD_KICK along -z.
+    const fire: boolean =
+      !dropped && sh.pos[2] + (sh.vel[2] - BOMB_FORWARD_KICK) * tf <= t.pos[2] + ((k % 3) - 1) * 20;
     dropped ||= fire;
     const ev = sim2.step(
       new Map([
         ['t', mk(i, {})],
-        ['sh', mk(i, { aim: [0, 0, -1], fire2: fire })],
+        ['sh', mk(i, { aim: [0, 0, -1], fire2: fire, target: null })],
       ]),
     );
     hit = ev.some((e) => e.type === 'hit' && e.victim === 't' && e.damage > 0);
   }
+  // 2 = one salvo killed the Target from full HP + shield.
+  for (let i = 0; i < 60 && hit; i++) sim2.step(new Map([['t', mk(1000 + i, {})]]));
+  const dead = !sim2.getShip('t')!.alive;
   sim2.dispose();
-  return hit;
+  return hit ? (dead ? 2 : 1) : 0;
 }
-const bombRes = { barrage: 0, strike: 0, of: 21 };
+const bombRes = { barrage: 0, strike: 0, barrageKills: 0, strikeKills: 0, of: 21 };
 for (let k = 0; k < bombRes.of; k++) {
-  if (barrageTrial(k)) bombRes.barrage++;
-  if (strikeTrial(k)) bombRes.strike++;
+  const b = barrageTrial(k),
+    st = strikeTrial(k);
+  if (b) bombRes.barrage++;
+  if (b === 2) bombRes.barrageKills++;
+  if (st) bombRes.strike++;
+  if (st === 2) bombRes.strikeKills++;
 }
 console.log('anvil bombing hit rate:', bombRes);
 
@@ -1042,8 +1068,12 @@ check(
 );
 check(travelOk, 'travel token sign/verify/tamper');
 check(
-  bombRes.barrage >= bombRes.of * 0.8 && bombRes.strike >= bombRes.of * 0.8,
-  'Anvil bombing salvos near the Target should mostly hit: ' + JSON.stringify(bombRes),
+  bombRes.barrage >= bombRes.of * 0.8 &&
+    bombRes.strike >= bombRes.of * 0.8 &&
+    bombRes.barrageKills >= bombRes.of * 0.5 &&
+    bombRes.strikeKills >= bombRes.of * 0.5,
+  'Anvil unlocked bombing salvos near the Target should mostly hit and one-hit kill: ' +
+    JSON.stringify(bombRes),
 );
 check(
   stdRes.spawnedNone > 0 && stdRes.hitsNone === 0 && stdRes.hitsTarget > 0,

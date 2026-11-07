@@ -116,6 +116,10 @@ export interface Projectile {
   gravity: number;
   /** Damage multiplier vs Grounded/Docked victims (ground-strike bombs). */
   groundMul: number;
+  /** Splash within this many metres of the blast deals full damage (bombing modes); falloff beyond. */
+  core: number;
+  /** Damage multiplier vs Base structures (bombing modes keep their old structure damage). */
+  structMul: number;
   /** Current weave offset amplitude (m) already applied to the position. */
   weaveAmp: number;
 }
