@@ -10,7 +10,9 @@ export const AGENT_MUTE =
 
 const FADE_S = 2;
 const TICK_MS = 50;
-const GAIN = 0.55;
+export const MUSIC_GAIN = 0.7;
+const DUCK_TO = 0.65; // big events dip the music ~3.7 dB, recovering over ~1.5 s
+let duck = 1;
 
 interface Track {
   src: string;
@@ -27,10 +29,11 @@ function trackFor(map: MapDef): string {
 
 function level(t: Track): number {
   const s = useSettings.getState();
-  return s.muted ? 0 : Math.min(1, s.master * s.music * GAIN * t.fade);
+  return s.muted ? 0 : Math.min(1, s.master * s.music * MUSIC_GAIN * t.fade * duck);
 }
 
 function tick() {
+  duck = Math.min(1, duck + TICK_MS / 1000 / 1.5);
   for (const t of tracks) {
     t.fade = Math.min(1, Math.max(0, t.fade + ((t.target ? 1 : -1) * TICK_MS) / 1000 / FADE_S));
     t.el.volume = level(t);
@@ -41,6 +44,9 @@ function tick() {
 }
 
 export const music = {
+  duck(): void {
+    duck = DUCK_TO;
+  },
   /** Play the map's track (fading out any other); `null` fades everything out. */
   setMap(map: MapDef | null): void {
     if (AGENT_MUTE) return;

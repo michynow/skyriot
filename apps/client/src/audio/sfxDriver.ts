@@ -62,8 +62,8 @@ export function handleAudioEvent(ev: SimEvent): void {
       const mine = ev.owner === own;
       if (ev.kind === 'tracer') {
         const name = FIRE_SFX[ev.weapon] ?? 'fire-needle';
-        if (mine) playSfx(name, { volume: 0.7 });
-        else playSfx(name, { pos: ev.origin, volume: 0.6 });
+        if (mine) playSfx(name, { volume: 0.5 });
+        else playSfx(name, { pos: ev.origin, volume: 0.45 });
         break;
       }
       const t: Tracked = {
@@ -175,7 +175,7 @@ export function updateAudio(): void {
     const def = FRAMES[own.frame];
     if (!engine) engine = startLoop('engine');
     const k = Math.min(1.4, own.speed / def.maxSpeed);
-    engine?.update({ gain: own.docked ? 0.15 : 0.35 + 0.35 * k, rate: 0.7 + 0.9 * k });
+    engine?.update({ gain: own.docked ? 0.08 : 0.2 + 0.25 * k, rate: 0.7 + 0.9 * k });
   } else if (engine) {
     engine.stop();
     engine = null;
@@ -195,7 +195,7 @@ export function updateAudio(): void {
   wasBoosting = boosting;
   if (boosting) {
     if (!burner) burner = startLoop('afterburner');
-    burner?.update({ gain: 0.7 });
+    burner?.update({ gain: 0.55 });
   } else if (burner) {
     burner.stop();
     burner = null;
@@ -245,7 +245,7 @@ export function updateAudio(): void {
       continue;
     }
     m.loop?.update({
-      gain: 0.6,
+      gain: 0.5,
       pos: [
         m.origin[0] + m.dir[0] * m.speed * age,
         m.origin[1] + m.dir[1] * m.speed * age,
