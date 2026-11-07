@@ -28,6 +28,7 @@ import {
   AIR_BARRAGE_RANGE_MUL,
   BOMB_RANGE_MUL,
   BOMBING_REATTACK_MUL,
+  BOMB_ARM_SEC,
   MISSILE_SALVO_SPREAD_RAD,
   GROUND_STRIKE_GROUND_MUL,
   GROUND_STRIKE_SPLASH_MUL,
@@ -655,6 +656,20 @@ function secondaryInterval(rec: ShipRec, w: WeaponDef): number {
  * its lead point, needing the lock held for every volley. Without a lock the salvo dumb-fires straight off the
  * nose (contact or splash only). Anvil bombs and its bombing modes never lock.
  */
+// ponytail: per-Ship arm clock kept beside the sim (weapons are server-only); move into ShipRec with the RPG work.
+const _armed = new WeakMap<ShipRec, { mode: string | undefined; at: number }>();
+
+/** Track when the bombing mode last changed; true once it has been on for BOMB_ARM_SEC. */
+function bombsArmed(ctx: SimCtx, rec: ShipRec, mode: string | undefined): boolean {
+  let a = _armed.get(rec);
+  if (!a) _armed.set(rec, (a = { mode, at: -Infinity }));
+  if (a.mode !== mode) {
+    a.mode = mode;
+    a.at = ctx.tick;
+  }
+  return (ctx.tick - a.at) * ctx.dt >= BOMB_ARM_SEC;
+}
+
 function stepSecondary(
   ctx: SimCtx,
   rec: ShipRec,
@@ -665,11 +680,14 @@ function stepSecondary(
 ): void {
   const s = rec.state;
   const interval = secondaryInterval(rec, w);
+  const armed = bombsArmed(ctx, rec, s.toggles.bombing);
   if (rec.salvoLeft <= 0) {
     rec.fireCd[1] = Math.max(rec.fireCd[1] - ctx.dt, -ctx.dt);
     if (fire && rec.fireCd[1] <= 0 && s.ammo2 > 0) {
       const mode = s.toggles.bombing;
-      if (mode || w.validAngleDeg <= 0) {
+      if (mode && !armed) {
+        // Bay still opening after the mode came on: no salvo yet.
+      } else if (mode || w.validAngleDeg <= 0) {
         rec.fireCd[1] += interval * (mode ? BOMBING_REATTACK_MUL : 1);
         dropCloak(rec);
         fireLockless(ctx, rec, w, mode, rewind);

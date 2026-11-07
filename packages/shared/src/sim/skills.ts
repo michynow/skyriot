@@ -81,7 +81,9 @@ export function castSkill(
   const def = SKILLS[id];
   if (!def || !s.alive) return false;
   if (def.frames !== 'all' && !def.frames.includes(s.frame)) return false;
-  const movesShip = def.kind === 'buff' && affectsFlight(def.buff);
+  // Bombing modes slow the Anvil (flight.ts), so their toggles are predicted too.
+  const movesShip =
+    (def.kind === 'buff' && affectsFlight(def.buff)) || def.toggleGroup === 'bombing';
   if (predictOnly && !PREDICTED.has(id) && !movesShip) return false;
   if (GROUND_ONLY.has(id) && !s.grounded) return false;
   // Finite Consumables: 0 left blocks the cast. Only the server spends one (the profile resend syncs the client).
