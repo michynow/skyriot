@@ -214,6 +214,11 @@ export function createBotMemory(
 }
 
 /** Bots are just another PilotInput source: the sim cannot tell them from humans. */
+/** Per-tick chance to start a sideways jink against a bombing Anvil (a jink lasts 0.5-1.2 s). */
+/** Standoff range scale against a bombing Anvil (closer = inside its turn). */
+const BOMBER_STANDOFF_MUL = 0.4;
+const BOMBER_JINK_CHANCE = 0.02;
+
 export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   const me = sim.getShip(id);
   const input: PilotInput = { seq: ++mem.seq, viewTick: sim.tick, ...EMPTY_INPUT, aim: [0, 0, -1] };
@@ -306,11 +311,11 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   }
   const groundRun =
     mem.skill.strafeGround && enemy?.grounded === true && me.frame !== 'anvil' && !retreating;
-  // An enemy Anvil with a bombing mode on is slow and one-hits at range: close in instead of holding standoff.
+  // An enemy Anvil with a bombing mode on is slow and one-hits at range: hold a tighter standoff.
   const bomberThreat = enemy?.frame === 'anvil' && !!enemy.toggles.bombing && me.frame !== 'anvil';
-  if (!enemy || enemy.grounded || dist > mem.skill.standoffMaxM || bomberThreat)
-    mem.separating = false;
-  else if (dist < mem.skill.standoffMinM) mem.separating = true;
+  const standoff = bomberThreat ? BOMBER_STANDOFF_MUL : 1;
+  if (!enemy || enemy.grounded || dist > mem.skill.standoffMaxM * standoff) mem.separating = false;
+  else if (dist < mem.skill.standoffMinM * standoff) mem.separating = true;
   if (enemy && mem.separating && !retreating) {
     const away = norm3(me.pos[0] - enemy.pos[0], 0, me.pos[2] - enemy.pos[2]);
     tx = me.pos[0] + away[0] * 500;
@@ -546,7 +551,13 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   }
   mem.lastHealth = health;
   // Jink sideways against a bombing Anvil so its salvos lead into empty air.
-  if (bomberThreat && !me.sieged && !me.grounded && mem.dodgeTicks <= 0) {
+  if (
+    bomberThreat &&
+    !me.sieged &&
+    !me.grounded &&
+    mem.dodgeTicks <= 0 &&
+    mem.rng() < BOMBER_JINK_CHANCE
+  ) {
     mem.dodgeTicks = 15 + Math.floor(mem.rng() * 20);
     mem.dodgeDir = mem.rng() < 0.5 ? -1 : 1;
   }

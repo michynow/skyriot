@@ -156,8 +156,8 @@ export const GROUND_STRIKE_DAMAGE_MUL = 7.5;
 /** A bombing-mode salvo one-hits, so its reattack is this much longer: a miss leaves the Anvil exposed. */
 export const BOMBING_REATTACK_MUL = 3;
 /** Counterplay: an Anvil with a bombing mode on flies slower and turns worse, so it can be caught and dodged. */
-export const BOMBING_SPEED_MUL = 0.75;
-export const BOMBING_TURN_MUL = 0.7;
+export const BOMBING_SPEED_MUL = 0.8;
+export const BOMBING_TURN_MUL = 0.75;
 /** Seconds after a bombing mode comes on before its first salvo can fire (the bay opening is the telegraph). */
 export const BOMB_ARM_SEC = 0.6;
 export const BOMB_DROP_SPEED = 20;
