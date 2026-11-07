@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { FrameId, NationId, ShipId } from '@skyriot/shared';
@@ -49,8 +49,13 @@ export function FrameModel({
   shipId,
 }: FrameModelProps) {
   const data = useMemo(() => getModel(frame, tier, upgrade), [frame, tier, upgrade]);
-  const mats = useMemo(() => getMaterials(nation, upgrade), [nation, upgrade]);
-  const flame = useMemo(() => getFlameMaterials(nation, upgrade), [nation, upgrade]);
+  // Equipped Cosmetic of this Ship (seen by everyone); polled per frame, re-renders only on change.
+  const [cosmetic, setCosmetic] = useState('');
+  const mats = useMemo(() => getMaterials(nation, upgrade, cosmetic), [nation, upgrade, cosmetic]);
+  const flame = useMemo(
+    () => getFlameMaterials(nation, upgrade, cosmetic),
+    [nation, upgrade, cosmetic],
+  );
   const aura = upgrade >= 10 ? getAuraMaterial(nation) : null;
 
   const flames = useRef<(THREE.Group | null)[]>([]);
@@ -77,6 +82,7 @@ export function FrameModel({
 
   useFrame(({ camera }, dt) => {
     const s = st.current;
+    if (shipId) setCosmetic(world.ships.get(shipId)?.cosmetic ?? '');
     const bc = beacon.current;
     if (bc) {
       // min-size beacon: screen size ~ constant, fades in past 150 m so near Ships look as before
