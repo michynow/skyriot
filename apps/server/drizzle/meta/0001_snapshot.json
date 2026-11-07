@@ -49,16 +49,12 @@
         "account_email_unique": {
           "name": "account_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         },
         "account_discord_id_unique": {
           "name": "account_discord_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "discord_id"
-          ]
+          "columns": ["discord_id"]
         }
       },
       "policies": {},
@@ -140,12 +136,8 @@
           "name": "item_pilot_id_pilot_id_fk",
           "tableFrom": "item",
           "tableTo": "pilot",
-          "columnsFrom": [
-            "pilot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["pilot_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -185,12 +177,8 @@
           "name": "loadout_pilot_id_pilot_id_fk",
           "tableFrom": "loadout",
           "tableTo": "pilot",
-          "columnsFrom": [
-            "pilot_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["pilot_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -198,10 +186,7 @@
       "compositePrimaryKeys": {
         "loadout_pilot_id_frame_pk": {
           "name": "loadout_pilot_id_frame_pk",
-          "columns": [
-            "pilot_id",
-            "frame"
-          ]
+          "columns": ["pilot_id", "frame"]
         }
       },
       "uniqueConstraints": {},
@@ -287,12 +272,8 @@
           "name": "pilot_account_id_account_id_fk",
           "tableFrom": "pilot",
           "tableTo": "account",
-          "columnsFrom": [
-            "account_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["account_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -302,9 +283,7 @@
         "pilot_account_id_unique": {
           "name": "pilot_account_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "account_id"
-          ]
+          "columns": ["account_id"]
         }
       },
       "policies": {},
