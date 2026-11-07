@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { FRAMES } from '@skyriot/shared';
+import { ownRadarRange } from '../state/profile';
 import { world } from '../state/world';
 import { inputState } from '../input/input';
 import { NATION_COLOR } from './Reticles';
@@ -47,7 +47,7 @@ export function Radar() {
 
       const own = ownShip();
       if (!own) return;
-      const range = FRAMES[own.frame].radarRangeM;
+      const range = ownRadarRange(own.frame);
       const [qx, qy, qz, qw] = own.rot;
       let fx = -2 * (qx * qz + qw * qy);
       let fz = -(1 - 2 * (qx * qx + qy * qy));

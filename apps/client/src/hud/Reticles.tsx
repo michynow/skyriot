@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { ownRadarRange } from '../state/profile';
 import {
   AIM_ASSIST,
   FRAMES,
@@ -150,7 +151,7 @@ export function Reticles() {
       const secondary = sec0 && bombingSecondary(sec0, own.toggles.bombing);
       const primRange = (primary?.rangeM ?? 0) * rangeMul;
       const secRange = (secondary?.rangeM ?? 0) * rangeMul;
-      const radar = def.radarRangeM;
+      const radar = ownRadarRange(own.frame);
 
       const [qx, qy, qz, qw] = own.rot;
       const fx = -2 * (qx * qz + qw * qy);

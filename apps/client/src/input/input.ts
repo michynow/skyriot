@@ -1,4 +1,5 @@
 import type { Camera } from 'three';
+import { ownRadarRange } from '../state/profile';
 import {
   EMPTY_INPUT,
   FRAMES,
@@ -144,7 +145,7 @@ function validTarget(own: ShipState, id: ShipId): boolean {
   const y = st ? st.pos[1] + STRUCTURES[st.kind].height / 2 : t.pos[1];
   return (
     Math.hypot(t.pos[0] - own.pos[0], y - own.pos[1], t.pos[2] - own.pos[2]) <=
-    FRAMES[own.frame].radarRangeM
+    ownRadarRange(own.frame)
   );
 }
 

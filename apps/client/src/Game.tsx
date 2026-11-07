@@ -5,6 +5,7 @@ import {
   MAPS,
   TICK_DT,
   createSim,
+  chargesOf,
   gearOf,
   generateHeightfield,
   type JoinOptions,
@@ -45,7 +46,9 @@ const FX_QUEUE_MAX = 600;
 /** Prediction must run the own Ship with the same gear the server resolved from the same profile. */
 function applyOwnGear(ownId: ShipId, frame: JoinOptions['frame']) {
   const profile = useProfile.getState().profile;
-  if (profile) session.sim?.setGear(ownId, gearOf(profile, frame));
+  if (!profile) return;
+  session.sim?.setGear(ownId, gearOf(profile, frame));
+  session.sim?.setCharges(ownId, chargesOf(profile));
 }
 
 async function startPrediction(
