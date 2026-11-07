@@ -20,6 +20,9 @@ const LIFE_MS = 1200;
 const MERGE_MS = 350;
 /** Hits worth at least this much (missiles, bombs) get the big size. */
 const BIG_DAMAGE = 200;
+/** Numbers for off-screen victims: inset from the edge (px) and shrunk. */
+const PIN_MARGIN = 120;
+const PIN_SCALE = 0.55;
 const live: Floater[] = [];
 const p = { x: 0, y: 0 };
 
@@ -62,8 +65,9 @@ export function Floaters() {
         const el = els.current[i];
         const f = live[i];
         if (!el) continue;
-        // Off-screen victims: the number sticks to the screen edge in their direction.
-        if (!f || !projectPinned(f.pos[0], f.pos[1], f.pos[2], p)) {
+        // Off-screen victims: the number sticks to the screen edge in their direction, smaller.
+        const at = f ? projectPinned(f.pos[0], f.pos[1], f.pos[2], p, PIN_MARGIN) : 0;
+        if (!f || !at) {
           el.style.display = 'none';
           continue;
         }
@@ -76,7 +80,7 @@ export function Floaters() {
         const pop = 1 + Math.max(0, 1 - age / 0.12) * 0.8;
         // Bigger hits (and merged streaks) read bigger.
         const size = 0.7 + Math.min(1, f.sum / BIG_DAMAGE) * 0.6;
-        el.style.transform = `translate(${p.x + f.jx}px,${p.y - age * 90}px) scale(${pop * (f.kind === 'defl' || f.kind === 'absorb' ? 1 : size)})`;
+        el.style.transform = `translate(${p.x + f.jx}px,${p.y - age * 90}px) scale(${pop * (f.kind === 'defl' || f.kind === 'absorb' ? 1 : size) * (at === 2 ? PIN_SCALE : 1)})${at === 2 ? ' translate(-50%,-50%)' : ''}`;
       }
     };
     raf = requestAnimationFrame(frame);

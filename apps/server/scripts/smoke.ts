@@ -14,6 +14,7 @@ import {
   BOMB_DROP_SPEED,
   BOMB_GRAVITY,
   BOMB_FORWARD_KICK,
+  BOMBING_REATTACK_MUL,
   AIR_BARRAGE_COUNT,
   OVERHEAT_COOL_MUL,
   TARGETING,
@@ -506,14 +507,25 @@ function buffTests() {
   const ev = sim2.step(new Map([['a', mk(1, { aim: [0, 0, -1], fire2: true })]]));
   for (const e of ev) if (e.type === 'projectileSpawned' && e.owner === 'a') spawnedRockets++;
   const barrage = spawnedRockets === AIR_BARRAGE_COUNT && before - a.ammo2 === AIR_BARRAGE_COUNT;
-  idle(120, { a: {} });
+  idle(Math.ceil(WEAPONS['brick-bomb']!.fireIntervalSec * BOMBING_REATTACK_MUL * 30) + 10, {
+    a: {},
+  });
   const gsSlot = FRAMES.anvil.hotbar.indexOf('ground-strike-mode');
   idle(1, { a: { hotbar: gsSlot } });
   const switched = a.toggles.bombing === 'ground-strike-mode' && a.cooldowns[gsSlot]! > 0;
-  idle(70, { a: {} });
+  idle(Math.ceil(WEAPONS['brick-bomb']!.fireIntervalSec * BOMBING_REATTACK_MUL * 30) + 10, {
+    a: {},
+  });
+  // Ground Strike throws the bomb forward and down.
   let bombDown = false;
   for (const e of sim2.step(new Map([['a', mk(2, { aim: [0, 0, -1], fire2: true })]]))) {
-    if (e.type === 'projectileSpawned' && e.owner === 'a' && e.dir[1] < -0.1) bombDown = true;
+    if (
+      e.type === 'projectileSpawned' &&
+      e.owner === 'a' &&
+      e.dir[1] < 0 &&
+      Math.hypot(e.dir[0], e.dir[2]) > 0.5
+    )
+      bombDown = true;
   }
   // Pressing the active mode turns bombing off again.
   idle(70, { a: {} });
