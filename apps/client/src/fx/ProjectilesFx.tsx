@@ -1684,7 +1684,7 @@ function updateShipFx(fx: Fx, dt: number, cam: THREE.Vector3) {
     q.set(s.rot[0], s.rot[1], s.rot[2], s.rot[3]);
     const bl = world.boostLevel.get(s.id) ?? 0; // continuous boost intensity
     const sp = dx * dx + dy * dy + dz * dz > 500 * 500 ? TRAIL_SPACING * 3 : TRAIL_SPACING;
-    const [ar, ag, ab] = trailRgb(s.nation, look.upgrade);
+    const [ar, ag, ab] = trailRgb(s.nation, look.upgrade, s.cosmetic);
     const ub = 1 + look.upgrade * 0.03; // higher upgrades leave fatter, longer, brighter trails
     for (let i = 0; i < engines.length; i++) {
       const e = engines[i]!;
