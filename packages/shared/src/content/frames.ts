@@ -15,7 +15,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     name: 'Wasp',
     role: 'Agile fighter',
     ...engineStats('kestrel-jet'),
-    maxHp: 1800,
+    maxHp: 2100,
     maxShield: 800,
     shieldRegenPerSec: 35,
     shieldRegenDelaySec: 4,
@@ -81,7 +81,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     name: 'Anvil',
     role: 'Bomber',
     ...engineStats('mule-turbine'),
-    maxHp: 2650,
+    maxHp: 1850,
     maxShield: 900,
     shieldRegenPerSec: 40,
     shieldRegenDelaySec: 5,
@@ -147,7 +147,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     name: 'Halo',
     role: 'Support',
     ...engineStats('lantern-drive'),
-    maxHp: 1700,
+    maxHp: 2400,
     maxShield: 600,
     shieldRegenPerSec: 25,
     shieldRegenDelaySec: 4,
@@ -213,7 +213,7 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     name: 'Bulwark',
     role: 'Armored gunship',
     ...engineStats('crawler-rig'),
-    maxHp: 2950,
+    maxHp: 2800,
     maxShield: 900,
     shieldRegenPerSec: 35,
     shieldRegenDelaySec: 5,
@@ -346,8 +346,8 @@ export const TARGETING = {
  * - homing missiles get `endgameTurnMul` turn rate inside `endgameDistM` so straight flight is not enough.
  */
 export const MISSILE_EVADE = {
-  rollBreakDistM: 600,
+  rollBreakDistM: 460,
   losBreakSec: 0.4,
-  endgameDistM: 650,
+  endgameDistM: 500,
   endgameTurnMul: 1.25,
 };

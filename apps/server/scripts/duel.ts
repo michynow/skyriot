@@ -45,16 +45,16 @@ const ACE: BotSkill = {
   combatThrottle: 0.5,
   rollDodgeChance: 0.5,
   panicRollChance: 0,
-  rollWindowMinM: 70,
-  rollWindowMaxM: 570,
+  rollWindowMinM: 55,
+  rollWindowMaxM: 440,
   skillUseChance: 0.02,
   missileFireChance: 0.3,
   disengageChance: 0,
   turnBrake: true,
   pivotFlip: true,
   strafeGround: true,
-  standoffMinM: 250,
-  standoffMaxM: 800,
+  standoffMinM: 190,
+  standoffMaxM: 600,
 };
 const HOLD: BotSkill = { ...ACE, heatCap: 1.01 };
 const NO_KITS: BotSkill = { ...ACE, kits: false };

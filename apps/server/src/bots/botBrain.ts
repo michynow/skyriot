@@ -49,8 +49,8 @@ export const BOT_SKILL = {
   /** Chance of a (wasted) Barrel Roll when an evasive jink starts after taking damage. */
   panicRollChance: 0.08,
   /** Missile distance window (m) a Bot tries to Barrel Roll in. */
-  rollWindowMinM: 130,
-  rollWindowMaxM: 350,
+  rollWindowMinM: 100,
+  rollWindowMaxM: 270,
   skillUseChance: 0.004,
   missileFireChance: 0.015,
   disengageChance: 0.5,
@@ -216,8 +216,6 @@ export function createBotMemory(
 
 /** Bots are just another PilotInput source: the sim cannot tell them from humans. */
 /** Per-tick chance to start a sideways jink against a bombing Anvil (a jink lasts 0.5-1.2 s). */
-/** Standoff range scale against a bombing Anvil (closer = inside its turn). */
-const BOMBER_STANDOFF_MUL = 0.4;
 const BOMBER_JINK_CHANCE = 0.02;
 
 export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
@@ -312,11 +310,10 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   }
   const groundRun =
     mem.skill.strafeGround && enemy?.grounded === true && me.frame !== 'anvil' && !retreating;
-  // An enemy Anvil with a bombing mode on is slow and one-hits at range: hold a tighter standoff.
+  // An enemy Anvil with a bombing mode on: jink (below) so its salvos lead into empty air.
   const bomberThreat = enemy?.frame === 'anvil' && !!enemy.toggles.bombing && me.frame !== 'anvil';
-  const standoff = bomberThreat ? BOMBER_STANDOFF_MUL : 1;
-  if (!enemy || enemy.grounded || dist > mem.skill.standoffMaxM * standoff) mem.separating = false;
-  else if (dist < mem.skill.standoffMinM * standoff) mem.separating = true;
+  if (!enemy || enemy.grounded || dist > mem.skill.standoffMaxM) mem.separating = false;
+  else if (dist < mem.skill.standoffMinM) mem.separating = true;
   if (enemy && mem.separating && !retreating) {
     const away = norm3(me.pos[0] - enemy.pos[0], 0, me.pos[2] - enemy.pos[2]);
     tx = me.pos[0] + away[0] * 800;

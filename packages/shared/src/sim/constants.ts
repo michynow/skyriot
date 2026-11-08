@@ -83,9 +83,9 @@ export const DAMAGE_AURA_RADIUS = 55;
 /** Desired turn rate = angle-to-aim * gain (capped at turnRate): eases out of turns. */
 export const TURN_GAIN = 7;
 /** Angular velocity blend time constant (s): eases into turns. */
-export const TURN_TAU_SEC = 0.09;
+export const TURN_TAU_SEC = 0.13;
 /** Turn rate gains/loses up to this fraction: +below cruise, −toward boost speed. */
-export const TURN_SPEED_FALLOFF = 0.35;
+export const TURN_SPEED_FALLOFF = 0.45;
 
 // Launch Decks
 export const DECK_HALF_THICKNESS = 1;
@@ -108,7 +108,7 @@ export const LAND_HOLD_HEADING_MUL = 0.5;
 export const GROUND_CLEARANCE_EXTRA = 2;
 export const GROUND_STRAFE_MUL = 0.5;
 /** Grounded Bulwark drives at this fraction of its (air) cruise speed. */
-export const GROUND_DRIVE_MUL = 0.2;
+export const GROUND_DRIVE_MUL = 0.25;
 export const GROUND_REVERSE_MUL = 0.5;
 export const GROUND_MAX_SLOPE_RAD = (40 * Math.PI) / 180;
 export const GROUND_SLIDE_SPEED = 25;
@@ -133,14 +133,14 @@ export const ROLL_DISPLACEMENT_PER_IMPULSE = 0.25;
 
 // Frame core kits
 export const AIR_BARRAGE_COUNT = 5;
-export const AIR_BARRAGE_SPREAD_RAD = 0.045;
+export const AIR_BARRAGE_SPREAD_RAD = 0.09;
 /** Air Barrage rockets burst wider than the plain bomb. */
-export const AIR_BARRAGE_SPLASH_MUL = 2.2;
+export const AIR_BARRAGE_SPLASH_MUL = 1.6;
 /**
  * Each of the salvo's rockets deals this multiple of the Secondary's damage. No single rocket kills: the whole
- * salvo landing (5 x ~730 = ~3640) takes most Frames from full HP + shield. Air Barrage outhits Ground Strike.
+ * salvo landing (5 x ~570 = ~2860) takes most Frames from full HP + shield. Air Barrage outhits Ground Strike.
  */
-export const AIR_BARRAGE_DAMAGE_MUL = 1.4;
+export const AIR_BARRAGE_DAMAGE_MUL = 1.1;
 /** Wide Lock Mode: the Secondary's lock cone widens by this, its lock/fire range scales, and each salvo seeks up to N Ships. */
 export const WIDE_LOCK_CONE_ADD_RAD = 0.384; // ~22 degrees
 export const WIDE_LOCK_RANGE_MUL = 1.45;
@@ -189,4 +189,4 @@ export const MISSILE_FUSE_M = 20;
  * A target pulling at least this lateral acceleration (speed * turn rate, m/s^2) while the missile is in its
  * endgame out-turns it. Wasp manages it at cruise, Halo needs throttle, Anvil/Bulwark only while boosting.
  */
-export const BREAK_TURN_ACCEL = 1030;
+export const BREAK_TURN_ACCEL = 770;

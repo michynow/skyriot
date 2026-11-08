@@ -997,7 +997,7 @@ const sweep = (i: number): Partial<PilotInput> => ({
 const eq = {
   flightRollBoostDash: prediction(true, 'wasp', [0, 600, 0], sweep),
   edgeOverride: prediction(true, 'wasp', [1500, 500, 0], () => ({ aim: [1, 0, 0] })),
-  buffMovement: prediction(false, 'wasp', [0, 600, 0], (i) => ({
+  buffMovement: prediction(true, 'wasp', [0, 600, 0], (i) => ({
     ...sweep(i),
     hotbar: i === 3 ? 1 : i === 10 ? 2 : sweep(i).hotbar,
   })),
@@ -1045,7 +1045,7 @@ const eq = {
     [0, 1].map((n) => [
       `consumableCharges${n}`,
       prediction(
-        false,
+        true,
         'wasp',
         [0, 600, 0],
         (i) => ({ ...sweep(i), hotbar: i === 60 ? waspSlot('fuel-cell') : -1 }),
