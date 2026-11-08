@@ -576,7 +576,6 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
       me.incomingDist < mem.skill.rollWindowMaxM &&
       me.incomingDist > mem.skill.rollWindowMinM &&
       me.rollCooldownTicks === 0 &&
-      me.fuel >= fd.rollFuelCost &&
       mem.rng() < mem.skill.rollDodgeChance
     ) {
       if (mem.rng() < 0.5) input.rollLeft = true;

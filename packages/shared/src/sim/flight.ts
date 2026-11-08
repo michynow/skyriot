@@ -530,7 +530,6 @@ export function stepFlight(
   if (
     (input.rollLeft || input.rollRight) &&
     s.rollCooldownTicks === 0 &&
-    s.fuel >= fd.rollFuelCost &&
     s.rollPhase < 0 &&
     !(boosting && input.boost) && // only while boost is held: the bleed or a tap's tail never blocks a roll
     !sieged &&
@@ -541,7 +540,6 @@ export function stepFlight(
     s.rollDir = dir;
     s.rollTicks = Math.ceil(fd.rollInvulnSec * TICK_HZ);
     s.rollCooldownTicks = Math.ceil(fd.rollCooldownSec * rec.mods.rollCooldownMul * TICK_HZ);
-    s.fuel -= fd.rollFuelCost;
     ctx.events.push({ type: 'barrelRoll', id: s.id, dir });
   }
 

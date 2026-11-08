@@ -446,7 +446,6 @@ export interface FrameDef extends Omit<EngineDef, 'id' | 'name'> {
   rollImpulse: number; // m/s lateral burst
   rollInvulnSec: number;
   rollCooldownSec: number;
-  rollFuelCost: number;
   deflectChance: number; // 0..0.15
   ammo1Max: number;
   /** Radar and visibility range (m): enemies beyond it aren't shown or sent to this Pilot. */
