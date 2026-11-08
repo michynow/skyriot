@@ -952,6 +952,17 @@
   font-size: 20px;
   color: #ffd24a;
   margin-top: 4px;
+  animation: roll-now 0.35s ease-in-out infinite alternate;
+}
+@keyframes roll-now {
+  from {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  to {
+    opacity: 0.55;
+    transform: scale(1);
+  }
 }
 .inc-arrow {
   position: absolute;

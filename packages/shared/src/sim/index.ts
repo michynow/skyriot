@@ -121,6 +121,7 @@ export {
   LAND_DECK_RANGE,
   NOSE_OFFSET,
   ROLL_DURATION_SEC,
+  ROLL_EVADE_WINDOW_SEC,
 } from './constants';
 // Heat HUD: the forced Primary cool-down length.
 export { OVERHEAT_COOL_MUL } from './constants';

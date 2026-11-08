@@ -38,6 +38,8 @@ import {
   BREAK_TURN_ACCEL,
   MISSILE_FUSE_M,
   MISSILE_MOTOR_SEC,
+  ROLL_EVADE_SWERVE_RAD,
+  ROLL_EVADE_WINDOW_SEC,
   WEAVE_AMP_MIN_M,
   WEAVE_AMP_SPAN_M,
   WEAVE_PERIOD_MIN_SEC,
@@ -1136,8 +1138,33 @@ export function stepProjectiles(ctx: SimCtx): void {
         const missile = p.kind === 'missile';
         let broke: 'roll' | 'terrain' | 'lost' | null = null;
         if (missile) {
-          if (ts.rollTicks > 0 && tl < MISSILE_EVADE.rollBreakDistM && !t.mods.missileBlind) {
+          if (
+            ts.rollTicks > 0 &&
+            (tl < MISSILE_EVADE.rollBreakDistM || tl <= p.speed * ROLL_EVADE_WINDOW_SEC) &&
+            !t.mods.missileBlind
+          ) {
             broke = 'roll';
+            // Spoofed: swerve away from the Target (tx,ty,tz point at it) so it overshoots instead of drifting in.
+            const along = p.dx * tx + p.dy * ty + p.dz * tz;
+            let ox = p.dx - along * tx,
+              oy = p.dy - along * ty,
+              oz = p.dz - along * tz;
+            let ol = Math.hypot(ox, oy, oz);
+            if (ol < 1e-6) {
+              ox = -tz;
+              oy = 0;
+              oz = tx;
+              ol = Math.hypot(ox, oz) || 1;
+            }
+            const c = Math.cos(ROLL_EVADE_SWERVE_RAD),
+              sn = Math.sin(ROLL_EVADE_SWERVE_RAD);
+            p.dx = p.dx * c + (ox / ol) * sn;
+            p.dy = p.dy * c + (oy / ol) * sn;
+            p.dz = p.dz * c + (oz / ol) * sn;
+            const dl = Math.hypot(p.dx, p.dy, p.dz) || 1;
+            p.dx /= dl;
+            p.dy /= dl;
+            p.dz /= dl;
           } else if (
             age * dt > MISSILE_MOTOR_SEC ||
             (tl < MISSILE_EVADE.endgameDistM &&

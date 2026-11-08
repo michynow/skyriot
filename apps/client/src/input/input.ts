@@ -34,8 +34,8 @@ export const inputState = {
   rollDeniedAt: 0,
   /** performance.now() of the last C with no own Launch Deck in landing range. */
   landDeniedAt: 0,
-  /** Why that double-tap was denied: boost held, too little fuel, or still recharging. */
-  rollDeniedWhy: '' as '' | 'boost' | 'fuel' | 'cooldown',
+  /** Why that double-tap was denied: boost held or still recharging. */
+  rollDeniedWhy: '' as '' | 'boost' | 'cooldown',
   /** Hotbar bar the number keys fire (0-based); Tab cycles, F1-F3 pick. */
   hotbarBar: 0,
   /** Last aim direction sent (unit, world space); HUD range feedback raycasts along it from the Ship. */
@@ -228,16 +228,14 @@ export function attachInput(canvas: HTMLElement): () => void {
         rollArmUntil = performance.now() + ROLL_ARM_MS;
         lastUp[e.code] = -1e9;
         const own = world.ownId ? world.ships.get(world.ownId) : undefined;
-        // The roll won't happen (boost held, tank too low, recharging past the arm window): say so, never fail silently.
+        // The roll won't happen (boost held, recharging past the arm window): say so, never fail silently.
         const why = !own
           ? ''
           : keys.has('Space') && own.fuel > 0
             ? 'boost'
-            : own.fuel < FRAMES[own.frame].rollFuelCost
-              ? 'fuel'
-              : own.rollCooldownTicks / TICK_HZ > ROLL_ARM_MS / 1000
-                ? 'cooldown'
-                : '';
+            : own.rollCooldownTicks / TICK_HZ > ROLL_ARM_MS / 1000
+              ? 'cooldown'
+              : '';
         if (why) {
           inputState.rollDeniedAt = performance.now();
           inputState.rollDeniedWhy = why;
@@ -245,7 +243,7 @@ export function attachInput(canvas: HTMLElement): () => void {
       }
     } else if (e.code === 'Tab') inputState.hotbarBar = (inputState.hotbarBar + 1) % HOTBAR_BARS;
     else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') switchTarget();
-    else if (e.code === 'KeyX') world.lookBack = true;
+    else if (e.code === 'KeyR') world.lookBack = true;
     else if (e.code === 'KeyB' || (e.code === 'KeyY' && inputState.haltPromptUntil > 0)) {
       const own = world.ownId ? world.ships.get(world.ownId) : undefined;
       const now = performance.now();
@@ -254,7 +252,8 @@ export function attachInput(canvas: HTMLElement): () => void {
         halt = true;
         inputState.haltPromptUntil = 0;
       } else if (e.code === 'KeyB') inputState.haltPromptUntil = now + HALT_CONFIRM_MS;
-    } else if (e.code === 'KeyR' && !e.repeat) launch = true;
+    } else if (e.code === 'Space')
+      launch = true; // launches off a Launch Deck / the catapult
     else if (e.code.startsWith('Alt')) {
       world.freeLook = true;
       world.cursor.x = world.cursor.y = 0;
@@ -314,7 +313,7 @@ export function attachInput(canvas: HTMLElement): () => void {
     keys.delete(e.code);
     if (e.code === 'KeyA' || e.code === 'KeyD') lastUp[e.code] = performance.now();
     if (e.code.startsWith('Alt')) world.freeLook = false;
-    if (e.code === 'KeyX') world.lookBack = false;
+    if (e.code === 'KeyR') world.lookBack = false;
   };
   const onMouseMove = (e: MouseEvent) => {
     if (inputState.typing) return;

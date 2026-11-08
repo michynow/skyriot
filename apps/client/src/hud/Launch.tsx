@@ -123,7 +123,7 @@ export function Launch() {
           <small>{tunnelName(h.tunnel)}</small>
           <h2>CATAPULT READY</h2>
           <p>
-            FULL THROTTLE <kbd>W</kbd>
+            <kbd>SPACE</kbd> or full throttle <kbd>W</kbd>
           </p>
         </div>
       </div>

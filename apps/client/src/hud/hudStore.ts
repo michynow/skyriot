@@ -726,11 +726,9 @@ export function startHudFeed(): () => void {
             ? ''
             : inputState.rollDeniedWhy === 'boost'
               ? 'NO ROLL WHILE BOOSTING'
-              : inputState.rollDeniedWhy === 'fuel'
-                ? 'NO FUEL TO ROLL'
-                : own.rollCooldownTicks > 0
-                  ? `ROLL RECHARGING ${(own.rollCooldownTicks / TICK_HZ).toFixed(1)}s`
-                  : '',
+              : own.rollCooldownTicks > 0
+                ? `ROLL RECHARGING ${(own.rollCooldownTicks / TICK_HZ).toFixed(1)}s`
+                : '',
         deckHint: own.docked
           ? ''
           : own.landing

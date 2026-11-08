@@ -23,12 +23,11 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     verticalSpeed: 75,
     lateralTauSec: 0.07,
     slipTauSec: 0.05,
-    fuelBurnPerSec: 0.22,
-    fuelRegenPerSec: 0.12,
+    fuelBurnPerSec: 0.05, // a full tank = 20 s of boost
+    fuelRegenPerSec: 0.05,
     rollImpulse: 120,
-    rollInvulnSec: 1.1, // = ROLL_DURATION_SEC: invulnerable for the whole visible roll
+    rollInvulnSec: 1.1, // the spin (~94% of the visual rotation); the last of ROLL_DURATION_SEC is the settle
     rollCooldownSec: 3,
-    rollFuelCost: 0.12,
     deflectChance: 0.15,
     ammo1Max: 3600,
     ammo2Max: 320,
@@ -89,12 +88,11 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     verticalSpeed: 66,
     lateralTauSec: 0.09,
     slipTauSec: 0.1,
-    fuelBurnPerSec: 0.18,
-    fuelRegenPerSec: 0.1,
+    fuelBurnPerSec: 0.05, // a full tank = 20 s of boost
+    fuelRegenPerSec: 0.05,
     rollImpulse: 105,
-    rollInvulnSec: 1.1, // = ROLL_DURATION_SEC: invulnerable for the whole visible roll
+    rollInvulnSec: 1.1, // the spin (~94% of the visual rotation); the last of ROLL_DURATION_SEC is the settle
     rollCooldownSec: 3,
-    rollFuelCost: 0.14,
     deflectChance: 0.1,
     ammo1Max: 1500,
     ammo2Max: 100,
@@ -155,12 +153,11 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     verticalSpeed: 63,
     lateralTauSec: 0.12,
     slipTauSec: 0.1,
-    fuelBurnPerSec: 0.2,
-    fuelRegenPerSec: 0.12,
+    fuelBurnPerSec: 0.05, // a full tank = 20 s of boost
+    fuelRegenPerSec: 0.05,
     rollImpulse: 110,
-    rollInvulnSec: 1.1, // = ROLL_DURATION_SEC: invulnerable for the whole visible roll
+    rollInvulnSec: 1.1, // the spin (~94% of the visual rotation); the last of ROLL_DURATION_SEC is the settle
     rollCooldownSec: 3,
-    rollFuelCost: 0.14,
     deflectChance: 0.08,
     ammo1Max: 2400,
     ammo2Max: 320,
@@ -221,12 +218,11 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     verticalSpeed: 36,
     lateralTauSec: 0.08,
     slipTauSec: 0.08,
-    fuelBurnPerSec: 0.2,
-    fuelRegenPerSec: 0.1,
+    fuelBurnPerSec: 0.05, // a full tank = 20 s of boost
+    fuelRegenPerSec: 0.05,
     rollImpulse: 65,
-    rollInvulnSec: 1.1, // = ROLL_DURATION_SEC: invulnerable for the whole visible roll
+    rollInvulnSec: 1.1, // the spin (~94% of the visual rotation); the last of ROLL_DURATION_SEC is the settle
     rollCooldownSec: 3,
-    rollFuelCost: 0.2,
     deflectChance: 0.03,
     ammo1Max: 1800,
     ammo2Max: 192,

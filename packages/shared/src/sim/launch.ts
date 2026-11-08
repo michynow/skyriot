@@ -120,7 +120,12 @@ export function stepLaunch(ctx: SimCtx, rec: ShipRec, input: PilotInput): void {
       }
       return;
     case 'ready':
-      if (s.isBot || input.throttle >= LAUNCH.readyThrottle || --s.launchTicks <= 0) {
+      if (
+        s.isBot ||
+        input.launch ||
+        input.throttle >= LAUNCH.readyThrottle ||
+        --s.launchTicks <= 0
+      ) {
         s.launchPhase = 'catapult';
         s.launchTicks = strokeTicks(ctx, rec);
         ctx.events.push({ type: 'catapult', id: s.id, tunnel: s.tunnel });

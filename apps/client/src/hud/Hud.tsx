@@ -434,7 +434,7 @@ function Warnings() {
       {h.docked && flying && (
         <div className="dock">
           {fullyStocked ? (
-            <b className="ready">PRESS R TO LAUNCH</b>
+            <b className="ready">PRESS SPACE TO LAUNCH</b>
           ) : (
             <>
               <b>DOCKED — RESUPPLYING…</b>
