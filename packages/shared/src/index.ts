@@ -3,6 +3,7 @@ export * from './content/engines';
 export * from './content/frames';
 export * from './content/weapons';
 export * from './content/maps';
+export * from './content/cities';
 export * from './content/bases';
 export * from './content/economy';
 export * from './content/items';

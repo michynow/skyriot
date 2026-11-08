@@ -76,6 +76,22 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       );
     }
   }
+  // City buildings: static boxes / upright cylinders from the shared layout, so client and server agree.
+  for (const b of map.layout?.blocks ?? []) {
+    if (b.solid === false) continue;
+    const [w, h, d] = b.size;
+    const desc =
+      b.shape === 'cyl'
+        ? R.ColliderDesc.cylinder(h / 2, w / 2)
+        : R.ColliderDesc.cuboid(w / 2, h / 2, d / 2);
+    const yaw = b.yaw ?? 0;
+    world.createCollider(
+      desc
+        .setTranslation(b.pos[0], b.pos[1] + h / 2, b.pos[2])
+        .setRotation({ x: 0, y: Math.sin(yaw / 2), z: 0, w: Math.cos(yaw / 2) })
+        .setCollisionGroups(TERRAIN_GROUPS),
+    );
+  }
   const controller = world.createCharacterController(KCC_OFFSET);
   controller.setSlideEnabled(true);
 

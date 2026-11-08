@@ -2396,6 +2396,23 @@ body.rpg-dragging {
   letter-spacing: 0.2em;
   color: #9ff0da;
 }
+.city-prompt {
+  display: flex;
+  gap: 18px;
+  margin-top: 4px;
+  padding: 4px 14px;
+  font-size: 18px;
+  color: #fff3d6;
+  background: #ffd24a1f;
+  border: 1px solid #ffd24a66;
+  animation: city-prompt-in 0.18s ease-out;
+}
+@keyframes city-prompt-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
 
 /* Targeting: candidate bracket, off-screen Target arrow, far (greyed) state, Target window, weapon panel. */
 .cand {

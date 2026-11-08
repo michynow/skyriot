@@ -18,6 +18,7 @@ import { FlightTapes } from './FlightTapes';
 import { Launch } from './Launch';
 import { BattleBanner, BattleEnd, Objectives } from './Objectives';
 import { world } from '../state/world';
+import { useCityPrompt } from '../scene/city/prompt';
 import { useProfile } from '../state/profile';
 import { ItemIcon } from '../ui/rpg/itemIcons';
 import { closeWindow, isWindowOpen, openWindow, useWindows } from '../ui/rpg/windows';
@@ -508,6 +509,7 @@ function FlightTips() {
 
 /** Cities have no Battle panel: say where we are and which windows serve the City. */
 function CityBanner() {
+  const prompts = useCityPrompt((s) => s.prompts);
   const city = world.map?.city ? world.map : null;
   if (!city) return null;
   const gate = city.gates?.[0];
@@ -515,9 +517,18 @@ function CityBanner() {
     <div className="city-banner">
       <b>{city.name.toUpperCase()} · SAFE ZONE</b>
       <span>
-        Vendor <kbd>V</kbd> · Character <kbd>P</kbd> · Inventory <kbd>I</kbd>
+        Vendor <kbd>V</kbd> · Hangar <kbd>P</kbd> · Inventory <kbd>I</kbd>
         {gate && ` · fly through the Gate to return to ${MAPS[gate.to]?.name ?? gate.to}`}
       </span>
+      {prompts.length > 0 && (
+        <span className="city-prompt">
+          {prompts.map((p) => (
+            <span key={p.label}>
+              <kbd>{p.key}</kbd> {p.label}
+            </span>
+          ))}
+        </span>
+      )}
     </div>
   );
 }

@@ -349,6 +349,33 @@ export interface MapDef {
   /** City: safe zone (no damage), hosts the shop/hangar; owned by this Nation. */
   city?: NationId;
   gates?: GateDef[];
+  /** City only: its own ground and the buildings Ships collide with. */
+  layout?: CityLayout;
+}
+
+/** Which Window a City building serves (its key works anywhere in the City; the building just shows the prompt). */
+export type CityService = 'vendor' | 'hangar' | 'charms';
+
+/** One solid City building. Collider = box (or upright cylinder) over its footprint, base at `pos`. */
+export interface CityBlock {
+  /** Look selector for the client builder (e.g. 'gild-tower', 'crane'). */
+  kind: string;
+  /** Centre of the footprint at the base (m). */
+  pos: Vec3;
+  /** Width (x), height (y), depth (z) before yaw; a cylinder uses size[0] as diameter. */
+  size: Vec3;
+  /** Rotation about +Y (radians). */
+  yaw?: number;
+  shape?: 'box' | 'cyl';
+  /** false: drawn but not collided with (thin props). Default solid. */
+  solid?: boolean;
+  service?: CityService;
+}
+
+export interface CityLayout {
+  /** Heightfield generator: Gildspire's mesa above a cloud sea, Rivet Harbor's quay and bay. */
+  ground: 'sky-mesa' | 'harbour';
+  blocks: CityBlock[];
 }
 
 export interface BaseDef {
