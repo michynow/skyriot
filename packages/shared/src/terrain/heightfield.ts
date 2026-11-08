@@ -17,6 +17,18 @@ export function generateHeightfield(map: MapDef): Heightfield {
   const n = map.resolution;
   const noise = createNoise2D(mulberry32(map.seed));
   const heights = new Float32Array(n * n);
+  const ground = map.layout?.ground;
+  if (ground) {
+    const f = ground === 'sky-mesa' ? skyMesa : harbour;
+    for (let iz = 0; iz < n; iz++)
+      for (let ix = 0; ix < n; ix++)
+        heights[iz * n + ix] = f(
+          noise,
+          (ix / (n - 1) - 0.5) * map.size,
+          (iz / (n - 1) - 0.5) * map.size,
+        );
+    return { resolution: n, size: map.size, heights };
+  }
   for (let iz = 0; iz < n; iz++) {
     for (let ix = 0; ix < n; ix++) {
       const u = ix / (n - 1);
@@ -61,6 +73,52 @@ function flattenForBases(map: MapDef, x: number, z: number, h: number): number {
 }
 
 const PLATEAU_BLEND = 1.3;
+
+type Noise = (x: number, y: number) => number;
+
+/** Gildspire rock: flat tops (buildings stand at `top`), edge wobbles inward only, cliff flares out to the floor. */
+export const SKY_MESAS: { x: number; z: number; r: number; top: number }[] = [
+  { x: 0, z: 0, r: 560, top: 200 },
+  { x: 560, z: -470, r: 150, top: 300 },
+  { x: -620, z: 360, r: 140, top: 260 },
+  { x: 660, z: 420, r: 120, top: 230 },
+  { x: -730, z: -570, r: 90, top: 190 },
+];
+const MESA_FLARE_M = 110;
+
+/** Gildspire: cliff-top mesas over a cloud sea (the cloud deck is drawn above this floor). */
+function skyMesa(noise: Noise, x: number, z: number): number {
+  const floor = 6 + 6 * noise(x * 0.002, z * 0.002);
+  let h = floor;
+  for (const m of SKY_MESAS) {
+    const d = Math.hypot(x - m.x, z - m.z);
+    const rr = m.r * (0.92 + 0.08 * noise(x * 0.004 + m.x, z * 0.004 + m.z));
+    if (d > rr + MESA_FLARE_M) continue;
+    const k = Math.max(d - rr, 0) / MESA_FLARE_M;
+    h = Math.max(h, floor + (m.top - floor) * (1 - k) ** 2.5);
+  }
+  return h;
+}
+
+/** Rivet Harbor levels: quay deck and the bay floor (water is drawn at y = 0). */
+export const HARBOUR = { quay: 6, bay: -5 };
+
+/** Rivet Harbor: a flat quay north of a bay that opens south, headlands east and west, hills behind. */
+function harbour(noise: Noise, x: number, z: number): number {
+  const shore = 150 + 25 * noise(x * 0.003, 7.7);
+  const ax = Math.abs(x);
+  const half = 980 + 60 * noise(z * 0.003, 3.1);
+  if (z > shore && ax < half) return HARBOUR.bay;
+  const h = HARBOUR.quay;
+  const hills = smooth(-560, -1150, z) * (110 + 70 * noise(x * 0.003, z * 0.003));
+  const heads = smooth(half, half + 400, ax) * (90 + 60 * noise(x * 0.004, z * 0.004));
+  return h + Math.max(hills, heads, 0);
+}
+
+function smooth(a: number, b: number, v: number): number {
+  const t = Math.min(Math.max((v - a) / (b - a), 0), 1);
+  return t * t * (3 - 2 * t);
+}
 
 /** Bilinear height at world x/z. Terrain spans [-size/2, size/2]. */
 export function sampleHeight(hf: Heightfield, x: number, z: number): number {

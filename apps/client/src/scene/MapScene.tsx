@@ -11,6 +11,7 @@ import { Scatter } from './Scatter';
 import { Structures } from './Structures';
 import { SkyDome, SUN_DIR } from './SkyDome';
 import { Terrain } from './Terrain';
+import { CITY_LOOK, CityScene } from './city/CityScene';
 
 const LIGHT = {
   'desert-dusk': { sun: '#ffa868', sunI: 3.1, sky: '#a89ac8', ground: '#b0653a', hemiI: 0.85 },
@@ -35,8 +36,9 @@ const SHADOW_R = 260;
 function Lights({ map }: { map: MapDef }) {
   const sun = useRef<THREE.DirectionalLight>(null);
   const target = useMemo(() => new THREE.Object3D(), []);
-  const L = LIGHT[map.env.sky];
-  const dir = SUN_DIR[map.env.sky];
+  const city = map.layout ? CITY_LOOK[map.layout.ground] : null;
+  const L = city?.light ?? LIGHT[map.env.sky];
+  const dir = city?.sun ?? SUN_DIR[map.env.sky];
   useFrame(() => {
     const l = sun.current;
     const s = world.ownId ? world.ships.get(world.ownId) : undefined;
@@ -102,10 +104,10 @@ export function MapScene({ map, onReady }: { map: MapDef; onReady?: () => void }
       pm.dispose();
     };
   }, [gl]);
-  const atmos = map.env.kind === 'atmosphere';
+  const atmos = map.env.kind === 'atmosphere' && !map.layout;
   return (
     <>
-      <SkyDome env={map.env} />
+      {map.layout ? <CityScene map={map} hf={hf} /> : <SkyDome env={map.env} />}
       <Lights map={map} />
       <LaunchDecks map={map} />
       <Gates map={map} />

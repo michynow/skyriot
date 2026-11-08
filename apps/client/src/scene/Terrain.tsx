@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import type { Heightfield, MapDef } from '@skyriot/shared';
 
 /** Render-only mesh of the exact heights the server collides with (row-major iz*n+ix, x/z in [-size/2, size/2]). */
-function buildGeometry(hf: Heightfield) {
+export function buildGeometry(hf: Heightfield) {
   const n = hf.resolution;
   const g = new THREE.PlaneGeometry(hf.size, hf.size, n - 1, n - 1);
   g.rotateX(-Math.PI / 2); // plane row 0 -> z = -size/2, matching iz = 0

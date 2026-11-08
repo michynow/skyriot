@@ -1,4 +1,5 @@
 import type { MapDef } from '../types';
+import { GILDSPIRE_CITY, RIVET_HARBOR_CITY, type CityContent } from './cities';
 
 export const RUSTWATER_CANYONS: MapDef = {
   id: 'rustwater-canyons',
@@ -94,13 +95,17 @@ export const RUSTWATER_CANYONS: MapDef = {
   ],
 };
 
-/** City Maps: small, low rolling ground, no Bases. Safe zone (sim skips damage and firing). */
+/**
+ * City Maps: no Bases, safe zone (sim skips damage and firing). Each has its own ground and buildings
+ * (cities.ts); the Gate back to Rustwater sits on the far side so arrivals look across the City.
+ */
 function city(
   id: string,
   name: string,
   nation: 'concord' | 'vex',
   seed: number,
   fog: string,
+  c: CityContent,
 ): MapDef {
   return {
     id,
@@ -108,10 +113,11 @@ function city(
     seed,
     // Soft boundary starts 700 m in from the edge; 3600 leaves a ±1100 m open bowl.
     size: 3600,
-    resolution: 129,
-    maxHeight: 60,
+    resolution: 257,
+    maxHeight: 300,
     ceiling: 700,
     city: nation,
+    layout: c.layout,
     env: {
       kind: 'atmosphere',
       gravity: 9.8,
@@ -121,18 +127,21 @@ function city(
       fogFar: 3300,
       sky: 'desert-dusk',
     },
-    launchDecks: { concord: [], vex: [] },
-    spawns: {
-      concord: [[0, 260, 450]],
-      vex: [[0, 260, 450]],
-    },
-    // Off the spawn's heading (spawns face the centre), so a fresh Pilot doesn't drift straight in.
-    gates: [{ pos: [-675, 260, -525], radius: 45, to: RUSTWATER_CANYONS.id }],
+    launchDecks: c.launchDecks,
+    spawns: { concord: [c.spawn], vex: [c.spawn] },
+    gates: [c.gate],
   };
 }
 
-export const GILDSPIRE = city('gildspire', 'Gildspire', 'concord', 4242, '#e3c38a');
-export const RIVET_HARBOR = city('rivet-harbor', 'Rivet Harbor', 'vex', 6161, '#a8705a');
+export const GILDSPIRE = city('gildspire', 'Gildspire', 'concord', 4242, '#efd9ae', GILDSPIRE_CITY);
+export const RIVET_HARBOR = city(
+  'rivet-harbor',
+  'Rivet Harbor',
+  'vex',
+  6161,
+  '#7f8c86',
+  RIVET_HARBOR_CITY,
+);
 
 export const MAPS: Record<string, MapDef> = {
   [RUSTWATER_CANYONS.id]: RUSTWATER_CANYONS,
