@@ -35,7 +35,9 @@ const AIR_MARK_RANGE_FRAC = 0.9;
 const FADE_NEAR_M = 25;
 const FADE_FAR_M = 60;
 /** Minimum angular size (radius / camera distance) so the sight stays readable far away. */
-const MIN_ANGULAR = 0.045;
+const MIN_ANGULAR = 0.018;
+/** Maximum angular size: past this the ring stays a sight, not a wall (the blast still covers its real area). */
+const MAX_ANGULAR = 0.035;
 const MAX_STEPS = 900;
 const TEETH = 12;
 
@@ -117,8 +119,8 @@ function trace(
 }
 
 /**
- * Where the Secondary will land: a bright gold toothed gun-sight ring (dark outline for contrast) over a
- * faint blast-area fill, sized to the real blast radius and drawn on top
+ * Where the Secondary will land: a gold toothed gun-sight ring (thin dark outline for contrast) over a faint
+ * blast-area fill, sized to the blast radius within MIN/MAX_ANGULAR on screen and drawn on top
  * of everything. Ground-strike bombs: flat on the terrain at the ballistic impact of the forward throw. Air
  * mode: facing the camera where the rockets meet terrain or AIR_MARK_RANGE_FRAC of their range down the aim,
  * whichever is nearer.
@@ -232,16 +234,16 @@ export function AimPreview() {
     } else return;
 
     const camD = camera.position.distanceTo(sight.position.set(hit[0]!, hit[1]!, hit[2]!));
-    sight.scale.setScalar(Math.max(radius, camD * MIN_ANGULAR));
+    sight.scale.setScalar(Math.min(Math.max(radius, camD * MIN_ANGULAR), camD * MAX_ANGULAR));
     if (flat) {
       sight.position.y += 0.6;
       sight.rotation.set(-Math.PI / 2, 0, 0);
     } else sight.quaternion.copy(camera.quaternion);
     const [fill, bg, fg] = sight.children as Mesh[];
     const pulse = 0.85 + 0.15 * Math.sin(clock.elapsedTime * 6);
-    (fg!.material as MeshBasicMaterial).opacity = pulse * opacity;
-    (bg!.material as MeshBasicMaterial).opacity = 0.6 * opacity;
-    (fill!.material as MeshBasicMaterial).opacity = 0.18 * pulse * opacity;
+    (fg!.material as MeshBasicMaterial).opacity = 0.75 * pulse * opacity;
+    (bg!.material as MeshBasicMaterial).opacity = 0.35 * opacity;
+    (fill!.material as MeshBasicMaterial).opacity = 0.06 * pulse * opacity;
     sight.visible = opacity > 0.01;
   });
 

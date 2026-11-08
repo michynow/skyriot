@@ -158,7 +158,7 @@ export const GROUND_STRIKE_DAMAGE_MUL = 1.6;
 export const BOMB_ARM_SEC = 0.6;
 export const BOMB_DROP_SPEED = 60;
 /** Ground strike: bombs leave with this extra horizontal forward speed, so they arc out ahead of the Ship. */
-export const BOMB_FORWARD_KICK = 100;
+export const BOMB_FORWARD_KICK = 220;
 /** Air barrage rockets reach this much further than the plain Secondary. */
 export const AIR_BARRAGE_RANGE_MUL = 1.3;
 /** Ground strike bombs fly this much further than the Secondary's range, so high drops still reach the ground. */
