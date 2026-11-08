@@ -24,12 +24,12 @@ export const FLOOR_CLEARANCE = 0.5;
 /** Hard clamp (last resort) sits this far inside the map edge. */
 export const BOUNDARY_MARGIN = 20;
 /** Steering override starts this far inside the map edge, blending to full over BOUNDARY_BLEND_M. */
-export const BOUNDARY_SOFT_M = 700;
-export const BOUNDARY_BLEND_M = 250;
+export const BOUNDARY_SOFT_M = 580;
+export const BOUNDARY_BLEND_M = 210;
 /** outOfBounds (HUD warning) is set this far before the override starts. */
-export const BOUNDARY_WARN_M = 300;
+export const BOUNDARY_WARN_M = 250;
 export const CEILING_SOFT_M = 250;
-export const CEILING_PUSH_SPEED = 100;
+export const CEILING_PUSH_SPEED = 70;
 export const CEILING_PITCH_DOWN = 0.5;
 export const TIMESCALE_MIN = 0.05;
 export const TIMESCALE_MAX = 4;
@@ -81,9 +81,9 @@ export const DAMAGE_AURA_RADIUS = 55;
 
 // Steering smoothing
 /** Desired turn rate = angle-to-aim * gain (capped at turnRate): eases out of turns. */
-export const TURN_GAIN = 7;
+export const TURN_GAIN = 5;
 /** Angular velocity blend time constant (s): eases into turns. */
-export const TURN_TAU_SEC = 0.13;
+export const TURN_TAU_SEC = 0.2;
 /** Turn rate gains/loses up to this fraction: +below cruise, −toward boost speed. */
 export const TURN_SPEED_FALLOFF = 0.45;
 
@@ -97,7 +97,7 @@ export const DECK_RESPAWN_SPREAD = 0.6;
 // Bulwark ground mode
 export const LAND_HEIGHT = 8;
 /** Landing autopilot (C): own Launch Deck must be within this horizontal range (m). */
-export const LAND_DECK_RANGE = 3000;
+export const LAND_DECK_RANGE = 2500;
 /** Approach speed per metre to the Deck (capped at cruise), height above the Deck until over it. */
 export const LAND_APPROACH_GAIN = 0.4;
 export const LAND_APPROACH_HEIGHT = 30;
@@ -108,7 +108,7 @@ export const LAND_HOLD_HEADING_MUL = 0.5;
 export const GROUND_CLEARANCE_EXTRA = 2;
 export const GROUND_STRAFE_MUL = 0.5;
 /** Grounded Bulwark drives at this fraction of its (air) cruise speed. */
-export const GROUND_DRIVE_MUL = 0.25;
+export const GROUND_DRIVE_MUL = 0.33;
 export const GROUND_REVERSE_MUL = 0.5;
 export const GROUND_MAX_SLOPE_RAD = (40 * Math.PI) / 180;
 export const GROUND_SLIDE_SPEED = 25;
@@ -189,4 +189,4 @@ export const MISSILE_FUSE_M = 20;
  * A target pulling at least this lateral acceleration (speed * turn rate, m/s^2) while the missile is in its
  * endgame out-turns it. Wasp manages it at cruise, Halo needs throttle, Anvil/Bulwark only while boosting.
  */
-export const BREAK_TURN_ACCEL = 770;
+export const BREAK_TURN_ACCEL = 440;

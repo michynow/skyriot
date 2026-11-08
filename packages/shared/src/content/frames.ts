@@ -19,8 +19,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     maxShield: 800,
     shieldRegenPerSec: 35,
     shieldRegenDelaySec: 4,
-    strafeSpeed: 110,
-    verticalSpeed: 100,
+    strafeSpeed: 82,
+    verticalSpeed: 75,
     lateralTauSec: 0.07,
     slipTauSec: 0.05,
     fuelBurnPerSec: 0.22,
@@ -32,9 +32,9 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     deflectChance: 0.15,
     ammo1Max: 3600,
     ammo2Max: 320,
-    radarRangeM: 2400,
-    radarStdM: 1800,
-    radarAdvM: 1950,
+    radarRangeM: 2000,
+    radarStdM: 1500,
+    radarAdvM: 1620,
     radius: 4.4,
     halfLength: 6.0,
     canHover: false,
@@ -85,8 +85,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     maxShield: 900,
     shieldRegenPerSec: 40,
     shieldRegenDelaySec: 5,
-    strafeSpeed: 96,
-    verticalSpeed: 88,
+    strafeSpeed: 72,
+    verticalSpeed: 66,
     lateralTauSec: 0.09,
     slipTauSec: 0.1,
     fuelBurnPerSec: 0.18,
@@ -98,9 +98,9 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     deflectChance: 0.1,
     ammo1Max: 1500,
     ammo2Max: 100,
-    radarRangeM: 1950,
-    radarStdM: 1420,
-    radarAdvM: 1280,
+    radarRangeM: 1620,
+    radarStdM: 1180,
+    radarAdvM: 1070,
     radius: 7.2,
     halfLength: 10.0,
     canHover: false,
@@ -151,8 +151,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     maxShield: 600,
     shieldRegenPerSec: 25,
     shieldRegenDelaySec: 4,
-    strafeSpeed: 96,
-    verticalSpeed: 84,
+    strafeSpeed: 72,
+    verticalSpeed: 63,
     lateralTauSec: 0.12,
     slipTauSec: 0.1,
     fuelBurnPerSec: 0.2,
@@ -164,9 +164,9 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     deflectChance: 0.08,
     ammo1Max: 2400,
     ammo2Max: 320,
-    radarRangeM: 2700,
-    radarStdM: 1580,
-    radarAdvM: 1720,
+    radarRangeM: 2250,
+    radarStdM: 1320,
+    radarAdvM: 1430,
     radius: 5.6,
     halfLength: 7.0,
     canHover: false,
@@ -217,8 +217,8 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     maxShield: 900,
     shieldRegenPerSec: 35,
     shieldRegenDelaySec: 5,
-    strafeSpeed: 72,
-    verticalSpeed: 48,
+    strafeSpeed: 54,
+    verticalSpeed: 36,
     lateralTauSec: 0.08,
     slipTauSec: 0.08,
     fuelBurnPerSec: 0.2,
@@ -230,9 +230,9 @@ export const FRAMES: Record<FrameId, FrameDef> = {
     deflectChance: 0.03,
     ammo1Max: 1800,
     ammo2Max: 192,
-    radarRangeM: 2100,
-    radarStdM: 1720,
-    radarAdvM: 2020,
+    radarRangeM: 1750,
+    radarStdM: 1430,
+    radarAdvM: 1680,
     radius: 6.8,
     halfLength: 8.0,
     canHover: true,
@@ -306,10 +306,10 @@ export const SIEGE_AIR = {
  * Terrain impact above `minSpeed` (m/s into the surface): with shield up the Ship bounces,
  * the shield is emptied and `bounceHpFrac` of max HP is lost; with no shield the Ship is destroyed.
  */
-export const TERRAIN_IMPACT = { minSpeed: 50, bounceHpFrac: 0.15, restitution: 0.6 };
+export const TERRAIN_IMPACT = { minSpeed: 40, bounceHpFrac: 0.15, restitution: 0.6 };
 
 /** Launch Deck behaviour. */
-export const DECK = { dockMaxSpeed: 60, resupplySec: 2, launchSpeed: 150 };
+export const DECK = { dockMaxSpeed: 60, resupplySec: 2, launchSpeed: 110 };
 
 export const RESPAWN_SEC = 5;
 
@@ -346,8 +346,8 @@ export const TARGETING = {
  * - homing missiles get `endgameTurnMul` turn rate inside `endgameDistM` so straight flight is not enough.
  */
 export const MISSILE_EVADE = {
-  rollBreakDistM: 460,
+  rollBreakDistM: 345,
   losBreakSec: 0.4,
-  endgameDistM: 500,
+  endgameDistM: 375,
   endgameTurnMul: 1.25,
 };

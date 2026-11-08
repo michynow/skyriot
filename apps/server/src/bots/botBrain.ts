@@ -49,8 +49,8 @@ export const BOT_SKILL = {
   /** Chance of a (wasted) Barrel Roll when an evasive jink starts after taking damage. */
   panicRollChance: 0.08,
   /** Missile distance window (m) a Bot tries to Barrel Roll in. */
-  rollWindowMinM: 100,
-  rollWindowMaxM: 270,
+  rollWindowMinM: 75,
+  rollWindowMaxM: 200,
   skillUseChance: 0.004,
   missileFireChance: 0.015,
   disengageChance: 0.5,
@@ -72,24 +72,24 @@ export type BotSkill = typeof BOT_SKILL;
 /** Anvil target pick: each point of the target's HP + shield costs this many metres of distance. */
 const ANVIL_TARGET_HEALTH_COST = 0.3;
 /** Anvil vs an air target: Air Barrage inside this range, Wide Lock (guided salvo) beyond it. */
-const BARRAGE_RANGE_M = 600;
+const BARRAGE_RANGE_M = 500;
 /** Anvil Secondary: rocket salvo cone, the guided salvo's minimum range, and its per-tick fire chance once locked. */
 const ROCKET_FIRE_CONE_RAD = 0.12;
-const WIDE_LOCK_MIN_M = 300;
+const WIDE_LOCK_MIN_M = 250;
 const WIDE_LOCK_FIRE_CHANCE = 0.06;
 /** Overcharge Round: armed only with the target this tight in the nose and inside Primary range. */
 const OVERCHARGE_CONE_RAD = 0.06;
 /** Mirrors the sim's TURN_GAIN (turn rate = aim angle * gain), used to cap the Bot's aim offset. */
-const SIM_TURN_GAIN = 7;
+const SIM_TURN_GAIN = 5;
 /** turnBrake: enemy this far off the nose (rad) = slow right down; pivotFlip: this far off and this close. */
 const TURN_BRAKE_RAD = 0.3;
 const FLIP_OFF_RAD = 2.2;
-const FLIP_MAX_M = 1000;
+const FLIP_MAX_M = 830;
 /** Hurt below this HP fraction, a Bot may break off and run for a while. */
 const DISENGAGE_HP_FRACTION = 0.35;
 const DISENGAGE_TICKS = 6 * TICK_HZ;
 /** Extra distance (m) a target costs per other Bot already on it: spreads Bots over targets. */
-const DOGPILE_PENALTY_M = 1500;
+const DOGPILE_PENALTY_M = 1250;
 
 // Bot tuning (module constants; no content/ equivalent yet).
 const AVOID_LOOKAHEAD_SEC = 2.2;
@@ -99,17 +99,17 @@ const CRUISE_THROTTLE = 0.6;
 /** Below the engine's min speed times this, Bots go full throttle. */
 const SLOW_SPEED_MUL = 1.3;
 const CRUISE_ALTITUDE = 160;
-const FAR_BOOST_DISTANCE = 1800;
+const FAR_BOOST_DISTANCE = 1500;
 const DODGE_CHANCE = 0.3;
 const HEAL_HP_FRACTION = 0.4;
 /** Repair/Shield Kits (4 s cooldown): only when low, never back to back, so a Bot can still be finished. */
 const KIT_SHIELD_FRACTION = 0.2;
 const RESUPPLY_AMMO_FRACTION = 0.05;
 const DECK_APPROACH_HEIGHT = 20;
-const DECK_BRAKE_DISTANCE = 600;
-const BOT_EDGE_MARGIN = 1000;
+const DECK_BRAKE_DISTANCE = 500;
+const BOT_EDGE_MARGIN = 830;
 const SIEGE_SLOT = 0; // siege-anchor is hotbar slot 0 on the Bulwark
-const BUFF_ENGAGE_DIST = 1350;
+const BUFF_ENGAGE_DIST = 1120;
 const BOMB_DROP_RADIUS = 60;
 /** Distance to the enemy under which a Bot fires each offensive Skill (roughly its effect reach). */
 const OFFENSIVE_REACH_M: Record<string, number> = {
@@ -132,19 +132,19 @@ const BREACH_HP_FRACTION = 0.2;
 const BREACH_REACH_M = 120;
 const BOMB_RUN_ALTITUDE = 120;
 const SIEGE_BOT_CHANCE = 0.5;
-const SIEGE_BOT_ENGAGE_DISTANCE = 2000;
-const SIEGE_BOT_LEAVE_DISTANCE = 2600;
+const SIEGE_BOT_ENGAGE_DISTANCE = 1670;
+const SIEGE_BOT_LEAVE_DISTANCE = 2170;
 /** Enemy Ships closer than this are fought; otherwise the bot attacks the enemy Base. Raiders mostly ignore Ships. */
-const SHIP_ENGAGE_DISTANCE = 1500;
-const RAIDER_ENGAGE_DISTANCE = 300;
+const SHIP_ENGAGE_DISTANCE = 1250;
+const RAIDER_ENGAGE_DISTANCE = 250;
 const RAIDER_CHANCE = 0.5;
 const STRUCTURE_FIRE_CONE_RAD = 0.12;
 /** Steepest dive (as aim y) on a strafing run, the height above ground that ends it, and the climb-out. */
 const STRUCTURE_MAX_DIVE_DY = 0.35;
 const STRUCTURE_PULL_UP_M = 120;
 const STRUCTURE_CLIMB_DY = 0.3;
-const STRUCTURE_BREAK_M = 400;
-const STRUCTURE_RUN_IN_M = 1350;
+const STRUCTURE_BREAK_M = 330;
+const STRUCTURE_RUN_IN_M = 1120;
 const STRUCTURE_RUN_ALTITUDE = 150;
 
 export interface BotMemory {
@@ -316,9 +316,9 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
   else if (dist < mem.skill.standoffMinM) mem.separating = true;
   if (enemy && mem.separating && !retreating) {
     const away = norm3(me.pos[0] - enemy.pos[0], 0, me.pos[2] - enemy.pos[2]);
-    tx = me.pos[0] + away[0] * 800;
+    tx = me.pos[0] + away[0] * 670;
     ty = Math.max(me.pos[1], enemy.pos[1]);
-    tz = me.pos[2] + away[2] * 800;
+    tz = me.pos[2] + away[2] * 670;
   }
   if (enemy && groundRun) {
     const hx = me.pos[0] - enemy.pos[0],
