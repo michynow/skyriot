@@ -814,10 +814,15 @@ function barrageTrial(k: number): number {
 function strikeTrial(k: number): number {
   const sim2 = fresh(true);
   let ox = 0;
-  const slope = (x: number) =>
-    Math.abs(sampleHeight(hf, x + 10, 0) - sampleHeight(hf, x - 10, 0)) +
-    Math.abs(sampleHeight(hf, x, 10) - sampleHeight(hf, x, -10));
-  for (let x = -1500; x <= 1500; x += 50) if (slope(x) < slope(ox)) ox = x;
+  // Flat ground at the Target and along the whole bomb run (+z): a ridge on the approach would catch the bombs.
+  const bumps = (x: number) => {
+    const g0 = sampleHeight(hf, x, 0);
+    let worst = Math.abs(sampleHeight(hf, x + 10, 0) - sampleHeight(hf, x - 10, 0));
+    for (let z = 10; z <= 600; z += 10)
+      worst = Math.max(worst, Math.abs(sampleHeight(hf, x, z) - g0));
+    return worst;
+  };
+  for (let x = -1500; x <= 1500; x += 50) if (bumps(x) < bumps(ox)) ox = x;
   const g = sampleHeight(hf, ox, 0);
   sim2.addShip('t', spawn('bulwark', 'concord'), [ox, g + 3, 0]);
   const t = sim2.getShip('t')!;
