@@ -39,7 +39,7 @@ export interface PilotInput {
   /** True on the tick a double-tap A / D was detected. */
   rollLeft: boolean;
   rollRight: boolean;
-  /** Rising edge of the launch key (R): take off from a Launch Deck. */
+  /** Rising edge of the launch key (Space): take off from a Launch Deck or fire the catapult. */
   launch: boolean;
   /** Rising edge of a confirmed B: toggle a mid-air halt (Ship stops in place to inspect its Loadout). */
   halt: boolean;

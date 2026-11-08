@@ -245,7 +245,7 @@ export function attachInput(canvas: HTMLElement): () => void {
       }
     } else if (e.code === 'Tab') inputState.hotbarBar = (inputState.hotbarBar + 1) % HOTBAR_BARS;
     else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') switchTarget();
-    else if (e.code === 'KeyX') world.lookBack = true;
+    else if (e.code === 'KeyR') world.lookBack = true;
     else if (e.code === 'KeyB' || (e.code === 'KeyY' && inputState.haltPromptUntil > 0)) {
       const own = world.ownId ? world.ships.get(world.ownId) : undefined;
       const now = performance.now();
@@ -254,7 +254,8 @@ export function attachInput(canvas: HTMLElement): () => void {
         halt = true;
         inputState.haltPromptUntil = 0;
       } else if (e.code === 'KeyB') inputState.haltPromptUntil = now + HALT_CONFIRM_MS;
-    } else if (e.code === 'KeyR' && !e.repeat) launch = true;
+    } else if (e.code === 'Space')
+      launch = true; // launches off a Launch Deck / the catapult
     else if (e.code.startsWith('Alt')) {
       world.freeLook = true;
       world.cursor.x = world.cursor.y = 0;
@@ -314,7 +315,7 @@ export function attachInput(canvas: HTMLElement): () => void {
     keys.delete(e.code);
     if (e.code === 'KeyA' || e.code === 'KeyD') lastUp[e.code] = performance.now();
     if (e.code.startsWith('Alt')) world.freeLook = false;
-    if (e.code === 'KeyX') world.lookBack = false;
+    if (e.code === 'KeyR') world.lookBack = false;
   };
   const onMouseMove = (e: MouseEvent) => {
     if (inputState.typing) return;

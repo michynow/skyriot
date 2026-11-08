@@ -28,7 +28,7 @@ export interface ClientWorld {
   /** Normalised aim cursor in screen space (-1..1), written by input, read by HUD/camera. */
   cursor: { x: number; y: number };
   freeLook: boolean;
-  /** X held: the chase camera swings round to look behind the Ship. */
+  /** R held: the chase camera swings round to look behind the Ship. */
   lookBack: boolean;
   /**
    * Screen-shake intensity 0..1, set by the HUD on a bounced terrain impact and decayed by the game loop

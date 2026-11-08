@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
+import { ROLL_EVADE_WINDOW_SEC } from '@skyriot/shared';
 import { incomingThreats } from './incomingMissiles';
 import { project } from './view';
 
-const ROLL_HINT_M = 90;
 const MAX_ARROWS = 4;
 const p = { x: 0, y: 0 };
 
@@ -25,7 +25,9 @@ export function Incoming() {
       if (best) {
         const text = `MISSILE ×${list.length}  ${Math.round(best.d)} m · ${best.t.toFixed(1)} s`;
         if (txt.current && txt.current.textContent !== text) txt.current.textContent = text;
-        if (hint.current) hint.current.style.display = best.d <= ROLL_HINT_M ? 'block' : 'none';
+        // A roll started now breaks the lock (sim: ROLL_EVADE_WINDOW_SEC); small lead for input latency.
+        if (hint.current)
+          hint.current.style.display = best.t <= ROLL_EVADE_WINDOW_SEC + 0.15 ? 'block' : 'none';
       }
       const W = window.innerWidth;
       const H = window.innerHeight;
@@ -62,7 +64,7 @@ export function Incoming() {
       <div className="incoming" ref={box} style={{ display: 'none' }}>
         <div ref={txt} />
         <div className="roll-hint" ref={hint}>
-          ROLL! (A/D ×2)
+          ROLL NOW · A/D ×2
         </div>
       </div>
       {Array.from({ length: MAX_ARROWS }, (_, i) => (

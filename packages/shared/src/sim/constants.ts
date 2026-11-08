@@ -128,7 +128,14 @@ export const ROCKET_FUSE_FRAC = 0.75;
 
 // Barrel Roll: displacement = rollImpulse * factor over ROLL_DURATION_SEC. Velocity curve p(1-p)^2: quick
 // rise (peak at a third of the roll), long smooth settle to zero (no hitch at the end).
-export const ROLL_DURATION_SEC = 1.1;
+export const ROLL_DURATION_SEC = 1.5;
+/**
+ * Missile evade window: a Barrel Roll in progress breaks a guided missile's lock once that missile is within this
+ * time to impact (or MISSILE_EVADE.rollBreakDistM). Rolling inside the window = a guaranteed miss.
+ */
+export const ROLL_EVADE_WINDOW_SEC = 1.5;
+/** A roll-broken missile swerves this far (rad) away from its Target so it visibly overshoots. */
+export const ROLL_EVADE_SWERVE_RAD = 0.3;
 export const ROLL_DISPLACEMENT_PER_IMPULSE = 0.25;
 
 // Frame core kits
