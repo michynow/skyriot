@@ -49,6 +49,7 @@ function mk(
     shield: d.maxShield,
     maxShield: d.maxShield,
     fuel: 1,
+    sp: 100,
     speed: 100,
     alive: true,
     respawnAtTick: 0,

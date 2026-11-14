@@ -102,6 +102,8 @@ export interface ShipState {
   shield: number;
   maxShield: number;
   fuel: number; // 0..1
+  /** Skill energy: every Skill cast spends its `spCost`; regenerates, refilled on a Launch Deck. Max = FrameDef.maxSp. */
+  sp: number;
   speed: number; // current forward speed m/s
   alive: boolean;
   respawnAtTick: number;
@@ -435,6 +437,9 @@ export interface FrameDef extends Omit<EngineDef, 'id' | 'name'> {
   maxShield: number;
   shieldRegenPerSec: number;
   shieldRegenDelaySec: number;
+  /** Skill energy pool and its regeneration (per second). */
+  maxSp: number;
+  spRegenPerSec: number;
   strafeSpeed: number;
   verticalSpeed: number;
   /** Time constant (s) of strafe/vertical velocity blending (strafe/vertical onset). */
@@ -514,6 +519,8 @@ export interface SkillDef {
   frames: FrameId[] | 'all';
   cooldownSec: number;
   durationSec: number;
+  /** SP spent per cast (0 = free: Consumables, toggles). */
+  spCost: number;
   kind: 'consumable' | 'skill' | 'buff' | 'toggle';
   /**
    * For 'buff': stat changes while active (durationSec). Applied to self, or to allies in `auraRadiusM`.

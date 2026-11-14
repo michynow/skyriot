@@ -62,6 +62,8 @@ Kits follow the genre's four gear classes (fighter / bomber / support / tank) fo
 
 Every Frame also has the shared bar 3: **Pivot Flip**, **Backdraft**, the Consumables Repair Kit, Shield Kit and Fuel Cell, and five long buffs: **Gun Tune** (+Primary damage), **Warhead Tune** (+Secondary damage), **Steady Hands** (−spread, faster locks), **Hardened Hull** (−damage taken), **Jink Jets** (+Deflect). Dev: `/cast <skill-id>` casts any kit Skill. Numbers live in `content/weapons.ts` (`SKILLS`) and `sim/constants.ts`.
 
+**SP.** Skills cost SP as well as a cooldown: pool 100 (Halo 150), regenerating 2.5/s (Halo 3.5/s), refilled on a Launch Deck and on respawn. The cooldown says how often one Skill returns; SP says how many can be chained. Toggles (bombing modes, Siege) and Consumables are free. Costs live in `content/weapons.ts` (`SP_COST`). The HUD dial shows SP; a slot the Pilot can't afford is greyed and a press says NOT ENOUGH SP.
+
 Long buffs last 1–2 minutes; active buffs show as timed icons in the HUD and as visual auras on the Ship. **Every Skill activation has its own animation** (Ship VFX + HUD flash). Hotbar icons are colour-coded: red attack, blue defence, green support, gold movement.
 
 ## 4. Controls

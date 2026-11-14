@@ -581,6 +581,12 @@
 .arc.fu {
   stroke: #ffd24a;
 }
+.arc.sp {
+  stroke: #c08cff;
+}
+.g-lbl .sp {
+  color: #c08cff;
+}
 .g-num {
   position: absolute;
   inset: 0;
@@ -2268,7 +2274,8 @@
     0 0 3px #000,
     0 1px 1px #000;
 }
-.slot.spent .skill-icon {
+.slot.spent .skill-icon,
+.slot.nosp .skill-icon {
   filter: grayscale(1) brightness(0.5);
 }
 .slot.spent .slot-n {

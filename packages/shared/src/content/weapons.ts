@@ -511,6 +511,52 @@ export const SKILLS: Record<string, SkillDef> = {
   'fuel-cell': c('fuel-cell', 'Fuel Cell', 'Refill booster fuel.', 15),
 };
 
+/**
+ * SP cost per cast. Pool 100 (Halo 150) regenerating 2.5/s (Halo 3.5/s): cooldowns say how often one Skill
+ * comes back, SP says how many you can chain. Toggles (bombing modes, Siege) and Consumables are free.
+ */
+const SP_COST: Record<string, number> = {
+  'gun-tune': 10,
+  'warhead-tune': 10,
+  'steady-hands': 10,
+  'hardened-hull': 10,
+  'jink-jets': 10,
+  'pivot-flip': 15,
+  backdraft: 15,
+  'afterburn-dash': 20,
+  overdrive: 25,
+  'quiver-surge': 35,
+  'trim-tabs': 15,
+  'roll-cascade': 30,
+  'blind-tag': 20,
+  'shield-damper': 20,
+  'overcharge-round': 25,
+  'chaff-screen': 30,
+  'shroud-veil': 35,
+  'core-breach': 50,
+  'rally-field': 15,
+  'ward-lattice': 15,
+  'veer-field': 15,
+  'renewal-pulse': 30,
+  'recharge-pulse': 25,
+  'mend-beam': 20,
+  'charge-beam': 20,
+  lifeline: 60,
+  sanctum: 50,
+  purge: 30,
+  'dispel-lance': 25,
+  'scan-pulse': 10,
+  'blast-ward': 35,
+  'shield-weave': 25,
+  'crash-frame': 10,
+  'track-drive': 10,
+  'snare-tag': 20,
+  'shield-breaker': 25,
+  'ground-shroud': 30,
+  'quake-round': 40,
+};
+for (const [id, cost] of Object.entries(SP_COST)) SKILLS[id]!.spCost = cost;
+
 function w(
   id: string,
   name: string,
@@ -555,7 +601,7 @@ function s(
   cooldownSec: number,
   durationSec: number,
 ): SkillDef {
-  return { id, name, description, frames, cooldownSec, durationSec, kind: 'skill' };
+  return { id, name, description, frames, cooldownSec, durationSec, spCost: 0, kind: 'skill' };
 }
 
 function b(
@@ -575,6 +621,7 @@ function b(
     frames,
     cooldownSec,
     durationSec,
+    spCost: 0,
     kind: 'buff',
     buff,
     auraRadiusM,
@@ -591,7 +638,17 @@ function d(
   durationSec: number,
   buff: SkillDef['buff'],
 ): SkillDef {
-  return { id, name, description, frames, cooldownSec, durationSec, kind: 'skill', buff };
+  return {
+    id,
+    name,
+    description,
+    frames,
+    cooldownSec,
+    durationSec,
+    spCost: 0,
+    kind: 'skill',
+    buff,
+  };
 }
 
 function t(
@@ -608,11 +665,21 @@ function t(
     frames,
     cooldownSec: 0.3,
     durationSec: 0,
+    spCost: 0,
     kind: 'toggle',
     toggleGroup,
   };
 }
 
 function c(id: string, name: string, description: string, cooldownSec: number): SkillDef {
-  return { id, name, description, frames: 'all', cooldownSec, durationSec: 0, kind: 'consumable' };
+  return {
+    id,
+    name,
+    description,
+    frames: 'all',
+    cooldownSec,
+    durationSec: 0,
+    spCost: 0,
+    kind: 'consumable',
+  };
 }

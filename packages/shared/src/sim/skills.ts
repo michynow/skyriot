@@ -55,6 +55,7 @@ const GROUND_ONLY = new Set(['ground-shroud', 'track-drive']);
 export function tickTimers(rec: ShipRec): void {
   const s = rec.state;
   for (let i = 0; i < s.cooldowns.length; i++) if (s.cooldowns[i]! > 0) s.cooldowns[i]!--;
+  if (s.alive) s.sp = Math.min(rec.fd.maxSp, s.sp + rec.fd.spRegenPerSec / TICK_HZ);
   tickBuffs(s);
 }
 
@@ -89,6 +90,11 @@ export function castSkill(
   // Finite Consumables: 0 left blocks the cast. Only the server spends one (the profile resend syncs the client).
   const charges = def.kind === 'consumable' ? rec.charges : null;
   if (charges && !((charges[id] ?? 0) > 0)) return false;
+  // SP: hotbar casts pay; slotless dev casts (/cast) are free. Siege refusals below cost nothing (toggles are free).
+  if (slot >= 0) {
+    if (s.sp < def.spCost) return false;
+    s.sp -= def.spCost;
+  }
   const ticks = Math.ceil(def.durationSec * TICK_HZ);
   forwardOf(s.rot, _f);
 

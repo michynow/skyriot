@@ -99,6 +99,7 @@ function Gauge() {
       shield: h.shield,
       maxShield: h.maxShield,
       fuel: h.fuel,
+      sp: h.sp,
       speed: h.speed,
       halted: h.halted,
       taken: h.taken,
@@ -128,6 +129,7 @@ function Gauge() {
         />
         {fd && <Tick f={fd.maxSpeed / top} r={64} />}
         <Arc r={52} pct={g.fuel} cls={g.fuel < 0.2 ? 'fu low' : 'fu'} width={4} />
+        <Arc r={45} pct={fd ? g.sp / fd.maxSp : 0} cls="sp" width={4} />
       </svg>
       <div className="g-num">
         <small className="g-cap">
@@ -142,6 +144,7 @@ function Gauge() {
       <div className="g-lbl">
         <i className="hp">HULL</i>
         <i className="fu">FUEL {Math.round(g.fuel * 100)}%</i>
+        <i className="sp">SP {g.sp}</i>
         <i className="sh">SHIELD</i>
       </div>
       {g.taken.map((t) => (

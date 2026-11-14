@@ -39,6 +39,8 @@ function HotSlot(props: {
   frac: number;
   sec: number;
   on: boolean;
+  /** Not enough SP to cast. */
+  nosp: boolean;
   punch: number | null;
   onTip(t: { i: number; left: number } | null): void;
 }) {
@@ -64,7 +66,7 @@ function HotSlot(props: {
   return (
     <div
       data-slot={i}
-      className={`slot ${skill ? '' : 'empty'} ${skill?.kind ?? ''} ${props.frac > 0 ? 'cooling' : ''} ${props.on ? 'on' : ''} ${props.punch !== null ? 'punch' : ''} ${empty0 ? 'spent' : ''} ${drop.over ? 'drop' : drop.accepts ? 'accepts' : ''}`}
+      className={`slot ${skill ? '' : 'empty'} ${skill?.kind ?? ''} ${props.frac > 0 ? 'cooling' : ''} ${props.on ? 'on' : ''} ${props.punch !== null ? 'punch' : ''} ${empty0 ? 'spent' : ''} ${props.nosp ? 'nosp' : ''} ${drop.over ? 'drop' : drop.accepts ? 'accepts' : ''}`}
       {...drop.props}
       onPointerDown={(e) => {
         if (e.button !== 0 || locked || !id) return;
@@ -95,7 +97,7 @@ function HotSlot(props: {
 
 /** The Hotbar: the Pilot's own layout (3 bars x 10 slots), drag to rearrange, padlock against accidents. */
 export function Hotbar() {
-  const { frame, bar, frac, sec, toggles, fx } = useHud(
+  const { frame, bar, frac, sec, toggles, fx, sp } = useHud(
     useShallow((h) => ({
       frame: h.frame,
       bar: h.hotbarBar,
@@ -103,6 +105,7 @@ export function Hotbar() {
       sec: h.cooldownSec,
       toggles: h.toggles,
       fx: h.skillFx,
+      sp: h.sp,
     })),
   );
   const layout = useLayouts((s) => (frame ? s.layouts[frame] : undefined));
@@ -173,6 +176,7 @@ export function Hotbar() {
                 frac={frac[i] ?? 0}
                 sec={sec[i] ?? 0}
                 on={on}
+                nosp={!!skill && sp < skill.spCost}
                 punch={punched ? fx!.nonce : null}
                 onTip={setTip}
               />
@@ -187,6 +191,7 @@ export function Hotbar() {
           <small>
             {tipSkill.durationSec > 0 && `Duration ${mmss(tipSkill.durationSec)}  ·  `}Cooldown{' '}
             {mmss(tipSkill.cooldownSec)}
+            {tipSkill.spCost > 0 && `  ·  ${tipSkill.spCost} SP`}
           </small>
         </div>
       )}

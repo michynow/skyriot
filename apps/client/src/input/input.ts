@@ -6,6 +6,7 @@ import {
   HOTBAR_BARS,
   HOTBAR_BAR_SLOTS,
   LAND_DECK_RANGE,
+  SKILLS,
   STRUCTURES,
   TICK_HZ,
   type PilotInput,
@@ -301,8 +302,11 @@ export function attachInput(canvas: HTMLElement): () => void {
             : 'Air Siege needs the Bulwark airborne',
           'bad',
         );
+      const short = !!own && !!sk && own.sp < SKILLS[sk]!.spCost;
+      if (short && !own.cooldowns[hotbar])
+        showBanner('NOT ENOUGH SP', `${SKILLS[sk]!.name} needs ${SKILLS[sk]!.spCost} SP`, 'bad');
       // Pivot Flip turns the steering aim around; the sim only lifts the turn-rate cap.
-      if (own && sk === 'pivot-flip' && !own.cooldowns[hotbar]) {
+      if (own && sk === 'pivot-flip' && !own.cooldowns[hotbar] && !short) {
         const [x, y, z, w] = own.rot;
         flipYaw = Math.atan2(2 * (x * z + w * y), 1 - 2 * (x * x + y * y)) + Math.PI;
         flipUntil = performance.now() + FLIP_MS;

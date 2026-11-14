@@ -44,6 +44,10 @@ _Avoid_: ability, spell, power
 **Skill Kit**:
 Every Skill one Frame can use (Frame-specific plus shared ones like Pivot Flip). The Hotbar holds 3 bars of 10.
 
+**SP**:
+Skill energy. Every Skill cast spends SP from the Ship's pool (100; Halo 150); it regenerates in flight and refills on a Launch Deck. Toggles and Consumables are free.
+_Avoid_: mana, energy (alone)
+
 **Debuff**:
 A timed effect a Skill puts on enemy Ships (slow, weaken), shown and resolved like a buff on the victim.
 _Avoid_: curse, hex (except as a Skill name)

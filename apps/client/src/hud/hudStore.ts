@@ -178,6 +178,8 @@ export interface HudState {
   shield: number;
   maxShield: number;
   fuel: number;
+  /** Skill energy, whole points. */
+  sp: number;
   speed: number;
   altitude: number;
   sieged: boolean;
@@ -274,6 +276,7 @@ export const useHud = create<HudState>(() => ({
   shield: 0,
   maxShield: 1,
   fuel: 1,
+  sp: 0,
   speed: 0,
   altitude: 0,
   sieged: false,
@@ -685,6 +688,7 @@ export function startHudFeed(): () => void {
         shield: own.shield,
         maxShield: own.maxShield,
         fuel: own.fuel,
+        sp: Math.floor(own.sp),
         speed: own.speed,
         altitude: hf ? own.pos[1] - sampleHeight(hf, own.pos[0], own.pos[2]) : own.pos[1],
         sieged: own.sieged,

@@ -72,6 +72,7 @@ export function SkillBook() {
                   <small>
                     {s.durationSec > 0 && `Duration ${mmss(s.durationSec)} · `}Cooldown{' '}
                     {mmss(s.cooldownSec)}
+                    {s.spCost > 0 && ` · ${s.spCost} SP`}
                   </small>
                   <p>{s.description}</p>
                 </div>

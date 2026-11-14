@@ -121,6 +121,7 @@ function resupply(ctx: SimCtx, s: ShipState): void {
   s.ammo1 = fd.ammo1Max;
   s.ammo2 = fd.ammo2Max;
   s.fuel = 1;
+  s.sp = fd.maxSp;
   s.shield = s.maxShield;
   ctx.events.push({ type: 'resupplied', id: s.id });
 }

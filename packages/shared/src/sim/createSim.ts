@@ -239,6 +239,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
     s.maxShield = fd.maxShield;
     s.shield = fd.maxShield;
     s.fuel = 1;
+    s.sp = fd.maxSp;
     s.speed = fd.cruiseSpeed;
     s.alive = true;
     s.respawnAtTick = 0;
@@ -321,6 +322,7 @@ export function createSim(map: MapDef, opts: SimOptions): Sim {
       shield: fd.maxShield,
       maxShield: fd.maxShield,
       fuel: 1,
+      sp: fd.maxSp,
       speed: fd.cruiseSpeed,
       alive: true,
       respawnAtTick: 0,
