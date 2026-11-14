@@ -1113,7 +1113,7 @@
 .slot-on {
   position: absolute;
   right: 3px;
-  bottom: 2px;
+  top: 2px;
   font:
     800 11px 'Orbitron',
     sans-serif;
@@ -2273,6 +2273,22 @@
   text-shadow:
     0 0 3px #000,
     0 1px 1px #000;
+}
+.slot-tag {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1px 0;
+  font:
+    800 8px 'Orbitron',
+    sans-serif;
+  letter-spacing: 0.02em;
+  text-align: center;
+  white-space: nowrap;
+  color: #fff;
+  background: #06101acc;
+  pointer-events: none;
 }
 .slot.spent .skill-icon,
 .slot.nosp .skill-icon {

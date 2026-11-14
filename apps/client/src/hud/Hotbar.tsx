@@ -14,7 +14,7 @@ import {
   useHud,
   useLayouts,
 } from './hudStore';
-import { SkillIcon } from './icons';
+import { SkillIcon, skillTag } from './icons';
 
 export const mmss = (sec: number) =>
   `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
@@ -87,6 +87,7 @@ function HotSlot(props: {
         {props.prefix}
         {(props.k + 1) % 10}
       </span>
+      {id && <span className="slot-tag">{skillTag(id)}</span>}
       {props.on && <span className="slot-on">ON</span>}
       <div className="slot-cd" style={{ ['--p' as string]: `${props.frac * 360}deg` }} />
       {props.sec > 0.05 && <span className="slot-t">{props.sec.toFixed(1)}</span>}

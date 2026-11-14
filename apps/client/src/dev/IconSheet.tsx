@@ -1,5 +1,5 @@
-import { ITEMS } from '@skyriot/shared';
-import { UiGlyph } from '../hud/icons';
+import { ITEMS, SKILLS } from '@skyriot/shared';
+import { IconDefs, SkillIcon, UiGlyph, skillTag } from '../hud/icons';
 import { ItemIcon, SlotGhost, type GhostSlot } from '../ui/rpg/itemIcons';
 
 const GHOSTS: GhostSlot[] = [
@@ -46,6 +46,25 @@ export default function IconSheet() {
               <ItemIcon def={id} />
             </div>
             <span style={{ fontSize: 10, lineHeight: 1.1, wordBreak: 'break-all' }}>{id}</span>
+          </div>
+        ))}
+      </div>
+      <h4>Skills</h4>
+      <IconDefs />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 150px)', gap: 8 }}>
+        {Object.values(SKILLS).map((s) => (
+          <div key={s.id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <div style={{ width: 58, height: 58, position: 'relative', flex: 'none' }}>
+              <SkillIcon id={s.id} />
+            </div>
+            <div style={{ width: 34, height: 34, position: 'relative', flex: 'none' }}>
+              <SkillIcon id={s.id} />
+            </div>
+            <span style={{ fontSize: 10, lineHeight: 1.1 }}>
+              {s.name}
+              <br />
+              <b>{skillTag(s.id)}</b>
+            </span>
           </div>
         ))}
       </div>
