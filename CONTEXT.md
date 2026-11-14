@@ -45,7 +45,7 @@ _Avoid_: ability, spell, power
 Every Skill one Frame can use (Frame-specific plus shared ones like Pivot Flip). The Hotbar holds 3 bars of 10.
 
 **SP**:
-Skill energy. Every Skill cast spends SP from the Ship's pool (100; Halo 150); it regenerates in flight and refills on a Launch Deck. Toggles and Consumables are free.
+Skill energy. Every Skill cast spends SP from the Ship's pool (300; Halo 400); it regenerates in flight and refills on a Launch Deck or from an SP Kit. Toggles are free to switch on and drain SP while they run; Consumables are free.
 _Avoid_: mana, energy (alone)
 
 **Debuff**:
@@ -53,7 +53,7 @@ A timed effect a Skill puts on enemy Ships (slow, weaken), shown and resolved li
 _Avoid_: curse, hex (except as a Skill name)
 
 **Consumable**:
-A single-use hotbar item: shield kit, repair kit, fuel cell.
+A single-use hotbar item: shield kit, repair kit, SP kit, fuel cell.
 _Avoid_: potion, item (too broad)
 
 **Hotbar**:

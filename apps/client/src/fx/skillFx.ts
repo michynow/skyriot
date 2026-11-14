@@ -37,44 +37,6 @@ const C = {
   cyan: [0.4, 2.6, 3.0] as RGB,
 };
 
-/** Bombing mode activation colour. */
-const MODE_COL: Record<string, RGB> = {
-  'air-barrage-mode': C.air,
-  'ground-strike-mode': C.ground,
-  'wide-lock-mode': C.red,
-};
-
-/** Activation colour and spot per self-buff Skill: hex shell, a flash at the nose, or one at the tail. */
-const SELF: Record<string, [RGB, 'hex' | 'nose' | 'tail']> = {
-  'gun-tune': [C.red, 'nose'],
-  'warhead-tune': [C.heat, 'nose'],
-  'steady-hands': [C.white, 'nose'],
-  'overcharge-round': [C.charge, 'nose'],
-  'hardened-hull': [C.silver, 'hex'],
-  'jink-jets': [C.cyan, 'hex'],
-  'shield-damper': [C.cyan, 'hex'],
-  'blast-ward': [C.blue, 'hex'],
-  'shield-weave': [C.blue, 'hex'],
-  'crash-frame': [C.silver, 'hex'],
-  sanctum: [C.gold, 'hex'],
-  'trim-tabs': [C.yellow, 'tail'],
-  'roll-cascade': [C.yellow, 'tail'],
-  'track-drive': [C.yellow, 'tail'],
-};
-/** Ally-aura colours (Halo fields). */
-const AURA_COL: Record<string, RGB> = {
-  'rally-field': C.rally,
-  'ward-lattice': C.blue,
-  'veer-field': C.cyan,
-};
-/** Single-target debuff beams. */
-const TAG_COL: Record<string, RGB> = {
-  'snare-tag': C.yellow,
-  'blind-tag': C.violet,
-  'shield-breaker': C.red,
-  'dispel-lance': C.white,
-};
-
 const v = new THREE.Vector3();
 const q = new THREE.Quaternion();
 
@@ -209,15 +171,108 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
   const s = world.ships.get(e.id);
   if (!s) return;
   const R = FRAMES[s.frame].radius;
+  const L = FRAMES[s.frame].halfLength;
   const P: number[] = [s.pos[0], s.pos[1], s.pos[2]];
   q.set(s.rot[0], s.rot[1], s.rot[2], s.rot[3]);
-  const fwd = v.set(0, 0, -1).applyQuaternion(q);
-  const fx0 = fwd.x,
-    fy0 = fwd.y,
-    fz0 = fwd.z;
+  const F = v.set(0, 0, -1).applyQuaternion(q).toArray();
+  const Rt = v.set(1, 0, 0).applyQuaternion(q).toArray();
+  const Up = v.set(0, 1, 0).applyQuaternion(q).toArray();
+  /** Point `f` metres along the nose, `r` to the right, `u` up from the Ship. */
+  const pt = (f: number, r = 0, u = 0): number[] => [
+    P[0]! + F[0]! * f + Rt[0]! * r + Up[0]! * u,
+    P[1]! + F[1]! * f + Rt[1]! * r + Up[1]! * u,
+    P[2]! + F[2]! * f + Rt[2]! * r + Up[2]! * u,
+  ];
+  const nose = pt(L),
+    tail = pt(-L);
+  /** A light streak from `p` reaching `len` metres along the nose (negative = backwards). */
+  const streak = (p: number[], len: number, col: RGB, w = R * 0.4, a = 0.8) =>
+    fx.streaks.push(
+      p[0]!,
+      p[1]!,
+      p[2]!,
+      w,
+      col[0],
+      col[1],
+      col[2],
+      a,
+      F[0]! * len,
+      F[1]! * len,
+      F[2]! * len,
+    );
+  /** Ring that closes in on `p` (focus / charge) instead of expanding. */
+  const focus = (p: number[], col: RGB, from: number, life = 0.5) =>
+    ring(fx, p, col, R * 0.4, life, [0, 0, 0], from);
+  /** Glows spun around the hull's long axis: a corkscrew (dir = +1 / -1). */
+  const swirl = (col: RGB, n: number, rad: number, speed: number, dir = 1, life = 0.8) => {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * 6.283;
+      const c = Math.cos(a) * rad,
+        sn = Math.sin(a) * rad;
+      const p = pt(rr(-L, L), c, sn);
+      const t = dir * speed;
+      fx.glow.emit(
+        p[0]!,
+        p[1]!,
+        p[2]!,
+        (-Rt[0]! * sn + Up[0]! * c) * (t / rad) + s.vel[0],
+        (-Rt[1]! * sn + Up[1]! * c) * (t / rad) + s.vel[1],
+        (-Rt[2]! * sn + Up[2]! * c) * (t / rad) + s.vel[2],
+        rr(life * 0.6, life),
+        1.3,
+        0.2,
+        col[0],
+        col[1],
+        col[2],
+        1,
+        1,
+      );
+    }
+  };
+  const dust = (n: number, col: RGB) => {
+    for (let i = 0; i < n; i++) {
+      const a = rnd() * 6.28,
+        sp = rr(6, 26);
+      fx.puffs.emit(
+        P[0]!,
+        P[1]! - R,
+        P[2]!,
+        Math.cos(a) * sp,
+        rr(1, 5),
+        Math.sin(a) * sp,
+        rr(1.4, 2.6),
+        3,
+        10,
+        col[0],
+        col[1],
+        col[2],
+        0.5,
+        1.4,
+        -0.3,
+      );
+    }
+  };
+  const targets = targetsOf(e);
   const nat = PALETTES[s.nation].accent;
   const ncol: RGB = nat === PALETTES.concord.accent ? [0.3, 1.5, 2.4] : [2.6, 0.9, 0.25];
+
   switch (e.skill) {
+    // ---- attack (red / orange): at the weapons ----
+    case 'gun-tune': // three barrel flashes off the nose
+      for (const r of [-R * 0.5, 0, R * 0.5]) streak(pt(L, r), R * 5, C.red, R * 0.25);
+      ring(fx, nose, C.red, R * 2.2, 0.4);
+      break;
+    case 'warhead-tune': // a warhead lights up under each wing
+      for (const r of [-R, R]) {
+        ring(fx, pt(0, r, -R * 0.3), C.heat, R * 1.8, 0.5);
+        burst(fx, pt(0, r, -R * 0.3), C.heat, 14, 14, 0.5, 1.1);
+      }
+      break;
+    case 'zenith-tune': // both at once, climbing gold
+      ring(fx, nose, C.red, R * 2.5, 0.45);
+      ring(fx, P, C.gold, R * 5, 0.6, [0, 14, 0]);
+      ring(fx, P, C.gold, R * 3.5, 0.75, [0, 22, 0]);
+      break;
     case 'overdrive': {
       for (const en of getModel(s.frame, lookOf(s).tier, lookOf(s).upgrade).engines) {
         v.set(en.pos[0], en.pos[1], en.pos[2] + 0.5)
@@ -236,95 +291,125 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
           ...C.heat,
           1,
         );
-        for (let i = 0; i < 8; i++)
-          fx.glow.emit(
-            P[0]! + v.x,
-            P[1]! + v.y,
-            P[2]! + v.z,
-            rr(-6, 6) + s.vel[0] * 0.5,
-            rr(-6, 6),
-            rr(-6, 6) + s.vel[2] * 0.5,
-            0.6,
-            1.2,
-            0.2,
-            ...C.overdrive,
-            1,
-            1,
-          );
       }
+      for (const r of [-R, 0, R]) streak(pt(L * 0.5, r), R * 7, C.overdrive, R * 0.3);
       ring(fx, P, C.overdrive, R * 7, 0.6);
       break;
     }
-    case 'air-barrage-mode':
-    case 'ground-strike-mode':
-    case 'wide-lock-mode': {
-      const col = MODE_COL[e.skill]!;
-      burst(fx, P, col, 30, R * 6, 0.6, 1.0);
-      ring(fx, P, col, R * 5, 0.5);
-      fx.sph.follow(e.id, col, 1.2, 0.5);
+    case 'quiver-surge': // racks blow open: three staggered shock rings and a wide spray
+      for (const [k, life] of [
+        [3, 0.35],
+        [6, 0.55],
+        [10, 0.8],
+      ] as const)
+        ring(fx, nose, k === 6 ? C.yellow : C.heat, R * k, life);
+      burst(fx, nose, C.heat, 60, 40, 0.7, 1.4);
+      fx.sph.follow(e.id, C.heat, 1.4, 0.6);
       break;
-    }
-    case 'rally-field':
-    case 'ward-lattice':
-    case 'veer-field': {
-      const col = AURA_COL[e.skill]!;
-      const rad = SKILLS[e.skill]?.auraRadiusM ?? 150;
-      ring(fx, P, col, rad / 0.78, 0.9, [0, 0, 0], 4);
-      flatRing(fx, P, col, rad / 0.78, 1.0);
-      fx.sph.wave(s.pos, [col[0] * 0.5, col[1] * 0.5, col[2] * 0.5], 0.8, R, rad);
-      for (const t of targetsOf(e)) beam(fx, e.id, t, col, 0.9);
-      break;
-    }
-    case 'renewal-pulse':
-    case 'recharge-pulse': {
-      const col = e.skill === 'renewal-pulse' ? C.green : C.blue;
-      flatRing(fx, P, col, HEAL_FIELD_RADIUS / 0.78, 1.0);
-      fx.sph.wave(s.pos, [col[0] * 0.5, col[1] * 0.5, col[2] * 0.5], 0.7, R, HEAL_FIELD_RADIUS);
-      sparkle(fx, s, col);
-      for (const t of targetsOf(e)) {
-        beam(fx, e.id, t, col, 0.7);
-        const ts = world.ships.get(t);
-        if (ts) sparkle(fx, ts, col);
-      }
-      break;
-    }
-    case 'mend-beam':
-    case 'charge-beam':
-    case 'lifeline': {
-      const col = e.skill === 'mend-beam' ? C.green : e.skill === 'charge-beam' ? C.blue : C.gold;
-      const t = targetsOf(e)[0];
-      const ts = t ? world.ships.get(t) : s;
-      if (t) beam(fx, e.id, t, col, e.skill === 'lifeline' ? 1.4 : 0.8);
-      if (ts) {
-        sparkle(fx, ts, col);
-        if (e.skill === 'lifeline') {
-          fx.sph.follow(ts.id, col, 1.4, 0.9);
-          ring(fx, ts.pos, col, FRAMES[ts.frame].radius * 6, 0.8);
-        }
-      }
-      break;
-    }
-    case 'purge':
-      fx.sph.wave(s.pos, C.white, 0.7, R * 0.8, 130);
-      ring(fx, P, C.white, 170, 0.6);
-      burst(fx, P, C.white, 40, 60, 0.6, 1.4);
-      break;
-    case 'afterburn-dash':
-      burst(fx, P, ncol, 30, 40, 0.5, 1.2);
-      ring(fx, [P[0]! - fx0 * R, P[1]! - fy0 * R, P[2]! - fz0 * R], ncol, R * 4, 0.4);
-      fx.streaks.push(
-        P[0]!,
-        P[1]!,
-        P[2]!,
-        R * 0.5,
-        ncol[0],
-        ncol[1],
-        ncol[2],
-        0.7,
-        -fx0 * 60,
-        -fy0 * 60,
-        -fz0 * 60,
+    case 'overcharge-round': // charge gathers at the muzzle
+      focus(nose, C.charge, R * 7, 0.6);
+      focus(nose, C.white, R * 4, 0.45);
+      fx.glow.emit(
+        nose[0]!,
+        nose[1]!,
+        nose[2]!,
+        s.vel[0],
+        s.vel[1],
+        s.vel[2],
+        0.9,
+        1,
+        R * 2.2,
+        ...C.charge,
+        1,
       );
+      break;
+    case 'quake-round': // the big one: slow heavy charge plus a ground-shaking pulse
+      focus(nose, C.ground, R * 12, 0.9);
+      focus(nose, C.heat, R * 8, 0.7);
+      focus(nose, C.white, R * 4, 0.5);
+      fx.sph.wave(s.pos, [1.4, 0.8, 0.2], 0.7, R, R * 9);
+      fx.glow.emit(
+        nose[0]!,
+        nose[1]!,
+        nose[2]!,
+        s.vel[0],
+        s.vel[1],
+        s.vel[2],
+        1.2,
+        1,
+        R * 3.5,
+        ...C.ground,
+        1,
+      );
+      break;
+    case 'core-breach':
+      fx.sph.wave(s.pos, [2.4, 1.0, 0.3], 0.9, R, BREACH_RADIUS);
+      ring(fx, P, C.heat, BREACH_RADIUS / 0.78, 0.9, [0, 0, 0], 4);
+      flatRing(fx, P, C.white, BREACH_RADIUS / 0.78, 0.7);
+      burst(fx, P, C.heat, 90, BREACH_RADIUS * 0.8, 1.0, 2.4);
+      burst(fx, P, C.white, 30, BREACH_RADIUS * 0.4, 0.5, 2.0);
+      break;
+
+    // ---- weapon modes (orange): the bay opens differently per mode ----
+    case 'air-barrage-mode': // fan of rocket trails forward
+      for (const r of [-2, -1, 0, 1, 2]) streak(pt(L, r * R * 0.5), R * 9, C.air, R * 0.25);
+      ring(fx, nose, C.air, R * 4, 0.5);
+      break;
+    case 'ground-strike-mode': // bay doors: a ring dropping away below the hull
+      ring(fx, pt(0, 0, -R), C.ground, R * 4, 0.7, [0, -30, 0]);
+      ring(fx, pt(0, 0, -R), C.ground, R * 2.5, 0.9, [0, -45, 0]);
+      burst(fx, pt(0, 0, -R), C.ground, 20, 16, 0.6, 1.0, -30);
+      break;
+    case 'wide-lock-mode': // a seeker cone sweeps out
+      for (const r of [-1, 0, 1]) {
+        const p = pt(R * 16, r * R * 7);
+        ring(fx, p, C.red, R * 2.2, 0.7, [0, 0, 0], R * 4);
+        fx.streaks.push(
+          nose[0]!,
+          nose[1]!,
+          nose[2]!,
+          R * 0.15,
+          ...C.red,
+          0.6,
+          p[0]! - nose[0]!,
+          p[1]! - nose[1]!,
+          p[2]! - nose[2]!,
+        );
+      }
+      break;
+    case 'siege-anchor': // slam down
+      flatRing(fx, P, C.ground, R * 8, 0.8);
+      dust(18, [0.6, 0.45, 0.32]);
+      fx.hex.follow(e.id, C.ground, 1.2, 0.5, 1.3);
+      break;
+    case 'air-siege': // hover lock: two rings stacked under the hull
+      flatRing(fx, pt(0, 0, -R), C.air, R * 6, 0.7);
+      flatRing(fx, pt(0, 0, -R * 2.5), C.air, R * 4, 0.9);
+      fx.hex.follow(e.id, C.air, 1.2, 0.5, 1.3);
+      break;
+
+    // ---- defence (blue): around the hull ----
+    case 'hardened-hull': // plates bolt on
+      fx.hex.follow(e.id, C.silver, 1.6, 0.7, 1.25);
+      burst(fx, P, C.silver, 18, R * 2, 0.4, 0.8);
+      break;
+    case 'shield-damper': // the shield tightens
+      fx.sph.follow(e.id, C.cyan, 1.4, 0.7);
+      focus(P, C.cyan, R * 7, 0.55);
+      break;
+    case 'blast-ward': // a big bubble snaps outward
+      fx.sph.follow(e.id, C.blue, 2, 1.0, 2.1);
+      ring(fx, P, C.blue, R * 9, 0.5);
+      break;
+    case 'siege-bastion': // dug in: walls rise
+      fx.hex.follow(e.id, C.blue, 1.8, 0.9, 1.5);
+      flatRing(fx, P, C.blue, R * 6, 0.9);
+      dust(10, [0.5, 0.55, 0.65]);
+      break;
+    case 'sanctum': // golden halo drops over the Ship
+      fx.hex.follow(e.id, C.gold, 2.2, 1.0, 1.6);
+      ring(fx, pt(0, 0, R * 3), C.gold, R * 3, 0.9, [0, -R * 3, 0], R * 3);
+      sparkle(fx, s, C.gold);
       break;
     case 'chaff-screen':
       for (let i = 0; i < 14; i++)
@@ -348,100 +433,196 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
           0.38,
           0.37,
         );
-      burst(fx, P, C.silver, 24, 30, 0.6, 1.2);
+      burst(fx, tail, C.silver, 40, 34, 0.9, 1.3, -8);
       break;
-    case 'siege-anchor':
-    case 'air-siege':
-      flatRing(fx, P, C.ground, R * 8, 0.8);
-      for (let i = 0; i < 18; i++) {
-        const a = rnd() * 6.28,
-          sp = rr(6, 26);
-        fx.puffs.emit(
-          P[0]!,
-          P[1]! - R,
-          P[2]!,
-          Math.cos(a) * sp,
-          rr(1, 5),
-          Math.sin(a) * sp,
-          rr(1.4, 2.6),
-          3,
-          10,
-          0.6,
-          0.45,
-          0.32,
-          0.5,
-          1.4,
-          -0.3,
-        );
+
+    // ---- shield (cyan) and heal (green) ----
+    case 'shield-weave': // threads spin up the hull
+      swirl(C.cyan, 28, R * 1.2, 26, 1, 0.9);
+      fx.sph.follow(e.id, C.cyan, 1.2, 0.9);
+      break;
+    case 'renewal-pulse':
+    case 'recharge-pulse': {
+      const col = e.skill === 'renewal-pulse' ? C.green : C.cyan;
+      flatRing(fx, P, col, HEAL_FIELD_RADIUS / 0.78, 1.0);
+      fx.sph.wave(s.pos, [col[0] * 0.5, col[1] * 0.5, col[2] * 0.5], 0.7, R, HEAL_FIELD_RADIUS);
+      sparkle(fx, s, col);
+      for (const t of targets) {
+        const ts = world.ships.get(t);
+        if (ts) sparkle(fx, ts, col);
       }
       break;
+    }
+    case 'mend-beam':
+    case 'charge-beam':
+    case 'fuel-line':
+    case 'lifeline': {
+      const col =
+        e.skill === 'mend-beam'
+          ? C.green
+          : e.skill === 'charge-beam'
+            ? C.cyan
+            : e.skill === 'fuel-line'
+              ? C.yellow
+              : C.gold;
+      const t = targets[0];
+      const ts = t ? world.ships.get(t) : s;
+      if (t) beam(fx, e.id, t, col, e.skill === 'lifeline' ? 1.4 : 0.8);
+      if (ts) {
+        sparkle(fx, ts, col);
+        if (e.skill === 'lifeline') {
+          fx.sph.follow(ts.id, col, 1.4, 0.9);
+          ring(fx, ts.pos, C.green, FRAMES[ts.frame].radius * 6, 0.8);
+          ring(fx, ts.pos, C.cyan, FRAMES[ts.frame].radius * 4, 1.0);
+        }
+      }
+      break;
+    }
     case 'repair-kit':
       sparkle(fx, s, C.green);
       break;
     case 'shield-kit':
-      sparkle(fx, s, C.blue);
+      sparkle(fx, s, C.cyan);
+      break;
+    case 'sp-kit':
+      sparkle(fx, s, C.violet);
+      focus(P, C.violet, R * 4, 0.5);
       break;
     case 'fuel-cell':
       sparkle(fx, s, C.yellow);
       break;
+
+    // ---- ally auras: one big ring in the aura's colour ----
+    case 'rally-field':
+    case 'ward-lattice':
+    case 'veer-field': {
+      const col = e.skill === 'rally-field' ? C.red : e.skill === 'ward-lattice' ? C.blue : C.gold;
+      const rad = SKILLS[e.skill]?.auraRadiusM ?? 150;
+      ring(fx, P, col, rad / 0.78, 0.9, [0, 0, 0], 4);
+      flatRing(fx, P, col, rad / 0.78, 1.0);
+      fx.sph.wave(s.pos, [col[0] * 0.5, col[1] * 0.5, col[2] * 0.5], 0.8, R, rad);
+      for (const t of targets) beam(fx, e.id, t, col, 0.9);
+      break;
+    }
+
+    // ---- movement (gold): along the flight line ----
+    case 'afterburn-dash': // shock cone off the tail
+      ring(fx, tail, C.yellow, R * 3, 0.3);
+      ring(fx, tail, C.heat, R * 6, 0.5);
+      streak(P, -R * 14, C.heat, R * 0.7);
+      burst(fx, tail, C.heat, 30, 40, 0.5, 1.2);
+      break;
+    case 'pivot-flip': // a hoop the Ship swings through
+      ring(fx, P, C.yellow, R * 5, 0.5, [0, 0, 0], R * 5);
+      streak(nose, -L * 5, C.yellow, R * 0.3);
+      break;
+    case 'backdraft': // retro thrusters fire forward
+      for (const r of [-R * 0.8, R * 0.8]) streak(pt(L, r), R * 10, C.yellow, R * 0.45);
+      ring(fx, nose, C.yellow, R * 4, 0.4);
+      burst(fx, nose, C.white, 24, 50, 0.4, 1.0);
+      break;
+    case 'reverse-drive':
+      ring(fx, nose, C.gold, R * 3, 0.5);
+      ring(fx, pt(L * 3), C.gold, R * 2, 0.7);
+      break;
+    case 'roll-cascade': // corkscrew
+      swirl(C.yellow, 36, R * 1.6, 40, 1, 0.7);
+      swirl(C.white, 18, R * 2.4, 40, -1, 0.7);
+      break;
+    case 'trim-tabs': // wingtip vortices
+      for (const r of [-R * 1.6, R * 1.6]) streak(pt(0, r), -R * 9, C.yellow, R * 0.2);
+      ring(fx, tail, C.yellow, R * 2.5, 0.4);
+      break;
+    case 'jink-jets': // side thrusters puff left and right
+      for (const d of [-1, 1]) {
+        const p = pt(0, d * R);
+        fx.streaks.push(
+          p[0]!,
+          p[1]!,
+          p[2]!,
+          R * 0.35,
+          ...C.yellow,
+          0.8,
+          Rt[0]! * d * R * 5,
+          Rt[1]! * d * R * 5,
+          Rt[2]! * d * R * 5,
+        );
+        burst(fx, p, C.yellow, 10, 18, 0.4, 0.9);
+      }
+      break;
+    case 'track-drive':
+      dust(22, [0.75, 0.6, 0.3]);
+      streak(tail, -R * 6, C.yellow, R * 0.5);
+      break;
+
+    // ---- stealth and debuffs (violet): on the victim ----
     case 'shroud-veil':
     case 'ground-shroud':
       // inward-collapsing shimmer: the hull folds out of sight
       ring(fx, P, C.violet, R * 0.5, 0.5, [0, 0, 0], R * 6);
       burst(fx, P, C.phantom, 26, R * 3, 0.5, 0.8);
       fx.sph.follow(e.id, C.violet, 0.8, 0.6);
+      if (e.skill === 'ground-shroud') flatRing(fx, P, C.violet, R * 5, 0.7);
       break;
-    case 'quiver-surge':
-      v.set(0, 0, -FRAMES[s.frame].halfLength).applyQuaternion(q);
-      burst(fx, [P[0]! + v.x, P[1]! + v.y, P[2]! + v.z], C.heat, 30, 22, 0.5, 1.0);
-      ring(fx, [P[0]! + v.x, P[1]! + v.y, P[2]! + v.z], C.heat, R * 2.5, 0.4);
-      break;
-    case 'snare-tag':
     case 'blind-tag':
+    case 'snare-tag':
     case 'shield-breaker':
-    case 'dispel-lance': {
-      const col = TAG_COL[e.skill]!;
-      for (const t of targetsOf(e)) {
-        beam(fx, e.id, t, col, 0.6);
+    case 'dispel-lance':
+      for (const t of targets) {
         const ts = world.ships.get(t);
         if (!ts) continue;
-        ring(fx, ts.pos, col, FRAMES[ts.frame].radius * 4, 0.6);
-        if (e.skill === 'dispel-lance') burst(fx, ts.pos, col, 30, 20, 0.6, 1.0);
+        const tr = FRAMES[ts.frame].radius;
+        if (e.skill === 'blind-tag') {
+          // dark bubble closes over the victim
+          beam(fx, e.id, t, C.violet, 0.5);
+          fx.sph.follow(t, C.violet, 1.6, 1.0, 1.3);
+          ring(fx, ts.pos, C.violet, tr * 0.5, 0.6, [0, 0, 0], tr * 6);
+        } else if (e.skill === 'snare-tag') {
+          // net: flat rings tightening
+          beam(fx, e.id, t, C.yellow, 0.7);
+          for (const k of [6, 4.5, 3])
+            ring(fx, ts.pos, C.yellow, tr, 0.4 + k * 0.08, [0, 0, 0], tr * k);
+        } else if (e.skill === 'shield-breaker') {
+          // the shield shatters outward
+          beam(fx, e.id, t, C.red, 0.6);
+          fx.hex.follow(t, C.red, 1.6, 0.5, 1.4);
+          burst(fx, ts.pos, C.cyan, 34, 30, 0.6, 1.1, -10);
+        } else {
+          // lance: white bolt, the buffs burst off in colours
+          beam(fx, e.id, t, C.white, 0.4);
+          burst(fx, ts.pos, C.red, 12, 22, 0.6, 1.0);
+          burst(fx, ts.pos, C.blue, 12, 22, 0.6, 1.0);
+          burst(fx, ts.pos, C.gold, 12, 22, 0.6, 1.0);
+          ring(fx, ts.pos, C.white, tr * 5, 0.5);
+        }
       }
       break;
-    }
-    case 'scan-pulse':
-      fx.sph.wave(s.pos, [0.1, 0.5, 0.18], 0.9, R, FRAMES[s.frame].radarRangeM);
-      flatRing(fx, P, C.green, FRAMES[s.frame].radarRangeM / 0.78, 1.0);
-      for (const t of targetsOf(e)) {
+
+    // ---- utility (teal / white) ----
+    case 'steady-hands': // sights close on the nose point
+      focus(pt(L * 4), C.white, R * 5, 0.5);
+      focus(pt(L * 4), C.cyan, R * 3, 0.65);
+      break;
+    case 'thrift-circuit':
+      swirl(C.violet, 24, R * 1.3, 18, 1, 1.0);
+      break;
+    case 'scan-pulse': {
+      const rad = FRAMES[s.frame].radarRangeM;
+      fx.sph.wave(s.pos, [0.1, 0.5, 0.45], 0.9, R, rad);
+      flatRing(fx, P, C.cyan, rad / 0.78, 1.0);
+      for (const t of targets) {
         const ts = world.ships.get(t);
-        if (ts) ring(fx, ts.pos, C.green, FRAMES[ts.frame].radius * 5, 0.9);
+        if (ts) ring(fx, ts.pos, C.red, FRAMES[ts.frame].radius * 5, 0.9);
       }
       break;
-    case 'core-breach':
-      fx.sph.wave(s.pos, [2.4, 1.0, 0.3], 0.9, R, BREACH_RADIUS);
-      ring(fx, P, C.heat, BREACH_RADIUS / 0.78, 0.9, [0, 0, 0], 4);
-      flatRing(fx, P, C.white, BREACH_RADIUS / 0.78, 0.7);
-      burst(fx, P, C.heat, 90, BREACH_RADIUS * 0.8, 1.0, 2.4);
-      burst(fx, P, C.white, 30, BREACH_RADIUS * 0.4, 0.5, 2.0);
-      break;
-    default: {
-      const look = SELF[e.skill];
-      if (!look) {
-        burst(fx, P, ncol, 16, R * 4, 0.5, 0.9);
-        break;
-      }
-      const [col, where] = look;
-      if (where === 'hex') {
-        fx.hex.follow(e.id, col, 1.6, 0.7, 1.4);
-        sparkle(fx, s, col);
-      } else {
-        const k = where === 'nose' ? FRAMES[s.frame].halfLength : -FRAMES[s.frame].halfLength;
-        const at = [P[0]! + fx0 * k, P[1]! + fy0 * k, P[2]! + fz0 * k];
-        ring(fx, at, col, R * (where === 'nose' ? 2.5 : 4), 0.45);
-        burst(fx, at, col, 26, where === 'nose' ? 20 : 34, 0.5, 1.0);
-      }
     }
+    case 'purge':
+      fx.sph.wave(s.pos, C.white, 0.7, R * 0.8, 130);
+      ring(fx, P, C.white, 170, 0.6);
+      burst(fx, P, C.white, 40, 60, 0.6, 1.4);
+      break;
+    default:
+      burst(fx, P, ncol, 16, R * 4, 0.5, 0.9);
   }
 }
 

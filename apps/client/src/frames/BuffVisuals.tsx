@@ -38,9 +38,9 @@ function auraMat(col: [number, number, number], hex: boolean, strength: number) 
   });
 }
 const AURA = {
-  rally: auraMat([0.3, 2.2, 0.7], false, 0.35),
+  rally: auraMat([2.8, 0.6, 0.3], false, 0.35),
   ward: auraMat([0.6, 1.6, 3.0], true, 0.3),
-  veer: auraMat([0.4, 2.4, 2.8], false, 0.3),
+  veer: auraMat([2.8, 2.1, 0.4], false, 0.3),
   hull: auraMat([1.6, 1.7, 2.0], true, 0.28),
   damper: auraMat([0.4, 2.2, 2.8], true, 0.3),
   blast: auraMat([0.5, 1.2, 3.2], true, 0.45),
@@ -81,9 +81,15 @@ const FLAME_BUFFS = new Set(['overdrive', 'quiver-surge', 'track-drive', 'warhea
 /** Buffs that leave afterimages (agility). */
 const GHOST_BUFFS = new Set(['trim-tabs', 'roll-cascade', 'jink-jets']);
 /** Buffs that bolt armour plates onto the hull. */
-const PLATE_BUFFS = new Set(['hardened-hull', 'crash-frame']);
+const PLATE_BUFFS = new Set(['hardened-hull', 'siege-bastion']);
 /** Buffs that spin charge rings at the nose (gun buffs). */
-const NOSE_BUFFS = new Set(['gun-tune', 'steady-hands', 'overcharge-round']);
+const NOSE_BUFFS = new Set([
+  'gun-tune',
+  'steady-hands',
+  'overcharge-round',
+  'quake-round',
+  'zenith-tune',
+]);
 const odMat = new THREE.MeshBasicMaterial({
   color: new THREE.Color(3.2, 0.7, 0.15),
   transparent: true,
@@ -198,14 +204,17 @@ export function BuffVisuals({ shipId, frame, nation, upgrade, data }: Props) {
       calibr = false;
     const on = s.on;
     for (const k in on) on[k] = false;
-    for (const b of ship.buffs) {
-      const a = BUFF_AURA[b.skill];
+    const look = (skill: string) => {
+      const a = BUFF_AURA[skill];
       if (a) on[a[0]] = true;
-      if (FLAME_BUFFS.has(b.skill)) overdrive = true;
-      if (GHOST_BUFFS.has(b.skill)) phantom = true;
-      if (PLATE_BUFFS.has(b.skill)) bulk = true;
-      if (NOSE_BUFFS.has(b.skill)) calibr = true;
-    }
+      if (FLAME_BUFFS.has(skill)) overdrive = true;
+      if (GHOST_BUFFS.has(skill)) phantom = true;
+      if (PLATE_BUFFS.has(skill)) bulk = true;
+      if (NOSE_BUFFS.has(skill)) calibr = true;
+    };
+    // Timed buffs and the toggles that are running.
+    for (const b of ship.buffs) look(b.skill);
+    for (const g in ship.toggles) look(ship.toggles[g]!);
     const set = (k: string, on: boolean, sc: number) => {
       const m = auras.current[k];
       if (!m) return;
