@@ -229,7 +229,7 @@ export const SKILLS: Record<string, SkillDef> = {
   'roll-cascade': b(
     'roll-cascade',
     'Roll Cascade',
-    'Barrel Rolls have no cooldown for 8 s (they still cost fuel).',
+    'Barrel Rolls have no cooldown for 8 s.',
     ['wasp'],
     45,
     8,

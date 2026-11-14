@@ -101,7 +101,7 @@ const AIM_PITCH_MAX = 1.45;
 const HOVER_PX = 44;
 /** Cursor is kept inside this NDC box so the aim point never leaves the screen. */
 const CURSOR_EDGE = 0.92;
-/** Full stick asks for this fraction of the Frame's turn rate (the sim turns at angle-to-aim * TURN_GAIN). */
+/** Full stick asks for this fraction of the turn rate the Ship has right now (the sim scales its gain by speed band and turn buffs). */
 const STICK_MAX_RATE = 0.7;
 const SIM_TURN_GAIN = 5;
 /** Response curve exponent: fine control near centre, full rate only at the rim. */

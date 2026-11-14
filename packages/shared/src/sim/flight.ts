@@ -370,13 +370,16 @@ export function stepFlight(
     ay = _f0[1]!;
     az = _f0[2]!;
   }
+  // Agility (speed band, turn buffs) scales the steering gain as well as the cap, so a partial aim offset (the
+  // Pilot's stick, a Bot's capped lead) turns faster below cruise and with Trim Tabs, not only at the cap.
+  const agility = rec.mods.turnRateMul * (grounded ? 1 : speedTurnMul(fd, s.speed));
+  const turnGain = TURN_GAIN * (s.flipTicks > 0 ? 1 : agility);
   const maxRate =
     s.flipTicks > 0
       ? FLIP_TURN_RATE
       : fd.turnRate *
-        rec.mods.turnRateMul *
+        agility *
         (sieged ? siegeMods(s).turnRateMul : 1) *
-        (grounded ? 1 : speedTurnMul(fd, s.speed)) *
         (1 + (fd.boostTurnMul - 1) * ramp);
   const cosA = clamp(_f0[0]! * ax + _f0[1]! * ay + _f0[2]! * az, -1, 1);
   const angle = Math.acos(cosA);
@@ -395,7 +398,7 @@ export function stepFlight(
       cl = 0;
     }
   }
-  const desired = cl > 0 ? Math.min(angle * TURN_GAIN, maxRate) : 0;
+  const desired = cl > 0 ? Math.min(angle * turnGain, maxRate) : 0;
   const kTurn = 1 - Math.exp(-dt / TURN_TAU_SEC);
   const w = s.angVel;
   const wdx = cl > 0 ? (cx / cl) * desired : 0;

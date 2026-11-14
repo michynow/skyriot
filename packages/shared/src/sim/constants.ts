@@ -194,6 +194,7 @@ export const MISSILE_MOTOR_SEC = 5;
 export const MISSILE_FUSE_M = 20;
 /**
  * A target pulling at least this lateral acceleration (speed * turn rate, m/s^2) while the missile is in its
- * endgame out-turns it. Wasp manages it at cruise, Halo needs throttle, Anvil/Bulwark only while boosting.
+ * endgame out-turns it. At full stick (0.7 of the turn rate) a Wasp just manages it from cruise up (245-271),
+ * boosting too (251); a Halo only at max speed (245); Anvil (218) and Bulwark (135) can't.
  */
-export const BREAK_TURN_ACCEL = 440;
+export const BREAK_TURN_ACCEL = 240;
