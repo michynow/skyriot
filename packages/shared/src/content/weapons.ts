@@ -1,4 +1,4 @@
-import type { SkillDef, WeaponDef, WeaponLook } from '../types';
+import type { FrameId, SkillDef, WeaponDef, WeaponLook } from '../types';
 
 // Halo (support) weapons hit softest: the support class trades attack for defence and heals.
 // Primary: `fireIntervalSec` is the reattack per pattern (count rounds at once); accuracy, pattern and overheat
@@ -134,229 +134,316 @@ function salvo(validAngleDeg: number): Partial<WeaponDef> {
 }
 
 /*
- * Skill kits. Mechanics follow the genre's four gear classes (fighter / bomber / support / tank):
- * every Frame shares the long weapon and hull buffs plus Pivot Flip and Backdraft (bar 3); each Frame's
- * own kit is on bars 1-2. Durations and cooldowns are compressed for match length.
+ * Skill kits. Mechanics follow the genre's four gear classes (fighter / bomber / support / tank) at their top
+ * skill level: SP cost, duration, recharge and effect size per class. Names, descriptions and icons are our own.
+ * Mapping of the genre's stats: attack % = damage multiplier; accuracy = Primary hit chance; defense = damage
+ * taken (guns / Secondary separately); evasion = chance a gun round or a Secondary hit misses outright; blast
+ * radii are scaled x0.2 to our maps. Toggles cost no SP to switch on and drain `spPerSec` while they run.
  */
+/** Defense: `std` of gun damage and `adv` of Secondary damage is shrugged off. */
+const defense = (std: number, adv: number) => ({
+  damageTakenMul: 1 - std,
+  secondaryDamageTakenMul: (1 - adv) / (1 - std),
+});
+const evasion = (std: number, adv: number) => ({ evasionStd: std, evasionAdv: adv });
+
 export const SKILLS: Record<string, SkillDef> = {
-  // ---- Shared (all Frames): long buffs, turn-around, reverse burst, consumables ----
-  'gun-tune': b('gun-tune', 'Gun Tune', 'Primary deals +25% damage.', 'all', 300, 300, {
-    primaryDamageMul: 1.25,
-  }),
+  // ---- Every Frame: the five long buffs, tuned per Frame ----
+  'gun-tune': b(
+    'gun-tune',
+    'Gun Tune',
+    'Primary hits harder.',
+    'all',
+    50,
+    290,
+    300,
+    {},
+    {
+      byFrame: {
+        wasp: { buff: { primaryDamageMul: 1.05 } },
+        anvil: { buff: { primaryDamageMul: 1.25 } },
+        halo: { buff: { primaryDamageMul: 1.3 } },
+        bulwark: { spCost: 48, buff: { primaryDamageMul: 1.35 } },
+      },
+    },
+  ),
   'warhead-tune': b(
     'warhead-tune',
     'Warhead Tune',
-    'Secondary deals +20% damage.',
+    'Secondary hits harder.',
     'all',
+    55,
+    290,
     300,
-    300,
-    { secondaryDamageMul: 1.2 },
+    {},
+    {
+      byFrame: {
+        wasp: { buff: { secondaryDamageMul: 1.35 } },
+        anvil: { spCost: 53, buff: { secondaryDamageMul: 1.35 } },
+        halo: { buff: { secondaryDamageMul: 1.4 } },
+        bulwark: { spCost: 48, buff: { secondaryDamageMul: 1.35 } },
+      },
+    },
   ),
   'steady-hands': b(
     'steady-hands',
     'Steady Hands',
-    'Steadier aim: +10% Primary accuracy and a 20% wider missile Valid Angle.',
+    'Steadier aim: Primary rounds hit more often.',
     'all',
+    40,
+    290,
     300,
-    300,
-    { accuracyAdd: 0.1, spreadMul: 0.6, lockConeMul: 1.2 },
+    { accuracyAdd: 0.2745 },
+    {
+      byFrame: { wasp: { durationSec: 230, buff: { accuracyAdd: 0.1745 } } },
+    },
   ),
-  'hardened-hull': b('hardened-hull', 'Hardened Hull', 'Take 12% less damage.', 'all', 300, 300, {
-    damageTakenMul: 0.88,
-  }),
+  'hardened-hull': b(
+    'hardened-hull',
+    'Hardened Hull',
+    'Take less damage from guns and from Secondary weapons.',
+    'all',
+    40,
+    290,
+    300,
+    {},
+    {
+      byFrame: {
+        wasp: { buff: defense(0.06, 0.06) },
+        anvil: { buff: defense(0.2361, 0.2161) },
+        halo: { buff: defense(0.3166, 0.1866) },
+        bulwark: { buff: defense(0.1652, 0.1652) },
+      },
+    },
+  ),
   'jink-jets': b(
     'jink-jets',
     'Jink Jets',
-    '+12% Deflect chance (ignores the cap).',
+    'Evasion: enemy gun rounds and Secondary hits miss more often.',
     'all',
+    40,
+    290,
     300,
-    300,
-    { deflectAdd: 0.12 },
+    {},
+    {
+      byFrame: {
+        wasp: { buff: evasion(0.5173, 0.3352) },
+        anvil: { buff: evasion(0.2561, 0.2161) },
+        halo: { buff: evasion(0.1867, 0.1867) },
+        bulwark: { buff: evasion(0.0852, 0.0852) },
+      },
+    },
   ),
+
+  // ---- Wasp and Anvil: the two escape moves ----
   'pivot-flip': s(
     'pivot-flip',
     'Pivot Flip',
-    'Snap the nose around 180 degrees, keeping your speed.',
-    'all',
-    12,
+    'Snap the nose around 180 degrees in a flash, keeping your speed.',
+    ['wasp', 'anvil'],
+    10,
+    15,
     0.7,
+    {
+      byFrame: { anvil: { cooldownSec: 20 } },
+    },
   ),
   backdraft: s(
     'backdraft',
     'Backdraft',
-    'Reverse thrusters: burst backwards for a moment, guns still facing forward.',
-    'all',
+    'Reverse thrusters: shoot 1000 m backwards, guns still facing forward.',
+    ['wasp', 'anvil'],
     10,
-    0.8,
+    15,
+    1.5,
+    {
+      byFrame: { anvil: { cooldownSec: 20 } },
+    },
   ),
 
-  // ---- Wasp (fighter): missile frenzy, raw speed and agility, rolls on demand, anti-evasion ----
+  // ---- Wasp (fighter): missile frenzy, raw speed, rolls on demand, a jammer ----
   'afterburn-dash': s(
     'afterburn-dash',
     'Afterburn Dash',
-    'Straight-line boost burst for 2.5 s, no fuel cost.',
+    'Instant overboost for 2 s at one and a half times boost speed, no fuel.',
     ['wasp'],
-    20,
-    2.5,
+    60,
+    30,
+    2,
   ),
   overdrive: b(
     'overdrive',
     'Overdrive',
-    'Missile racks hot: Secondary +30% damage, +1 missile per salvo, 30% wider Valid Angle.',
+    'Missile racks hot: Secondary +15% damage, one more volley and one more missile per volley, Valid Angle +5°.',
     ['wasp'],
-    120,
-    90,
-    { secondaryDamageMul: 1.3, salvoAdd: 1, lockConeMul: 1.3 },
+    100,
+    290,
+    300,
+    {
+      secondaryDamageMul: 1.15,
+      salvoAdd: 1,
+      salvoCountAdd: 1,
+      validAngleAddDeg: 5.16,
+    },
   ),
   'quiver-surge': b(
     'quiver-surge',
     'Quiver Surge',
-    'Empty the racks: +2 missiles per salvo and Secondary refires 40% faster for 15 s.',
+    'Empty the racks for 30 s: two more volleys and two more missiles per volley, Secondary refires 30% sooner, +10% lock range.',
     ['wasp'],
-    150,
-    15,
-    { salvoAdd: 2, secondaryFireRateMul: 1.4 },
+    200,
+    900,
+    30,
+    {
+      salvoAdd: 2,
+      salvoCountAdd: 2,
+      secondaryFireRateMul: 1 / 0.7,
+      advRangeMul: 1.1,
+    },
   ),
   'trim-tabs': b(
     'trim-tabs',
     'Trim Tabs',
-    'Fine-tuned control surfaces: +15% turn rate.',
+    'Fine-tuned control surfaces for 60 s: +10% turn rate and strafe speed.',
     ['wasp'],
-    40,
-    30,
-    { turnRateMul: 1.15 },
+    100,
+    50,
+    60,
+    {
+      turnRateMul: 1.1,
+      strafeMul: 1.1,
+    },
   ),
-  'roll-cascade': b(
+  'roll-cascade': t(
     'roll-cascade',
     'Roll Cascade',
-    'Barrel Rolls have no cooldown for 8 s.',
+    'While on, Barrel Rolls chain back to back with no cooldown.',
     ['wasp'],
-    45,
-    8,
-    { rollCooldownMul: 0 },
+    25,
+    {
+      rollCooldownMul: 0,
+    },
   ),
   'blind-tag': d(
     'blind-tag',
     'Blind Tag',
-    'Jam the nearest enemy ahead (450 m) for 10 s: no missile warning, and its Barrel Rolls no longer shake missiles.',
+    'Jam the nearest enemy ahead (450 m) for 7 s: it gets no missile warnings.',
     ['wasp'],
-    40,
-    10,
-    { missileBlind: true },
-  ),
-  'shield-damper': b(
-    'shield-damper',
-    'Shield Damper',
-    'Shield takes 35% less damage.',
-    ['wasp', 'anvil'],
-    60,
-    30,
-    { shieldDamageTakenMul: 0.65 },
+    50,
+    420,
+    7,
+    {
+      missileBlind: true,
+    },
   ),
 
   // ---- Anvil (bomber): bombing modes, one huge shot, decoys, stealth, last-resort blast ----
-  'air-barrage-mode': t(
-    'air-barrage-mode',
-    'Air Barrage Mode',
-    'Bombing mode (press again for off): Secondary fires a tight forward salvo of 5 wide-burst proximity-fused rockets at air targets.',
-    ['anvil'],
-    'bombing',
-  ),
   'ground-strike-mode': t(
     'ground-strike-mode',
     'Ground Strike Mode',
-    'Bombing mode (press again for off): Secondary drops a stick of 3 heavy proximity-fused bombs straight down, big blasts, +40% damage vs Grounded/Docked targets.',
+    'Bombing mode: Secondary drops a stick of heavy proximity bombs, +70% damage, bigger blasts, +40% vs Grounded/Docked targets.',
     ['anvil'],
+    6,
+    undefined,
+    'bombing',
+  ),
+  'air-barrage-mode': t(
+    'air-barrage-mode',
+    'Air Barrage Mode',
+    'Bombing mode: Secondary fires a tight forward salvo of 5 proximity-fused rockets at air targets.',
+    ['anvil'],
+    6,
+    undefined,
     'bombing',
   ),
   'wide-lock-mode': t(
     'wide-lock-mode',
     'Wide Lock Mode',
-    'Bombing mode (press again for off): Secondary lock cone widens by 22°, lock and range +45%, and each salvo sends a guided rocket at up to 3 enemy Ships in the cone.',
+    'Bombing mode: Secondary lock cone +22°, lock and range +45%, and each salvo sends a guided rocket at up to 6 enemy Ships in the cone.',
     ['anvil'],
+    6,
+    undefined,
     'bombing',
   ),
   'overcharge-round': b(
     'overcharge-round',
     'Overcharge Round',
-    'Arm the guns (10 s): the next Primary round hits for x10 damage, flies twice as far and dead straight.',
+    'Charge the guns (10 s): the next Primary round hits for x12 damage, never misses its Target and flies twice as far.',
     ['anvil'],
-    20,
+    37,
+    5,
     10,
-    { primaryShotMul: 10 },
+    {
+      primaryShotMul: 12,
+    },
+  ),
+  'shield-damper': b(
+    'shield-damper',
+    'Shield Damper',
+    'Shield takes 20% less damage.',
+    ['anvil'],
+    80,
+    180,
+    180,
+    {
+      shieldDamageTakenMul: 0.8,
+    },
   ),
   'chaff-screen': b(
     'chaff-screen',
     'Chaff Screen',
-    'Trail 4 decoys for 20 s: each one soaks a whole hit, however big.',
+    'Trail 4 decoys for 60 s: each one soaks a whole hit.',
     ['anvil'],
-    40,
-    20,
-    { absorbHits: 4 },
+    70,
+    60,
+    60,
+    {
+      absorbHits: 4,
+    },
   ),
-  'shroud-veil': b(
+  'shroud-veil': t(
     'shroud-veil',
     'Shroud Veil',
-    'Stealth for 12 s: vanish from enemy radar beyond 180 m and refuse missile locks. Firing drops the veil.',
+    'Stealth while on: off enemy radar beyond 180 m and unlockable. Weapons and Skills are offline until you switch it off.',
     ['anvil'],
-    45,
-    12,
-    { cloak: true },
+    22,
+    {
+      cloak: true,
+      noAttack: true,
+      noSkills: true,
+    },
   ),
   'core-breach': s(
     'core-breach',
     'Core Breach',
-    'Overload the reactor and explode, dealing damage equal to your current HP to every enemy within 150 m. The cooldown keeps running through death and respawn.',
+    'Overload the reactor and explode, dealing your current HP as damage to every enemy within 280 m. Once per sortie day: the recharge runs through death.',
     ['anvil'],
-    240,
+    200,
+    43200,
     0,
   ),
 
-  // ---- Halo (support): team auras, instant heals and shield refills, invulnerability, cleanse/dispel ----
-  'rally-field': b(
-    'rally-field',
-    'Rally Field',
-    'Allies within 300 m deal +20% damage.',
+  // ---- Halo (support): team auras, heals and shield refills on a 1 s recharge, SP is the limit ----
+  'zenith-tune': b(
+    'zenith-tune',
+    'Zenith Tune',
+    'Both weapons hit harder: Secondary +39%, Primary +15%.',
     ['halo'],
+    50,
+    290,
     300,
-    300,
-    { damageMul: 1.2 },
-    300,
-  ),
-  'ward-lattice': b(
-    'ward-lattice',
-    'Ward Lattice',
-    'Allies within 300 m take 15% less damage.',
-    ['halo'],
-    300,
-    300,
-    { damageTakenMul: 0.85 },
-    300,
-  ),
-  'veer-field': b(
-    'veer-field',
-    'Veer Field',
-    'Allies within 300 m get +10% Deflect chance (ignores the cap).',
-    ['halo'],
-    300,
-    300,
-    { deflectAdd: 0.1 },
-    300,
+    {
+      secondaryDamageMul: 1.39,
+      primaryDamageMul: 1.15,
+    },
   ),
   'renewal-pulse': s(
     'renewal-pulse',
     'Renewal Pulse',
-    'Allies within 200 m (you too) instantly regain 10% max HP.',
+    'Allies within 200 m (you too) regain 4% max HP.',
     ['halo'],
-    40,
-    0,
-  ),
-  'recharge-pulse': s(
-    'recharge-pulse',
-    'Recharge Pulse',
-    'Allies within 200 m (you too) instantly regain 30% max shield.',
-    ['halo'],
-    30,
+    70,
+    1,
     0,
   ),
   'mend-beam': s(
@@ -365,6 +452,16 @@ export const SKILLS: Record<string, SkillDef> = {
     'Heal the most hurt ally within 400 m (or yourself) for 15% max HP.',
     ['halo'],
     30,
+    1,
+    0,
+  ),
+  'recharge-pulse': s(
+    'recharge-pulse',
+    'Recharge Pulse',
+    'Allies within 200 m (you too) regain 5% max shield.',
+    ['halo'],
+    70,
+    1,
     0,
   ),
   'charge-beam': s(
@@ -373,189 +470,254 @@ export const SKILLS: Record<string, SkillDef> = {
     'Recharge the ally within 400 m with the lowest shield (or yourself) for 20% max shield.',
     ['halo'],
     30,
+    1,
+    0,
+  ),
+  'rally-field': b(
+    'rally-field',
+    'Rally Field',
+    'Allies within 300 m deal +15% damage.',
+    ['halo'],
+    20,
+    410,
+    420,
+    { damageMul: 1.15 },
+    {},
+    300,
+  ),
+  'ward-lattice': b(
+    'ward-lattice',
+    'Ward Lattice',
+    'Allies within 300 m take 15% less damage.',
+    ['halo'],
+    20,
+    410,
+    420,
+    { damageTakenMul: 0.8517 },
+    {},
+    300,
+  ),
+  'veer-field': b(
+    'veer-field',
+    'Veer Field',
+    'Allies within 300 m get +15% evasion.',
+    ['halo'],
+    20,
+    410,
+    420,
+    evasion(0.1483, 0.1483),
+    {},
+    300,
+  ),
+  sanctum: b(
+    'sanctum',
+    'Sanctum',
+    'Take no damage for 8 s. Weapons and Skills are offline while it holds.',
+    ['halo'],
+    100,
+    600,
+    8,
+    {
+      invulnerable: true,
+      noAttack: true,
+      noSkills: true,
+    },
+  ),
+  'reverse-drive': t(
+    'reverse-drive',
+    'Reverse Drive',
+    'While on, the Halo flies backwards, nose and guns still forward. No boost.',
+    ['halo'],
+    6,
+    {
+      reverse: true,
+    },
+  ),
+  'fuel-line': s(
+    'fuel-line',
+    'Fuel Line',
+    'Top up half a tank of booster fuel on the ally within 400 m who is lowest (or yourself).',
+    ['halo'],
+    30,
+    2.5,
+    0,
+  ),
+  'thrift-circuit': b(
+    'thrift-circuit',
+    'Thrift Circuit',
+    'Skills cost 30% less SP.',
+    ['halo'],
+    20,
+    290,
+    300,
+    { spCostMul: 0.7 },
+  ),
+  'scan-pulse': s(
+    'scan-pulse',
+    'Scan Pulse',
+    'Expose every stealthed enemy inside your radar range (their stealth ends).',
+    ['halo'],
+    15,
+    3,
     0,
   ),
   lifeline: s(
     'lifeline',
     'Lifeline',
-    'Fully restore HP and shield of the most hurt ally within 400 m (or yourself).',
+    'Fully restore HP, shield, SP and fuel of the most hurt ally within 400 m (or yourself).',
     ['halo'],
-    300,
     0,
-  ),
-  sanctum: b(
-    'sanctum',
-    'Sanctum',
-    'Take no damage for 6 s. Weapons are offline while it holds.',
-    ['halo'],
-    120,
-    6,
-    { invulnerable: true, noAttack: true },
-  ),
-  purge: s(
-    'purge',
-    'Purge',
-    'You and allies within 120 m shed every enemy debuff and every missile lock.',
-    ['halo'],
-    45,
-    0.5,
+    900,
+    0,
   ),
   'dispel-lance': s(
     'dispel-lance',
     'Dispel Lance',
-    'Strip every buff off the nearest enemy ahead (600 m).',
+    'Strip every buff and running mode (Siege, bombing, stealth) off the nearest enemy ahead (600 m).',
     ['halo'],
-    45,
+    100,
+    300,
     0,
   ),
-  'scan-pulse': s(
-    'scan-pulse',
-    'Scan Pulse',
-    'Expose every stealthed enemy within 600 m (their stealth ends).',
+  purge: s(
+    'purge',
+    'Purge',
+    'You and allies within 120 m shed every enemy debuff.',
     ['halo'],
+    50,
     15,
-    0,
+    0.5,
   ),
 
-  // ---- Bulwark (tank): siege modes, missile immunity, shield rebuild, slow and shield lock, big shot ----
+  // ---- Bulwark (tank): siege modes, missile immunity, shield rebuild, slow and shield lock, one huge shell ----
   'siege-anchor': s(
     'siege-anchor',
     'Ground Siege',
-    'Landed only: anchor to the ground, first-person gunner view, Target lock. Guns fire x2.5 as fast, x1.5 damage, x1.4 range, 25% less damage taken.',
+    'Landed only: anchor to the ground, first-person gunner view, Target lock. Guns fire x2.5 as fast, x1.5 damage, x1.4 range, 25% less damage taken. Drains SP while it holds.',
     ['bulwark'],
+    0,
     0.3,
     0,
+    { spPerSec: 3 },
   ),
   'air-siege': s(
     'air-siege',
     'Air Siege',
-    'Airborne only: brake and hover-lock in place, gunner view, Target lock. Guns fire x1.6 as fast, x1.15 damage and range, wider lock cone, 15% less damage taken.',
+    'Airborne only: brake and hover-lock in place, gunner view, Target lock. Guns fire x1.6 as fast, x1.15 damage and range, wider lock cone, 15% less damage taken. Drains SP while it holds.',
     ['bulwark'],
+    0,
     0.3,
     0,
+    { spPerSec: 3 },
+  ),
+  'siege-bastion': t(
+    'siege-bastion',
+    'Bastion Siege',
+    'Landed only: dig in as a fixed turret. 17% less damage taken; the Bulwark cannot drive while it holds.',
+    ['bulwark'],
+    3,
+    {
+      damageTakenMul: 0.83,
+      groundSpeedMul: 0,
+    },
+  ),
+  'shield-weave': b(
+    'shield-weave',
+    'Shield Weave',
+    'Rebuild the shield: 60% of max shield over 9 s, even under fire.',
+    ['bulwark'],
+    60,
+    10,
+    9,
+    {
+      shieldRestorePerSec: 0.067,
+    },
   ),
   'blast-ward': b(
     'blast-ward',
     'Blast Ward',
     'For 10 s, missiles, rockets, bombs and shells do no damage to you.',
     ['bulwark'],
-    45,
+    40,
+    60,
     10,
-    { secondaryDamageTakenMul: 0 },
+    {
+      secondaryDamageTakenMul: 0,
+    },
   ),
-  'shield-weave': b(
-    'shield-weave',
-    'Shield Weave',
-    'Rebuild the shield: restores 8% max shield per second for 8 s, even under fire.',
-    ['bulwark'],
-    30,
-    8,
-    { shieldRestorePerSec: 0.08 },
-  ),
-  'crash-frame': b(
-    'crash-frame',
-    'Crash Frame',
-    'Terrain impacts cost half the HP.',
-    ['bulwark'],
-    300,
-    300,
-    { collisionDamageMul: 0.5 },
-  ),
-  'track-drive': b(
+  'track-drive': t(
     'track-drive',
     'Track Drive',
-    'Landed: drive twice as fast for 20 s.',
+    'Landed: drive at x2.75 speed while on.',
     ['bulwark'],
-    40,
-    20,
-    { groundSpeedMul: 2 },
+    8,
+    { groundSpeedMul: 2.75 },
   ),
   'snare-tag': d(
     'snare-tag',
     'Snare Tag',
     'Tag the nearest enemy ahead (450 m): -35% speed for 10 s.',
     ['bulwark'],
-    30,
+    50,
+    300,
     10,
-    { speedMul: 0.65 },
+    {
+      speedMul: 0.65,
+    },
+  ),
+  'ground-shroud': t(
+    'ground-shroud',
+    'Ground Shroud',
+    'Landed only: stealth while on (hidden beyond 180 m, no locks). Firing or lifting off drops it.',
+    ['bulwark'],
+    8,
+    {
+      cloak: true,
+    },
   ),
   'shield-breaker': d(
     'shield-breaker',
     'Shield Breaker',
-    'Lock the shield of the nearest enemy ahead (450 m): no shield regeneration or Shield Weave for 20 s.',
+    'Lock the shield of the nearest enemy ahead (450 m): no shield regeneration or Shield Weave for 12 s.',
     ['bulwark'],
-    60,
-    20,
-    { shieldRegenMul: 0 },
+    40,
+    360,
+    12,
+    {
+      shieldRegenMul: 0,
+    },
   ),
-  'ground-shroud': b(
-    'ground-shroud',
-    'Ground Shroud',
-    'Landed only: stealth for 20 s (hidden beyond 180 m, no locks). Firing drops it.',
-    ['bulwark'],
-    45,
-    20,
-    { cloak: true },
-  ),
-  'quake-round': s(
+  'quake-round': b(
     'quake-round',
     'Quake Round',
-    'Fire a charged shell 180 m ahead: 600 damage to every enemy within 70 m of the blast.',
+    'Charge the guns (10 s): the next Primary round hits for x36 damage, never misses its Target and bursts in a 280 m blast.',
     ['bulwark'],
-    90,
-    0,
+    150,
+    5,
+    10,
+    {
+      primaryShotMul: 36,
+      primaryShotSplashM: 280,
+    },
   ),
 
   'repair-kit': c('repair-kit', 'Repair Kit', 'Restore 8% HP.', 3),
   'shield-kit': c('shield-kit', 'Shield Kit', 'Restore 20% of the shield.', 3),
+  'sp-kit': c('sp-kit', 'SP Kit', 'Restore 100 SP.', 3),
   'fuel-cell': c('fuel-cell', 'Fuel Cell', 'Refill booster fuel.', 15),
 };
 
-/**
- * SP cost per cast. Pool 100 (Halo 150) regenerating 2.5/s (Halo 3.5/s): cooldowns say how often one Skill
- * comes back, SP says how many you can chain. Toggles (bombing modes, Siege) and Consumables are free.
- */
-const SP_COST: Record<string, number> = {
-  'gun-tune': 10,
-  'warhead-tune': 10,
-  'steady-hands': 10,
-  'hardened-hull': 10,
-  'jink-jets': 10,
-  'pivot-flip': 15,
-  backdraft: 15,
-  'afterburn-dash': 20,
-  overdrive: 25,
-  'quiver-surge': 35,
-  'trim-tabs': 15,
-  'roll-cascade': 30,
-  'blind-tag': 20,
-  'shield-damper': 20,
-  'overcharge-round': 25,
-  'chaff-screen': 30,
-  'shroud-veil': 35,
-  'core-breach': 50,
-  'rally-field': 15,
-  'ward-lattice': 15,
-  'veer-field': 15,
-  'renewal-pulse': 30,
-  'recharge-pulse': 25,
-  'mend-beam': 20,
-  'charge-beam': 20,
-  lifeline: 60,
-  sanctum: 50,
-  purge: 30,
-  'dispel-lance': 25,
-  'scan-pulse': 10,
-  'blast-ward': 35,
-  'shield-weave': 25,
-  'crash-frame': 10,
-  'track-drive': 10,
-  'snare-tag': 20,
-  'shield-breaker': 25,
-  'ground-shroud': 30,
-  'quake-round': 40,
-};
-for (const [id, cost] of Object.entries(SP_COST)) SKILLS[id]!.spCost = cost;
+const _byFrame = new Map<string, SkillDef>();
+/** The Skill as `frame` casts and carries it: the per-Frame overrides (`byFrame`) laid over the base def. */
+export function skillFor(id: string, frame: FrameId): SkillDef | undefined {
+  const base = SKILLS[id];
+  const over = base?.byFrame?.[frame];
+  if (!base || !over) return base;
+  const key = `${id}/${frame}`;
+  let def = _byFrame.get(key);
+  if (!def) _byFrame.set(key, (def = { ...base, ...over }));
+  return def;
+}
 
 function w(
   id: string,
@@ -593,15 +755,29 @@ function w(
   return def;
 }
 
+type SkillExtra = Pick<SkillDef, 'byFrame' | 'spPerSec'>;
+
 function s(
   id: string,
   name: string,
   description: string,
   frames: SkillDef['frames'],
+  spCost: number,
   cooldownSec: number,
   durationSec: number,
+  extra: SkillExtra = {},
 ): SkillDef {
-  return { id, name, description, frames, cooldownSec, durationSec, spCost: 0, kind: 'skill' };
+  return {
+    id,
+    name,
+    description,
+    frames,
+    cooldownSec,
+    durationSec,
+    spCost,
+    kind: 'skill',
+    ...extra,
+  };
 }
 
 function b(
@@ -609,9 +785,11 @@ function b(
   name: string,
   description: string,
   frames: SkillDef['frames'],
+  spCost: number,
   cooldownSec: number,
   durationSec: number,
   buff: SkillDef['buff'],
+  extra: SkillExtra = {},
   auraRadiusM?: number,
 ): SkillDef {
   return {
@@ -621,10 +799,11 @@ function b(
     frames,
     cooldownSec,
     durationSec,
-    spCost: 0,
+    spCost,
     kind: 'buff',
     buff,
     auraRadiusM,
+    ...extra,
   };
 }
 
@@ -634,29 +813,23 @@ function d(
   name: string,
   description: string,
   frames: SkillDef['frames'],
+  spCost: number,
   cooldownSec: number,
   durationSec: number,
   buff: SkillDef['buff'],
 ): SkillDef {
-  return {
-    id,
-    name,
-    description,
-    frames,
-    cooldownSec,
-    durationSec,
-    spCost: 0,
-    kind: 'skill',
-    buff,
-  };
+  return { id, name, description, frames, cooldownSec, durationSec, spCost, kind: 'skill', buff };
 }
 
+/** Toggle: free to switch, drains `spPerSec` while on; `buff` applies while on. Its group defaults to itself. */
 function t(
   id: string,
   name: string,
   description: string,
   frames: SkillDef['frames'],
-  toggleGroup: string,
+  spPerSec: number,
+  buff?: SkillDef['buff'],
+  toggleGroup: string = id,
 ): SkillDef {
   return {
     id,
@@ -666,7 +839,9 @@ function t(
     cooldownSec: 0.3,
     durationSec: 0,
     spCost: 0,
+    spPerSec,
     kind: 'toggle',
+    buff,
     toggleGroup,
   };
 }

@@ -56,27 +56,28 @@ export const REPAIR_KIT_FRACTION = 0.08;
 export const SHIELD_KIT_FRACTION = 0.2;
 /** Pivot Flip: the steering aim is turned 180 degrees and turn rate is raised to this for the duration. */
 export const FLIP_TURN_RATE = 6.5;
-/** Backdraft: fly backwards at this fraction of boost speed, then resume at min speed. */
-export const REVERSE_SPEED_MUL = 0.4;
+/** Backdraft: this far backwards over the Skill's duration, then resume at min speed. */
+export const BACKDRAFT_DISTANCE_M = 1000;
+/** Afterburn Dash runs at this multiple of boost speed. */
+export const DASH_SPEED_MUL = 1.5;
+export const SP_KIT_AMOUNT = 100;
+/** Fuel Line: fraction of a tank restored. */
+export const FUEL_LINE_FRACTION = 0.5;
 /** Shroud Veil: enemies closer than this still see (and can lock) a veiled Ship. */
 export const CLOAK_REVEAL_M = 180;
 export const SNARE_RANGE = 450;
 export const SNARE_CONE_RAD = 0.35;
-export const QUAKE_DISTANCE = 180;
-export const QUAKE_RADIUS = 70;
-export const QUAKE_DAMAGE = 600;
 /** Core Breach blast radius (damage = the caster's HP). */
-export const BREACH_RADIUS = 150;
+export const BREACH_RADIUS = 280;
 /** Renewal / Recharge Pulse: radius, HP and shield restored (fractions of max). */
 export const HEAL_FIELD_RADIUS = 200;
-export const HEAL_FIELD_HP = 0.1;
-export const HEAL_FIELD_SHIELD = 0.3;
+export const HEAL_FIELD_HP = 0.04;
+export const HEAL_FIELD_SHIELD = 0.05;
 /** Mend Beam / Lifeline reach, and Mend Beam heal (fraction of max HP). */
 export const HEAL_BEAM_RANGE = 400;
 export const HEAL_BEAM_HP = 0.15;
 export const CHARGE_BEAM_SHIELD = 0.2;
 export const DISPEL_RANGE = 600;
-export const SCAN_RADIUS = 600;
 export const DAMAGE_AURA_RADIUS = 55;
 
 // Steering smoothing
@@ -142,7 +143,7 @@ export const ROLL_DISPLACEMENT_PER_IMPULSE = 0.25;
 export const AIR_BARRAGE_COUNT = 5;
 export const AIR_BARRAGE_SPREAD_RAD = 0.09;
 /** Air Barrage rockets burst wider than the plain bomb. */
-export const AIR_BARRAGE_SPLASH_MUL = 1.6;
+export const AIR_BARRAGE_SPLASH_ADD_M = 10;
 /**
  * Each of the salvo's rockets deals this multiple of the Secondary's damage. No single rocket kills: the whole
  * salvo landing (5 x ~570 = ~2860) takes most Frames from full HP + shield. Air Barrage outhits Ground Strike.
@@ -151,16 +152,16 @@ export const AIR_BARRAGE_DAMAGE_MUL = 1.1;
 /** Wide Lock Mode: the Secondary's lock cone widens by this, its lock/fire range scales, and each salvo seeks up to N Ships. */
 export const WIDE_LOCK_CONE_ADD_RAD = 0.384; // ~22 degrees
 export const WIDE_LOCK_RANGE_MUL = 1.45;
-export const WIDE_LOCK_TARGETS = 3;
+export const WIDE_LOCK_TARGETS = 6;
 export const WIDE_LOCK_HOMING_TURN = 3.5;
 /** Each guided rocket (one per Target) deals this multiple of the Secondary's damage (a heavy hit, not a kill). */
 export const WIDE_LOCK_DAMAGE_MUL = 1.5;
 export const GROUND_STRIKE_GROUND_MUL = 1.4;
-export const GROUND_STRIKE_SPLASH_MUL = 1.7;
+export const GROUND_STRIKE_SPLASH_ADD_M = 20;
 /** Ground Strike drops this many bombs, fanned sideways at +-this speed (m/s), each dealing this multiple (3 x ~830). */
 export const GROUND_STRIKE_COUNT = 3;
 export const GROUND_STRIKE_SPREAD_MPS = 25;
-export const GROUND_STRIKE_DAMAGE_MUL = 1.6;
+export const GROUND_STRIKE_DAMAGE_MUL = 1.7;
 /** Seconds after a bombing mode comes on before its first salvo can fire (the bay opening is the telegraph). */
 export const BOMB_ARM_SEC = 0.6;
 export const BOMB_DROP_SPEED = 60;

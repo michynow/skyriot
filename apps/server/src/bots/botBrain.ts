@@ -661,8 +661,8 @@ export function botBrain(sim: Sim, id: ShipId, mem: BotMemory): PilotInput {
         continue;
       }
       if (id === 'purge') {
-        // Shake a missile or shed enemy debuffs.
-        if (me.incomingDist > 0 || me.buffs.some((b) => SKILLS[b.skill]?.kind === 'skill')) {
+        // Shed enemy debuffs.
+        if (me.buffs.some((b) => SKILLS[b.skill]?.kind === 'skill')) {
           input.hotbar = slot;
           break;
         }

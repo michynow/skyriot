@@ -42,6 +42,7 @@ export const SELL_RATE = 0.25;
 export const STARTING_CONSUMABLES: Record<SkillId, number> = {
   'repair-kit': 5,
   'shield-kit': 5,
+  'sp-kit': 5,
   'fuel-cell': 5,
 };
 

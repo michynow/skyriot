@@ -1,12 +1,12 @@
-import { SKILLS } from '../content/weapons';
+import { SKILLS, skillFor } from '../content/weapons';
 import { TICK_HZ, type NationId, type ShipId, type SkillDef, type SkillId } from '../types';
 import type { ShipRec, SimCtx } from './ctx';
 import {
   PURGE_RADIUS,
   DAMAGE_AURA_RADIUS,
-  QUAKE_DAMAGE,
-  QUAKE_DISTANCE,
-  QUAKE_RADIUS,
+  DASH_SPEED_MUL,
+  FUEL_LINE_FRACTION,
+  SP_KIT_AMOUNT,
   HEAL_FIELD_HP,
   HEAL_FIELD_SHIELD,
   HEAL_BEAM_HP,
@@ -19,9 +19,16 @@ import {
   HEAL_FIELD_RADIUS,
   HEAL_BEAM_RANGE,
   DISPEL_RANGE,
-  SCAN_RADIUS,
 } from './constants';
-import { applyBuff, breakCloak, dropBuffs, isCloaked, isDebuff, tickBuffs } from './buffs';
+import {
+  applyBuff,
+  breakCloak,
+  dropBuffs,
+  initToggles,
+  isCloaked,
+  isDebuff,
+  tickBuffs,
+} from './buffs';
 import { toggleSiege } from './flight';
 import { forwardOf } from './math';
 import { damageShip } from './damage';
@@ -30,6 +37,7 @@ const _f = [0, 0, 0];
 
 /** Skills that change movement and therefore must also run in client prediction. */
 const PREDICTED = new Set([
+  'sp-kit',
   'afterburn-dash',
   'siege-anchor',
   'air-siege',
@@ -49,13 +57,30 @@ function affectsFlight(e: SkillDef['buff']): boolean {
   );
 }
 
-/** Skills that only work while Grounded. */
-const GROUND_ONLY = new Set(['ground-shroud', 'track-drive']);
+/** Skills that only work while Grounded (toggles among them drop on lift-off). */
+const GROUND_ONLY = new Set(['ground-shroud', 'track-drive', 'siege-bastion']);
 
 export function tickTimers(rec: ShipRec): void {
   const s = rec.state;
   for (let i = 0; i < s.cooldowns.length; i++) if (s.cooldowns[i]! > 0) s.cooldowns[i]!--;
-  if (s.alive) s.sp = Math.min(rec.fd.maxSp, s.sp + rec.fd.spRegenPerSec / TICK_HZ);
+  if (s.alive) {
+    // SP: regeneration minus what the running toggles and Siege drain; dry = everything running drops.
+    let drain = 0;
+    for (const g in s.toggles) {
+      const id = s.toggles[g]!;
+      if (GROUND_ONLY.has(id) && !s.grounded) delete s.toggles[g];
+      else drain += SKILLS[id]?.spPerSec ?? 0;
+    }
+    if (s.sieged) drain += SKILLS[s.grounded ? 'siege-anchor' : 'air-siege']!.spPerSec ?? 0;
+    s.sp = Math.min(rec.fd.maxSp, s.sp + (rec.fd.spRegenPerSec - drain) / TICK_HZ);
+    if (s.sp <= 0) {
+      s.sp = 0;
+      if (drain > 0) {
+        initToggles(s);
+        s.sieged = s.siegePending = false;
+      }
+    }
+  }
   tickBuffs(s);
 }
 
@@ -79,21 +104,26 @@ export function castSkill(
 ): boolean {
   const s = rec.state;
   const fd = rec.fd;
-  const def = SKILLS[id];
+  const def = skillFor(id, s.frame);
   if (!def || !s.alive) return false;
   if (def.frames !== 'all' && !def.frames.includes(s.frame)) return false;
-  // Bombing modes slow the Anvil (flight.ts), so their toggles are predicted too.
-  const movesShip =
-    (def.kind === 'buff' && affectsFlight(def.buff)) || def.toggleGroup === 'bombing';
+  // Toggles are all predicted: they drain SP, and SP running dry ends Siege.
+  const movesShip = (def.kind === 'buff' && affectsFlight(def.buff)) || def.kind === 'toggle';
+  const group = def.toggleGroup ?? id;
+  const switchingOff = def.kind === 'toggle' && s.toggles[group] === id;
+  // Sanctum / Shroud Veil: Skills offline (Consumables and switching the toggle itself off still work).
+  if (rec.mods.noSkills && def.kind !== 'consumable' && !switchingOff) return false;
   if (predictOnly && !PREDICTED.has(id) && !movesShip) return false;
   if (GROUND_ONLY.has(id) && !s.grounded) return false;
   // Finite Consumables: 0 left blocks the cast. Only the server spends one (the profile resend syncs the client).
   const charges = def.kind === 'consumable' ? rec.charges : null;
   if (charges && !((charges[id] ?? 0) > 0)) return false;
   // SP: hotbar casts pay; slotless dev casts (/cast) are free. Siege refusals below cost nothing (toggles are free).
+  const cost = def.spCost * rec.mods.spCostMul;
   if (slot >= 0) {
-    if (s.sp < def.spCost) return false;
-    s.sp -= def.spCost;
+    if (s.sp < cost || (def.kind === 'toggle' && !switchingOff && s.sp < (def.spPerSec ?? 0)))
+      return false;
+    s.sp -= cost;
   }
   const ticks = Math.ceil(def.durationSec * TICK_HZ);
   forwardOf(s.rot, _f);
@@ -116,14 +146,14 @@ export function castSkill(
       applyBuff(s, id, s.id, ticks);
     }
     if (def.buff.absorbHits) rec.absorbLeft = def.buff.absorbHits;
-  } else if (def.kind === 'toggle' && def.toggleGroup) {
+  } else if (def.kind === 'toggle') {
     // Pressing the active mode turns it off; another mode of the group switches to it.
-    if (s.toggles[def.toggleGroup] === id) delete s.toggles[def.toggleGroup];
-    else s.toggles[def.toggleGroup] = id;
+    if (switchingOff) delete s.toggles[group];
+    else s.toggles[group] = id;
     // Switching modes costs the cooldown on every slot of the group.
     const cd = Math.ceil(def.cooldownSec * TICK_HZ);
     for (let j = 0; j < fd.hotbar.length; j++) {
-      if (SKILLS[fd.hotbar[j] ?? '']?.toggleGroup === def.toggleGroup) s.cooldowns[j] = cd;
+      if (SKILLS[fd.hotbar[j] ?? '']?.toggleGroup === group) s.cooldowns[j] = cd;
     }
   }
 
@@ -144,27 +174,12 @@ export function castSkill(
         if (a !== rec) targets.push(a.state.id);
         for (let k = a.state.buffs.length - 1; k >= 0; k--)
           if (isDebuff(a.state.buffs[k]!.skill)) a.state.buffs.splice(k, 1);
-        for (const o of ctx.recList) {
-          if (o.state.lockTarget === a.state.id) o.state.lockTarget = null;
-        }
-        for (const p of ctx.projectiles) {
-          if (p.kind === 'missile' && p.target === a.state.id) {
-            p.target = null;
-            p.homing = 0;
-            ctx.events.push({
-              type: 'missileEvaded',
-              id: p.id,
-              victim: a.state.id,
-              reason: 'purge',
-            });
-          }
-        }
       }
       break;
     }
     case 'afterburn-dash':
       rec.state.dashTicks = Math.max(ticks, 1);
-      s.speed = Math.max(s.speed, fd.boostSpeed);
+      s.speed = Math.max(s.speed, fd.boostSpeed * DASH_SPEED_MUL);
       break;
     case 'pivot-flip':
       // The steering aim is flipped client-side; the sim only lifts the turn-rate cap.
@@ -184,6 +199,20 @@ export function castSkill(
     case 'fuel-cell':
       s.fuel = 1;
       break;
+    case 'sp-kit':
+      s.sp = Math.min(fd.maxSp, s.sp + SP_KIT_AMOUNT);
+      break;
+    case 'fuel-line': {
+      let a = rec;
+      for (const o of ctx.recList) {
+        const os = o.state;
+        if (os.alive && os.nation === s.nation && os.launchPhase === 'none')
+          if (dist(os.pos, s.pos) <= HEAL_BEAM_RANGE && os.fuel < a.state.fuel) a = o;
+      }
+      a.state.fuel = Math.min(1, a.state.fuel + FUEL_LINE_FRACTION);
+      if (a !== rec) targets = [a.state.id];
+      break;
+    }
     case 'siege-anchor':
     case 'air-siege':
       if (!toggleSiege(rec, id === 'siege-anchor')) return false;
@@ -201,7 +230,10 @@ export function castSkill(
     case 'dispel-lance': {
       const foe = nearestEnemyInFront(ctx, rec, DISPEL_RANGE, SNARE_CONE_RAD);
       if (foe) {
+        // Buffs and everything running: toggles (bombing modes, stealth) and Siege.
         foe.state.buffs.length = 0;
+        initToggles(foe.state);
+        foe.state.sieged = foe.state.siegePending = false;
         targets = [foe.state.id];
       }
       break;
@@ -214,7 +246,7 @@ export function castSkill(
           !os.alive ||
           os.nation === s.nation ||
           !isCloaked(os) ||
-          dist(os.pos, s.pos) > SCAN_RADIUS
+          dist(os.pos, s.pos) > fd.radarRangeM
         )
           continue;
         breakCloak(os);
@@ -239,9 +271,10 @@ export function castSkill(
       const as = a.state;
       if (id === 'mend-beam') as.hp = Math.min(as.maxHp, as.hp + as.maxHp * HEAL_BEAM_HP);
       else {
-        // HP and shield only: fuel moves the Ship, and this cast isn't predicted.
         as.hp = as.maxHp;
         as.shield = as.maxShield;
+        as.sp = a.fd.maxSp;
+        as.fuel = 1;
       }
       if (a !== rec) targets = [as.id];
       break;
@@ -251,22 +284,6 @@ export function castSkill(
       const as = a.state;
       as.shield = Math.min(as.maxShield, as.shield + as.maxShield * CHARGE_BEAM_SHIELD);
       if (a !== rec) targets = [as.id];
-      break;
-    }
-    case 'quake-round': {
-      const x = s.pos[0] + _f[0]! * QUAKE_DISTANCE,
-        y = s.pos[1] + _f[1]! * QUAKE_DISTANCE,
-        z = s.pos[2] + _f[2]! * QUAKE_DISTANCE;
-      targets = hurtEnemiesNear(
-        ctx,
-        s.nation,
-        s.id,
-        x,
-        y,
-        z,
-        QUAKE_RADIUS,
-        QUAKE_DAMAGE * rec.mods.damageMul,
-      );
       break;
     }
     case 'core-breach':

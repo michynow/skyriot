@@ -53,6 +53,7 @@ const items: ItemInstance[] = [
   it('repair-kit', 'consumable', { count: 17 }),
   it('shield-kit', 'consumable', { count: 20 }),
   it('fuel-cell', 'consumable', { count: 8 }),
+  it('sp-kit', 'consumable', { count: 8 }),
   it('flak-repeater', 'weapon', {
     rarity: 'tuned',
     mods: [['weapon-damagePct', 'weapon-fireRatePct', 'weapon-ammoPct']],

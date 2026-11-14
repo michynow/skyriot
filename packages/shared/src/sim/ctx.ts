@@ -53,6 +53,16 @@ export interface BuffMods {
   groundSpeedMul: number;
   shieldRestorePerSec: number;
   missileBlind: boolean;
+  evasionStd: number;
+  evasionAdv: number;
+  validAngleAddDeg: number;
+  salvoCountAdd: number;
+  advRangeMul: number;
+  strafeMul: number;
+  spCostMul: number;
+  reverse: boolean;
+  noSkills: boolean;
+  primaryShotSplashM: number;
   primaryShotMul: number;
 }
 

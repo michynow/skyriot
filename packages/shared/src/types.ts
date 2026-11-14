@@ -531,6 +531,12 @@ export interface SkillDef {
   auraRadiusM?: number;
   /** For 'toggle': Skills sharing a group are mutually exclusive modes (e.g. Anvil bombing modes). */
   toggleGroup?: string;
+  /** SP drained per second while a toggle (or Siege) runs; it drops when SP runs out. */
+  spPerSec?: number;
+  /** Per-Frame tuning of a shared Skill, laid over the base def by `skillFor`. */
+  byFrame?: Partial<
+    Record<FrameId, Partial<Pick<SkillDef, 'spCost' | 'cooldownSec' | 'durationSec' | 'buff'>>>
+  >;
 }
 
 /** Multipliers default to 1, additions to 0. */
@@ -588,6 +594,24 @@ export interface BuffEffect {
   primaryShotMul?: number;
   /** Decoys: the next N projectile hits are absorbed whole; the buff ends when they're used up. */
   absorbHits?: number;
+  /** Evasion: chance an enemy Primary round (subtracted from its hit chance) / a Secondary hit misses outright. */
+  evasionStd?: number;
+  evasionAdv?: number;
+  /** Degrees added to the Secondary's Valid Angle. */
+  validAngleAddDeg?: number;
+  /** Extra missiles per volley of a guided salvo (salvoAdd adds volleys). */
+  salvoCountAdd?: number;
+  /** Secondary (ADV) radar range: lock distance. */
+  advRangeMul?: number;
+  strafeMul?: number;
+  /** SP cost of the holder's Skills. */
+  spCostMul?: number;
+  /** Fly backwards (nose held), no boost. */
+  reverse?: boolean;
+  /** Can't cast Skills (Consumables and switching the toggle itself off still work). */
+  noSkills?: boolean;
+  /** The armed Primary shot (primaryShotMul) bursts with this blast radius (m). */
+  primaryShotSplashM?: number;
 }
 
 export interface ActiveBuff {

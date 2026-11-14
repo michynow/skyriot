@@ -1,4 +1,4 @@
-import { SKILLS } from '../content/weapons';
+import { SKILLS, skillFor } from '../content/weapons';
 import type { BuffEffect, ShipId, ShipState, SkillId } from '../types';
 import type { BuffMods, ShipRec, SimCtx } from './ctx';
 
@@ -34,6 +34,16 @@ export function createMods(): BuffMods {
     shieldRestorePerSec: 0,
     missileBlind: false,
     primaryShotMul: 1,
+    evasionStd: 0,
+    evasionAdv: 0,
+    validAngleAddDeg: 0,
+    salvoCountAdd: 0,
+    advRangeMul: 1,
+    strafeMul: 1,
+    spCostMul: 1,
+    reverse: false,
+    noSkills: false,
+    primaryShotSplashM: 0,
   };
 }
 
@@ -56,10 +66,11 @@ export function resolveMods(ctx: SimCtx, rec: ShipRec): void {
     m.salvoAdd =
     m.shieldRestorePerSec =
       0;
-  m.cloak = m.invulnerable = m.noAttack = m.missileBlind = false;
-  for (const b of s.buffs) {
-    const e = SKILLS[b.skill]?.buff;
-    if (!e) continue;
+  m.cloak = m.invulnerable = m.noAttack = m.missileBlind = m.reverse = m.noSkills = false;
+  m.evasionStd = m.evasionAdv = m.validAngleAddDeg = m.salvoCountAdd = m.primaryShotSplashM = 0;
+  m.advRangeMul = m.strafeMul = m.spCostMul = 1;
+  const add = (e: BuffEffect | undefined): void => {
+    if (!e) return;
     m.fireRateMul *= e.fireRateMul ?? 1;
     m.speedMul *= e.speedMul ?? 1;
     m.turnRateMul *= e.turnRateMul ?? 1;
@@ -90,7 +101,20 @@ export function resolveMods(ctx: SimCtx, rec: ShipRec): void {
     m.invulnerable ||= e.invulnerable === true;
     m.noAttack ||= e.noAttack === true;
     m.missileBlind ||= e.missileBlind === true;
-  }
+    m.evasionStd += e.evasionStd ?? 0;
+    m.evasionAdv += e.evasionAdv ?? 0;
+    m.validAngleAddDeg += e.validAngleAddDeg ?? 0;
+    m.salvoCountAdd += e.salvoCountAdd ?? 0;
+    m.advRangeMul *= e.advRangeMul ?? 1;
+    m.strafeMul *= e.strafeMul ?? 1;
+    m.spCostMul *= e.spCostMul ?? 1;
+    m.primaryShotSplashM = Math.max(m.primaryShotSplashM, e.primaryShotSplashM ?? 0);
+    m.reverse ||= e.reverse === true;
+    m.noSkills ||= e.noSkills === true;
+  };
+  // Timed buffs, then the toggles that are on (their effect holds while they run).
+  for (const b of s.buffs) add(skillFor(b.skill, s.frame)?.buff);
+  for (const g in s.toggles) add(SKILLS[s.toggles[g]!]?.buff);
   if (!s.alive) return;
   const target = rec.fd.maxHp * m.maxHpMul;
   if (Math.abs(target - s.maxHp) > 1e-6) {
@@ -115,12 +139,14 @@ export function applyBuff(s: ShipState, skill: SkillId, source: ShipId, ticks: n
 /** Shroud Veil (or any cloak buff) is up. Derived from `buffs`, so the client sees it too. */
 export function isCloaked(s: ShipState): boolean {
   for (const b of s.buffs) if (SKILLS[b.skill]?.buff?.cloak) return true;
+  for (const g in s.toggles) if (SKILLS[s.toggles[g]!]?.buff?.cloak) return true;
   return false;
 }
 
 /** Drop every cloak buff (the Ship fired, or was scanned). */
 export function breakCloak(s: ShipState): void {
   dropBuffs(s, (e) => e.cloak === true);
+  for (const g in s.toggles) if (SKILLS[s.toggles[g]!]?.buff?.cloak) delete s.toggles[g];
 }
 
 /** Remove the buffs whose effect matches. */

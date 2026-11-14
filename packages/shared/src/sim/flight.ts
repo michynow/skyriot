@@ -1,4 +1,5 @@
 import { DECK, SIEGE, SIEGE_AIR, TERRAIN_IMPACT } from '../content/frames';
+import { SKILLS } from '../content/weapons';
 import { sampleHeight } from '../terrain/heightfield';
 import { TICK_HZ, type PilotInput, type ShipState } from '../types';
 import type { ShipRec, SimCtx } from './ctx';
@@ -42,7 +43,8 @@ import {
   ROLL_DISPLACEMENT_PER_IMPULSE,
   ROLL_DURATION_SEC,
   MIN_DIRECTION_LENGTH,
-  REVERSE_SPEED_MUL,
+  BACKDRAFT_DISTANCE_M,
+  DASH_SPEED_MUL,
   SHIP_QUERY_GROUPS,
   SIEGE_LOCK_CONE_MUL,
   SPEED_EASE_SEC,
@@ -297,6 +299,7 @@ export function stepFlight(
     !input.brake &&
     !s.siegePending &&
     !s.landing &&
+    !rec.mods.reverse &&
     s.fuel > 0;
   const lit =
     s.boostTicks > 0
@@ -610,7 +613,7 @@ export function stepFlight(
     // Approach: ease off as the Deck nears; the Bulwark just stops and sinks.
     target = Math.min(fd.cruiseSpeed, landDist * LAND_APPROACH_GAIN);
   } else if (s.reverseTicks > 0) {
-    target = -fd.boostSpeed * REVERSE_SPEED_MUL;
+    target = -BACKDRAFT_DISTANCE_M / SKILLS.backdraft!.durationSec;
   } else if (input.brake || s.siegePending) {
     target = fd.minSpeed;
   } else {
@@ -619,8 +622,11 @@ export function stepFlight(
       input.throttle >= 0
         ? fd.cruiseSpeed + (fd.maxSpeed - fd.cruiseSpeed) * input.throttle
         : fd.cruiseSpeed + (fd.cruiseSpeed - fd.minSpeed) * input.throttle;
-    target = s.dashTicks > 0 ? fd.boostSpeed : target + (fd.boostSpeed - target) * ramp;
+    target =
+      s.dashTicks > 0 ? fd.boostSpeed * DASH_SPEED_MUL : target + (fd.boostSpeed - target) * ramp;
     target *= rec.mods.speedMul;
+    // Reverse Drive: the same envelope, flown backwards.
+    if (rec.mods.reverse && s.dashTicks === 0) target = -target;
   }
   s.fuel = clamp(
     s.fuel + (boosting ? -fd.fuelBurnPerSec : fd.fuelRegenPerSec * rec.mods.fuelRegenMul) * dt,
@@ -643,8 +649,9 @@ export function stepFlight(
     hrz = _f1[0]!;
   const hrl = Math.hypot(hrx, hrz) || 1;
   let ty = input.vertical * fd.verticalSpeed;
-  let tx = (hrx / hrl) * input.strafe * fd.strafeSpeed;
-  let tz = (hrz / hrl) * input.strafe * fd.strafeSpeed;
+  const strafe = input.strafe * fd.strafeSpeed * rec.mods.strafeMul;
+  let tx = (hrx / hrl) * strafe;
+  let tz = (hrz / hrl) * strafe;
   // No stall or sink: at any speed a Ship holds its altitude unless Q/E moves it.
   if (sieged) {
     // Airborne siege: hold position and altitude.

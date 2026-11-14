@@ -3,9 +3,6 @@ import {
   BREACH_RADIUS,
   FRAMES,
   HEAL_FIELD_RADIUS,
-  QUAKE_DISTANCE,
-  QUAKE_RADIUS,
-  SCAN_RADIUS,
   SKILLS,
   type ShipId,
   type ShipState,
@@ -414,8 +411,8 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
       break;
     }
     case 'scan-pulse':
-      fx.sph.wave(s.pos, [0.1, 0.5, 0.18], 0.9, R, SCAN_RADIUS);
-      flatRing(fx, P, C.green, SCAN_RADIUS / 0.78, 1.0);
+      fx.sph.wave(s.pos, [0.1, 0.5, 0.18], 0.9, R, FRAMES[s.frame].radarRangeM);
+      flatRing(fx, P, C.green, FRAMES[s.frame].radarRangeM / 0.78, 1.0);
       for (const t of targetsOf(e)) {
         const ts = world.ships.get(t);
         if (ts) ring(fx, ts.pos, C.green, FRAMES[ts.frame].radius * 5, 0.9);
@@ -428,28 +425,6 @@ export function skillActivation(fx: Fx, e: SimEvent & { type: 'skillUsed' }) {
       burst(fx, P, C.heat, 90, BREACH_RADIUS * 0.8, 1.0, 2.4);
       burst(fx, P, C.white, 30, BREACH_RADIUS * 0.4, 0.5, 2.0);
       break;
-    case 'quake-round': {
-      const at: [number, number, number] = [
-        P[0]! + fx0 * QUAKE_DISTANCE,
-        P[1]! + fy0 * QUAKE_DISTANCE,
-        P[2]! + fz0 * QUAKE_DISTANCE,
-      ];
-      fx.streaks.push(
-        at[0]!,
-        at[1]!,
-        at[2]!,
-        R * 0.6,
-        ...C.ground,
-        0.8,
-        -fx0 * QUAKE_DISTANCE,
-        -fy0 * QUAKE_DISTANCE,
-        -fz0 * QUAKE_DISTANCE,
-      );
-      fx.sph.wave(at, [1.4, 0.8, 0.2], 0.6, 2, QUAKE_RADIUS);
-      ring(fx, at, C.ground, QUAKE_RADIUS / 0.78, 0.6);
-      burst(fx, at, C.ground, 50, QUAKE_RADIUS * 0.9, 0.6, 1.6);
-      break;
-    }
     default: {
       const look = SELF[e.skill];
       if (!look) {

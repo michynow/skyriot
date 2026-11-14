@@ -16,6 +16,7 @@ export const CONSUMABLE_STACK = 20;
 const CONSUMABLE_PRICE: Record<string, number> = {
   'repair-kit': 40,
   'shield-kit': 40,
+  'sp-kit': 40,
   'fuel-cell': 30,
 };
 const REWARD_CHARM_1H_PRICE = 400;

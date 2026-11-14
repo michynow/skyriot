@@ -39,7 +39,14 @@ const fwd = (s: ShipState) => {
 };
 /** Stack the team on one spot and put the foe `ahead` metres in front of `caster`. */
 const place = (caster: string, ahead: number) => {
-  for (const f of Object.keys(FRAMES)) sim.teleport(f, [0, 400, 0]);
+  for (const f of Object.keys(FRAMES)) {
+    sim.teleport(f, [0, 400, 0]);
+    // A clean slate per trial: nothing running (Sanctum and Shroud Veil block Skills), full SP.
+    const t = ship(f);
+    t.buffs.length = 0;
+    for (const g of Object.keys(t.toggles)) delete t.toggles[g];
+    t.sp = FRAMES[f as keyof typeof FRAMES].maxSp;
+  }
   step();
   const s = ship(caster);
   const d = fwd(s);
@@ -62,7 +69,7 @@ const check = (name: string, ok: boolean) => {
 };
 
 // Every kit Skill has a working cast on its Frame (landed-only ones are cast on the ground below).
-const GROUND_ONLY = new Set(['ground-shroud', 'track-drive', 'siege-anchor']);
+const GROUND_ONLY = new Set(['ground-shroud', 'track-drive', 'siege-anchor', 'siege-bastion']);
 for (const def of Object.values(SKILLS)) {
   if (def.frames === 'all' || GROUND_ONLY.has(def.id) || def.id === 'core-breach') continue;
   for (const f of def.frames) {
@@ -85,11 +92,18 @@ place('anvil', 100);
 sim.castSkill('anvil', 'shroud-veil');
 step();
 check('shroud-veil cloaks', isCloaked(ship('anvil')));
-step(2, { anvil: { fire1: true } });
-check('firing drops shroud-veil', !isCloaked(ship('anvil')));
+const ammoVeil = ship('anvil').ammo1;
+step(20, { anvil: { fire1: true } });
+check('shroud-veil holds fire', isCloaked(ship('anvil')) && ship('anvil').ammo1 === ammoVeil);
+sim.castSkill('anvil', 'shroud-veil');
+check('shroud-veil switches off', !isCloaked(ship('anvil')));
+ship('anvil').sp = 1;
+sim.castSkill('anvil', 'air-barrage-mode');
+step(30);
+check('a toggle drops when SP runs dry', ship('anvil').toggles.bombing === undefined);
 place('anvil', 100);
 sim.castSkill('anvil', 'overcharge-round');
-step(10, { anvil: { fire1: true } });
+step(30, { anvil: { fire1: true } });
 check('overcharge-round is spent by one shot', !has('anvil', 'overcharge-round'));
 sim.castSkill('anvil', 'chaff-screen');
 check('chaff-screen is up', has('anvil', 'chaff-screen'));
@@ -205,20 +219,25 @@ place('halo', 100);
 sim.castSkill('foe', 'blast-ward');
 sim.castSkill('halo', 'dispel-lance');
 check('dispel-lance strips the foe', ship('foe').buffs.length === 0);
+ship('halo').sp = 100;
+sim.castSkill('halo', 'thrift-circuit');
+step();
+ship('halo').cooldowns.fill(0);
+const spThrift = ship('halo').sp;
+step(1, { halo: { hotbar: FRAMES.halo.hotbar.indexOf('mend-beam') } });
+check('thrift-circuit cuts SP cost by 30%', Math.abs(spThrift - ship('halo').sp - 21) < 0.5);
 place('halo', 100);
-sim.castSkill('wasp', 'shield-damper');
+sim.castSkill('wasp', 'trim-tabs');
 ship('wasp').buffs.push({ skill: 'snare-tag', source: 'foe' as ShipId, ticksLeft: 300 });
 sim.castSkill('halo', 'purge');
-check(
-  'purge cleanses debuffs, keeps buffs',
-  !has('wasp', 'snare-tag') && has('wasp', 'shield-damper'),
-);
+check('purge cleanses debuffs, keeps buffs', !has('wasp', 'snare-tag') && has('wasp', 'trim-tabs'));
 
 // ---- Bulwark ----
 place('bulwark', 180);
 const hpQuake = ship('foe').hp;
 sim.castSkill('bulwark', 'quake-round');
-check('quake-round damages the blast area', ship('foe').hp < hpQuake);
+step(40, { bulwark: { fire1: true, target: 'foe' } });
+check('quake-round: the charged shell hurts its Target', ship('foe').hp < hpQuake - 500);
 place('bulwark', 200);
 sim.castSkill('bulwark', 'shield-breaker');
 check('shield-breaker locks the foe shield', has('foe', 'shield-breaker'));

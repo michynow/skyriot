@@ -81,6 +81,19 @@ export function hitShip(
     });
     return;
   }
+  // Evasion vs Secondary weapons: the hit misses outright (guns roll theirs when they fire).
+  if (p.kind !== 'tracer' && ctx.rng() < rec.mods.evasionAdv) {
+    ctx.events.push({
+      type: 'hit',
+      projectile,
+      attacker,
+      victim: s.id,
+      damage: 0,
+      deflected: true,
+      pos: [x, y, z],
+    });
+    return;
+  }
   const chance = Math.min(rec.fd.deflectChance, DEFLECT_CAP) + rec.mods.deflectAdd;
   const deflected = ctx.rng() < chance;
   let dmg = base;

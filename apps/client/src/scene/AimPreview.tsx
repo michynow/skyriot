@@ -4,13 +4,13 @@ import {
   AIR_BARRAGE_COUNT,
   AIR_BARRAGE_SPREAD_RAD,
   AIR_BARRAGE_RANGE_MUL,
-  AIR_BARRAGE_SPLASH_MUL,
+  AIR_BARRAGE_SPLASH_ADD_M,
   BOMB_DROP_SPEED,
   BOMB_FORWARD_KICK,
   BOMB_RANGE_MUL,
   BOMB_GRAVITY,
   FRAMES,
-  GROUND_STRIKE_SPLASH_MUL,
+  GROUND_STRIKE_SPLASH_ADD_M,
   GROUND_STRIKE_SPREAD_MPS,
   NOSE_OFFSET,
   TICK_DT,
@@ -209,7 +209,7 @@ export function AimPreview() {
       const d = Math.hypot(hit[0]! - own.pos[0], hit[1]! - own.pos[1], hit[2]! - own.pos[2]);
       opacity = Math.min(Math.max((d - FADE_NEAR_M) / (FADE_FAR_M - FADE_NEAR_M), 0), 1);
       // The stick fans sideways at +-GROUND_STRIKE_SPREAD_MPS: cover the outer bombs' blasts too.
-      radius = w.splashRadius * GROUND_STRIKE_SPLASH_MUL + GROUND_STRIKE_SPREAD_MPS * hit[3]!;
+      radius = w.splashRadius + GROUND_STRIKE_SPLASH_ADD_M + GROUND_STRIKE_SPREAD_MPS * hit[3]!;
       flat = true;
     } else if (mode === 'air-barrage-mode') {
       const nose = fd.halfLength + NOSE_OFFSET;
@@ -230,7 +230,7 @@ export function AimPreview() {
         mode === 'air-barrage-mode'
           ? d * AIR_BARRAGE_SPREAD_RAD * ((AIR_BARRAGE_COUNT - 1) / 2)
           : 0;
-      radius = w.splashRadius * AIR_BARRAGE_SPLASH_MUL + fan;
+      radius = w.splashRadius + AIR_BARRAGE_SPLASH_ADD_M + fan;
     } else return;
 
     const camD = camera.position.distanceTo(sight.position.set(hit[0]!, hit[1]!, hit[2]!));

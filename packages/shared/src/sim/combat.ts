@@ -18,7 +18,7 @@ import {
   AIR_BARRAGE_COUNT,
   AIR_BARRAGE_DAMAGE_MUL,
   AIR_BARRAGE_SPREAD_RAD,
-  AIR_BARRAGE_SPLASH_MUL,
+  AIR_BARRAGE_SPLASH_ADD_M,
   GROUND_STRIKE_COUNT,
   GROUND_STRIKE_DAMAGE_MUL,
   GROUND_STRIKE_SPREAD_MPS,
@@ -30,7 +30,7 @@ import {
   BOMB_ARM_SEC,
   MISSILE_SALVO_SPREAD_RAD,
   GROUND_STRIKE_GROUND_MUL,
-  GROUND_STRIKE_SPLASH_MUL,
+  GROUND_STRIKE_SPLASH_ADD_M,
   NAV_MAX_LEAD_SEC,
   ROCKET_WOBBLE_AMP_M,
   ROCKET_WOBBLE_PERIOD_SEC,
@@ -308,7 +308,9 @@ function wideLockTargets(ctx: SimCtx, rec: ShipRec, sec: WeaponDef): void {
     _wideD.push(-1);
   }
   forwardOf(s.rot, _f);
-  const cosCone = Math.cos(sec.validAngleDeg * DEG * rec.mods.lockConeMul);
+  const cosCone = Math.cos(
+    (sec.validAngleDeg * rec.mods.lockConeMul + rec.mods.validAngleAddDeg) * DEG,
+  );
   const range = advRadar(rec);
   for (const o of ctx.recList) {
     const os = o.state;
@@ -339,7 +341,9 @@ function stdRadar(rec: ShipRec): number {
 /** ADV radar (m): Wide Lock Mode stretches it. */
 function advRadar(rec: ShipRec): number {
   return (
-    rec.fd.radarAdvM * (rec.state.toggles.bombing === 'wide-lock-mode' ? WIDE_LOCK_RANGE_MUL : 1)
+    rec.fd.radarAdvM *
+    rec.mods.advRangeMul *
+    (rec.state.toggles.bombing === 'wide-lock-mode' ? WIDE_LOCK_RANGE_MUL : 1)
   );
 }
 
@@ -348,6 +352,7 @@ function validAngle(rec: ShipRec, sec: WeaponDef): number {
   const s = rec.state;
   return (
     (sec.validAngleDeg * rec.mods.lockConeMul * (s.sieged ? siegeLockConeMul(s) : 1) +
+      rec.mods.validAngleAddDeg +
       TARGETING.lockToleranceDeg) *
     DEG
   );
@@ -584,9 +589,11 @@ function stepPrimary(ctx: SimCtx, rec: ShipRec, w: WeaponDef, fire: boolean): vo
   // An armed Primary shot (consumed by this pattern's first round).
   const shotMul = rec.mods.primaryShotMul;
   const charged = shotMul !== 1;
+  const shotSplash = rec.mods.primaryShotSplashM;
   if (charged) {
     dropBuffs(s, (e) => e.primaryShotMul !== undefined);
     rec.mods.primaryShotMul = 1;
+    rec.mods.primaryShotSplashM = 0;
   }
   const range = w.rangeM * (mods ? mods.rangeMul : 1);
   const damage =
@@ -598,9 +605,12 @@ function stepPrimary(ctx: SimCtx, rec: ShipRec, w: WeaponDef, fire: boolean): vo
     const falloffRange = range * (charged ? CHARGED_SHOT_RANGE_MUL : 1);
     if (gunLock) chance = 1;
     else if (targetCos(s) >= Math.cos(TARGETING.stdConeRad))
-      chance =
-        (w.accuracy + rec.mods.accuracyAdd) *
-        (_td > falloffRange ? TARGETING.falloffBase ** ((_td / falloffRange - 1) * 100) : 1);
+      chance = charged
+        ? 1
+        : Math.max(
+            w.accuracy + rec.mods.accuracyAdd - (ctx.ships.get(_tgt.id)?.mods.evasionStd ?? 0),
+            0,
+          ) * (_td > falloffRange ? TARGETING.falloffBase ** ((_td / falloffRange - 1) * 100) : 1);
     if (s.sieged && s.grounded && _td < SIEGE.minRangeM) chance = 0;
     if (s.sieged && !s.grounded && (_ty - s.pos[1]) / _td < -Math.sin(SIEGE_AIR.maxDepressionRad))
       chance = 0;
@@ -625,7 +635,7 @@ function stepPrimary(ctx: SimCtx, rec: ShipRec, w: WeaponDef, fire: boolean): vo
       w.kind,
       w.id,
       damage * roll * (charged && k === 0 ? shotMul : 1),
-      w.splashRadius * rec.mods.splashMul,
+      (charged && k === 0 && shotSplash > 0 ? shotSplash : w.splashRadius) * rec.mods.splashMul,
       w.speed,
       hit ? Math.max(range, _ll + 1) : range,
       0,
@@ -752,7 +762,7 @@ function volley(ctx: SimCtx, rec: ShipRec, w: WeaponDef, rewind: number): void {
     _ly /= _ll;
     _lz /= _ll;
   }
-  const count = Math.min(w.pattern.count, s.ammo2);
+  const count = Math.min(w.pattern.count + (missile ? rec.mods.salvoCountAdd : 0), s.ammo2);
   s.ammo2 -= count;
   _ids.length = 0;
   for (let k = 0; k < count; k++) {
@@ -850,7 +860,7 @@ function fireLockless(
           rec.mods.damageMul *
           slotMul *
           (mods ? mods.damageMul : 1),
-        w.splashRadius * AIR_BARRAGE_SPLASH_MUL * rec.mods.splashMul,
+        (w.splashRadius + AIR_BARRAGE_SPLASH_ADD_M) * rec.mods.splashMul,
         w.speed,
         w.rangeM * AIR_BARRAGE_RANGE_MUL * (mods ? mods.rangeMul : 1),
         0,
@@ -934,7 +944,7 @@ function fireLockless(
           rec.mods.damageMul *
           slotMul *
           (mods ? mods.damageMul : 1),
-        w.splashRadius * GROUND_STRIKE_SPLASH_MUL * rec.mods.splashMul,
+        (w.splashRadius + GROUND_STRIKE_SPLASH_ADD_M) * rec.mods.splashMul,
         bs,
         w.rangeM * BOMB_RANGE_MUL,
         0,
@@ -1140,8 +1150,7 @@ export function stepProjectiles(ctx: SimCtx): void {
         if (missile) {
           if (
             ts.rollTicks > 0 &&
-            (tl < MISSILE_EVADE.rollBreakDistM || tl <= p.speed * ROLL_EVADE_WINDOW_SEC) &&
-            !t.mods.missileBlind
+            (tl < MISSILE_EVADE.rollBreakDistM || tl <= p.speed * ROLL_EVADE_WINDOW_SEC)
           ) {
             broke = 'roll';
             // Spoofed: swerve away from the Target (tx,ty,tz point at it) so it overshoots instead of drifting in.
